@@ -14,9 +14,9 @@ target("eirin_fixed.benchmark")
     if is_os("linux") then
         add_cxxflags("-Wmaybe-uninitialized", {force = true})
     end
-    after_build(function(target)
-        os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
-    end)
+    -- after_build(function(target)
+    --     os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
+    -- end)
 
 if has_config("eirin_build_advanced_benchmark") and get_config("eirin_build_advanced_benchmark") == true then
     target("eirin_fixed.perf")
@@ -30,9 +30,9 @@ if has_config("eirin_build_advanced_benchmark") and get_config("eirin_build_adva
         if is_os("linux") then
             add_cxxflags("-Wmaybe-uninitialized", {force = true})
         end
-        after_build(function(target)
-            os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
-        end)
+        -- after_build(function(target)
+        --     os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
+        -- end)
 
     target("eirin_fixed.accuracy")
         set_kind("binary")
@@ -45,9 +45,9 @@ if has_config("eirin_build_advanced_benchmark") and get_config("eirin_build_adva
         if is_os("linux") then
             add_cxxflags("-Wmaybe-uninitialized", {force = true})
         end
-        after_build(function(target)
-            os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
-        end)
+        -- after_build(function(target)
+        --     os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
+        -- end)
 end
 
 target("double.benchmark")
@@ -64,6 +64,6 @@ target("double.benchmark")
     if is_os("linux") then
         add_cxxflags("-Wmaybe-uninitialized", {force = true})
     end
-    after_build(function(target)
-        os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
-    end)
+    -- after_build(function(target)
+    --     os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
+    -- end)

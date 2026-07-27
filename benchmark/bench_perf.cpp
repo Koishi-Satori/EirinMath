@@ -23,15 +23,13 @@ using namespace eirin;
 
 static void taylor_sin(benchmark::State& state)
 {
-#    ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_sin");
-    auto fp1 = f64_identity(operator""_f64(value.c_str(), value.size()));
-#    else
-    auto fp1 = f64_identity("11.4514"_f64);
-#    endif
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        auto result = f64_identity(sin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = sin(input);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -39,15 +37,13 @@ static void taylor_sin(benchmark::State& state)
 
 static void cordic_sin(benchmark::State& state)
 {
-#    ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_sin");
-    auto fp1 = f64_identity(operator""_f64(value.c_str(), value.size()));
-#    else
-    auto fp1 = f64_identity("11.4514"_f64);
-#    endif
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        auto result = f64_identity(cordic_sine(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = cordic_sine(input);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -55,15 +51,13 @@ static void cordic_sin(benchmark::State& state)
 
 static void lut_sin(benchmark::State& state)
 {
-#    ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_sin");
-    auto fp1 = f64_identity(operator""_f64(value.c_str(), value.size()));
-#    else
-    auto fp1 = f64_identity("11.4514"_f64);
-#    endif
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        auto result = f64_identity(util::lut::lut_calc_sin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = util::lut::lut_calc_sin(input);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -71,24 +65,22 @@ static void lut_sin(benchmark::State& state)
 
 static void double_sin(benchmark::State& state)
 {
-#    ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_sin");
-    auto double_val = std::stod(value);
-#    else
-    double double_val = 11.1514;
-#    endif
+    double double_val = state.range(0) / 1000.0;
     for(auto _ : state)
     {
-        auto result = db_identity(std::sin(double_val));
+        auto input = double_val;
+        benchmark::DoNotOptimize(input);
+
+        auto result = std::sin(double_val);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
 }
 
-BENCHMARK(taylor_sin);
-BENCHMARK(cordic_sin);
-BENCHMARK(lut_sin);
-BENCHMARK(double_sin);
+BENCHMARK(taylor_sin)->Args({BENCH_F64_VAL(11.4514)});
+BENCHMARK(cordic_sin)->Args({BENCH_F64_VAL(11.4514)});
+BENCHMARK(lut_sin)->Args({BENCH_F64_VAL(11.4514)});
+BENCHMARK(double_sin)->Args({114514});
 
 // 参数化基准测试模板
 template <typename SinFunc>

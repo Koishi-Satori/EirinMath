@@ -3,7 +3,6 @@
 #include <eirin/ext/cordic.hpp>
 #include <eirin/detail/util.hpp>
 #include <benchmark/benchmark.h>
-#include "bench.hpp"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -194,9 +193,9 @@ private:
             // 参考值（标准库）
             double ref = std::sin(x);
             
-            // 转换为您的f64_identity类型
+            // convert to fixed64
             std::string x_str = std::to_string(x);
-            auto fp_x = f64_identity(operator""_f64(x_str.c_str(), x_str.size()));
+            auto fp_x = operator""_f64(x_str.c_str(), x_str.size());
             
             // 计算各个实现的结果
             double taylor_result = (double) sin(fp_x);

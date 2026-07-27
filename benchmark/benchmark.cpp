@@ -1,8 +1,8 @@
 #include <eirin/fixed.hpp>
 #include <eirin/math.hpp>
 #include <benchmark/benchmark.h>
-#include "bench.hpp"
 #include <eirin/ext/cordic.hpp>
+#include <bench.hpp>
 
 // on windows/msvc, -Wmaybe-uninitialized is not available
 // so we can use #pragma to ignore the warning there
@@ -15,435 +15,557 @@
 
 using namespace eirin;
 
-#ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-
-[[maybe_unused]] static void test_input(benchmark::State& state)
-{
-    auto str = get_input("input", "test_key");
-    fixed32 fp = 0_f32;
-    for(auto _ : state)
-    {
-        fixed_from_cstring(str.c_str(), str.size(), fp);
-        benchmark::DoNotOptimize(fp);
-    }
-    // printf("%f\n", (double)fp);
-}
-
-#endif
-
 static void f32_create(benchmark::State& state)
 {
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_create");
-    #endif
+    double arg = state.range(0);
     for(auto _ : state)
     {
-        #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-        auto fp1 = f32_identity(operator""_f32(value.c_str(), value.size()));
-        #else
-        auto fp1 = f32_identity("1145.14"_f32);
-        #endif
-        (void)fp1;
+        auto input = arg;
+        benchmark::DoNotOptimize(input);
+
+        auto result = fixed32(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_divide(benchmark::State& state)
 {
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value_1 = get_input("input", "test_divide_1");
-    auto value_2 = get_input("input", "test_divide_2");
-    auto fp1 = operator""_f32(value_1.c_str(), value_1.size());
-    auto fp2 = operator""_f32(value_2.c_str(), value_2.size());
-    #else
-    auto fp1 = f32_identity("4.95"_f32);
-    auto fp2 = f32_identity("1145.14"_f32);
-    #endif
+    auto fp1 = F32_FROM_BENCH(0);
+    auto fp2 = F32_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f32_identity(fp1 /= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 / input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_multiple(benchmark::State& state)
 {
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value_1 = get_input("input", "test_multiple_1");
-    auto value_2 = get_input("input", "test_multiple_2");
-    auto fp1 = operator""_f32(value_1.c_str(), value_1.size());
-    auto fp2 = operator""_f32(value_2.c_str(), value_2.size());
-    #else
     auto fp1 = "4.95"_f32;
-    auto fp2 = f32_identity("1145.14"_f32);
-    #endif
+    auto fp2 = "1145.14"_f32;
     for(auto _ : state)
     {
-        f32_identity(fp1 *= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 * input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_add(benchmark::State& state)
 {
     auto fp1 = "4.95"_f32;
-    auto fp2 = f32_identity("1145.14"_f32);
+    auto fp2 = "1145.14"_f32;
     for(auto _ : state)
     {
-        f32_identity(fp1 += fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 + input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_minus(benchmark::State& state)
 {
     auto fp1 = "4.95"_f32;
-    auto fp2 = f32_identity("1145.14"_f32);
+    auto fp2 = "1145.14"_f32;
     for(auto _ : state)
     {
-        f32_identity(fp1 -= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 - input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_sqrt(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(sqrt(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = sqrt(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_log2(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(log2(fp1));
+        auto result = log2(fp1);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_log(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(log(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = log(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_log10(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(log10(fp1));
+        auto result = log10(fp1);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_exp(benchmark::State& state)
 {
-    auto fp1 = f32_identity("11.4514"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(exp(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = exp(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_pow(benchmark::State& state)
 {
-    auto fp1 = f32_identity("11.4514"_f32);
-    auto fp2 = f32_identity("3.5"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
+    auto fp2 = F32_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f32_identity(pow(fp1, fp2));
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = pow(input1, input2);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_sin(benchmark::State& state)
 {
-
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_create");
-    auto fp1 = f32_identity(operator""_f32(value.c_str(), value.size()));
-    #else
-    auto fp1 = f32_identity("1145.14"_f32);
-    #endif
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(sin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = sin(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_cos(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(cos(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = cos(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_tan(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(tan(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = tan(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_atan(benchmark::State& state)
 {
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_atan");
-    auto fp1 = f32_identity(operator""_f32(value.c_str(), value.size()));
-    #else
-    auto fp1 = f32_identity("1145.14"_f32);
-    #endif
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(atan(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = atan(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_asin(benchmark::State& state)
 {
-    auto fp1 = f32_identity("0.5"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(asin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = asin(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_acos(benchmark::State& state)
 {
-    auto fp1 = f32_identity("0.5"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(acos(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = acos(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f32_cordic_sin(benchmark::State& state)
 {
-    auto fp1 = f32_identity("1145.14"_f32);
+    auto fp1 = F32_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f32_identity(cordic_sine(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = cordic_sine(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 #ifdef EIRIN_MATH_HAS_INT128
 static void f64_create(benchmark::State& state)
 {
+    double arg = state.range(0);
     for(auto _ : state)
     {
-        auto fp1 = f64_identity(1145.14_f64);
-        (void)fp1;
+        auto input = arg;
+        benchmark::DoNotOptimize(input);
+
+        auto fp1 = fixed64(input);
+        benchmark::DoNotOptimize(fp1);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_divide(benchmark::State& state)
 {
-    auto fp1 = 1145.14_f64;
-    auto fp2 = f64_identity("4.95"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f64_identity(fp1 /= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 / input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_multiple(benchmark::State& state)
 {
-    auto fp1 = "1145.14"_f64;
-    auto fp2 = f64_identity("4.95"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f64_identity(fp1 *= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 * input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_add(benchmark::State& state)
 {
-    auto fp1 = "1145.14"_f64;
-    auto fp2 = f64_identity("4.95"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f64_identity(fp1 += fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 + input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_minus(benchmark::State& state)
 {
-    auto fp1 = "1145.14"_f64;
-    auto fp2 = f64_identity("4.95"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f64_identity(fp1 -= fp2);
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = input1 - input2;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_sqrt(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(sqrt(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = sqrt(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_log2(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(log2(fp1));
+        auto result = log2(fp1);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_log(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(log(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = log(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_log10(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(log10(fp1));
+        auto result = log10(fp1);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_exp(benchmark::State& state)
 {
-    auto fp1 = f64_identity("11.4514"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(exp(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = exp(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_pow(benchmark::State& state)
 {
-    auto fp1 = f64_identity("11.4514"_f64);
-    auto fp2 = "3.5"_f64;
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        f64_identity(pow(fp1, fp2));
+        auto input1 = fp1, input2 =  fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = pow(input1, input2);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_sin(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(sin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = sin(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_cos(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(cos(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = cos(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_tan(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(tan(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = tan(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_atan(benchmark::State& state)
 {
-    #ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-    auto value = get_input("input", "test_atan");
-    auto fp1 = f64_identity(operator""_f64(value.c_str(), value.size()));
-    #else
-    auto fp1 = f64_identity("0.5"_f64);
-    #endif
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(atan(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = atan(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_asin(benchmark::State& state)
 {
-    auto fp1 = f64_identity("0.5"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(asin(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = asin(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_acos(benchmark::State& state)
 {
-    auto fp1 = f64_identity("0.5"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(acos(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = acos(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 
 static void f64_cordic_sin(benchmark::State& state)
 {
-    auto fp1 = f64_identity("1145.14"_f64);
+    auto fp1 = F64_FROM_BENCH(0);
     for(auto _ : state)
     {
-        f64_identity(cordic_sine(fp1));
+        auto input = fp1;
+        benchmark::DoNotOptimize(input);
+
+        auto result = cordic_sine(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
     }
 }
 #endif
 
-#ifdef EIRIN_BENCHMARK_FILE_INPUT_MODE
-BENCHMARK(test_input);
-#endif
-BENCHMARK(f32_create);
-BENCHMARK(f32_divide);
-BENCHMARK(f32_multiple);
-BENCHMARK(f32_add);
-BENCHMARK(f32_minus);
-BENCHMARK(f32_sqrt);
-BENCHMARK(f32_log2);
-BENCHMARK(f32_log);
-BENCHMARK(f32_log10);
-BENCHMARK(f32_exp);
-BENCHMARK(f32_pow);
-BENCHMARK(f32_sin);
-BENCHMARK(f32_cos);
-BENCHMARK(f32_tan);
-BENCHMARK(f32_atan);
-BENCHMARK(f32_acos);
-BENCHMARK(f32_asin);
-BENCHMARK(f32_cordic_sin);
+BENCHMARK(f32_create)->Args({1145});
+BENCHMARK(f32_divide)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_multiple)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_add)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_minus)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_sqrt)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_log2)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_log)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_log10)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_exp)->Args({BENCH_F32_VAL(11.4514)});
+BENCHMARK(f32_pow)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
+BENCHMARK(f32_sin)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_cos)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_tan)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_atan)->Args({BENCH_F32_VAL(0.5)});
+BENCHMARK(f32_acos)->Args({BENCH_F32_VAL(0.5)});
+BENCHMARK(f32_asin)->Args({BENCH_F32_VAL(0.5)});
+BENCHMARK(f32_cordic_sin)->Args({BENCH_F32_VAL(1145.14)});
 #ifdef EIRIN_MATH_HAS_INT128
-BENCHMARK(f64_create);
-BENCHMARK(f64_divide);
-BENCHMARK(f64_multiple);
-BENCHMARK(f64_add);
-BENCHMARK(f64_minus);
-BENCHMARK(f64_sqrt);
-BENCHMARK(f64_log2);
-BENCHMARK(f64_log);
-BENCHMARK(f64_log10);
-BENCHMARK(f64_exp);
-BENCHMARK(f64_pow);
-BENCHMARK(f64_sin);
-BENCHMARK(f64_cos);
-BENCHMARK(f64_tan);
-BENCHMARK(f64_atan);
-BENCHMARK(f64_acos);
-BENCHMARK(f64_asin);
-BENCHMARK(f64_cordic_sin);
+BENCHMARK(f64_create)->Args({1145});
+BENCHMARK(f64_divide)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
+BENCHMARK(f64_multiple)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
+BENCHMARK(f64_add)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
+BENCHMARK(f64_minus)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
+BENCHMARK(f64_sqrt)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_log2)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_log)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_log10)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_exp)->Args({BENCH_F64_VAL(11.4514)});
+BENCHMARK(f64_pow)->Args({BENCH_F64_VAL(11.4514), BENCH_F64_VAL(3.5)});
+BENCHMARK(f64_sin)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_cos)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_tan)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_atan)->Args({BENCH_F64_VAL(0.5)});
+BENCHMARK(f64_acos)->Args({BENCH_F64_VAL(0.5)});
+BENCHMARK(f64_asin)->Args({BENCH_F64_VAL(0.5)});
+BENCHMARK(f64_cordic_sin)->Args({BENCH_F64_VAL(1145.14)});
 #endif
 
 BENCHMARK_MAIN();
