@@ -31,7 +31,7 @@ namespace detail
 #define EIRIN_THROW_EXCEPTION(Exception, ...)                     \
     do {                                                          \
         ::eirin::detail::throw_exception<Exception>(__VA_ARGS__); \
-    } while(0);
+    } while(0)
 } // namespace eirin
 
 #endif

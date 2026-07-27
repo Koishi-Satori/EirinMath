@@ -45,14 +45,6 @@
     #define EIRIN_ARCH_UNKNOWN
 #endif
 
-// This feature is disabled now.
-// enable benchmark file input mode when on linux/windows/macos
-// #if defined(EIRIN_OS_LINUX) || defined(EIRIN_OS_WINDOWS) || defined(EIRIN_OS_MACOS)
-// #    define EIRIN_BENCHMARK_FILE_INPUT_MODE
-// #else
-// #    define EIRIN_BENCHMARK_COMMON_TEST_MODE
-// #endif
-
 // check if SIMD is enabled
 #ifdef __AVX2__
 #    define EIRIN_PLATFORM_HAS_SIMD
