@@ -9,6 +9,7 @@
 #include "macro.hpp"
 #include "numbers.hpp"
 #include "random.hpp"
+#include "vec.hpp"
 
 // IWYU pragma: end_exports
 

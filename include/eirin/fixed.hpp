@@ -415,26 +415,26 @@ public:
         return fixed_num(-m_value, raw_value_construct_tag{});
     }
 
-    inline fixed_num operator++() noexcept
+    constexpr inline fixed_num operator++() noexcept
     {
         m_value += Type(1) << fraction;
         return *this;
     }
 
-    inline fixed_num operator++(int) noexcept
+    constexpr inline fixed_num operator++(int) noexcept
     {
         fixed_num temp = *this;
         m_value += Type(1) << fraction;
         return temp;
     }
 
-    inline fixed_num operator--() noexcept
+    constexpr inline fixed_num operator--() noexcept
     {
         m_value -= Type(1) << fraction;
         return *this;
     }
 
-    inline fixed_num operator--(int) noexcept
+    constexpr inline fixed_num operator--(int) noexcept
     {
         fixed_num temp = *this;
         m_value -= Type(1) << fraction;
