@@ -410,6 +410,51 @@ public:
         return *this;
     }
 
+    // BEGIN bitwise
+    // Fixed point bitwise operation has no math meaning, but still need it.
+    // Just operate the internal representation can be good.
+
+    constexpr inline fixed_num operator^(const fixed_num& other) noexcept
+    {
+        return fixed_num(m_value ^ other.m_value, raw_value_construct_tag{});
+    }
+
+    constexpr inline fixed_num& operator^=(const fixed_num& other) noexcept
+    {
+        m_value ^= other.m_value;
+        return *this;
+    }
+
+    constexpr inline fixed_num operator&(const fixed_num& other) noexcept
+    {
+        return fixed_num(m_value & other.m_value, raw_value_construct_tag{});
+    }
+
+    constexpr inline fixed_num& operator&=(const fixed_num& other) noexcept
+    {
+        m_value &= other.m_value;
+        return *this;
+    }
+
+    constexpr inline fixed_num operator|(const fixed_num& other) noexcept
+    {
+        return fixed_num(m_value | other.m_value, raw_value_construct_tag{});
+    }
+
+    constexpr inline fixed_num& operator|=(const fixed_num& other) noexcept
+    {
+        m_value |= other.m_value;
+        return *this;
+    }
+
+    constexpr inline fixed_num& operator~() noexcept
+    {
+        m_value = ~m_value;
+        return *this;
+    }
+
+    // END bitwise
+
     constexpr inline fixed_num operator-() const noexcept
     {
         return fixed_num(-m_value, raw_value_construct_tag{});
@@ -446,6 +491,16 @@ public:
     constexpr std::strong_ordering operator<=>(const fixed_num& rhs) const noexcept
     {
         return m_value <=> rhs.m_value;
+    }
+
+    constexpr inline bool operator&&(const fixed_num& other) const noexcept
+    {
+        return m_value && other.m_value;
+    }
+
+    constexpr inline bool operator||(const fixed_num& other) const noexcept
+    {
+        return m_value || other.m_value;
     }
 
     /* nearly compare */
