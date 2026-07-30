@@ -89,6 +89,25 @@ namespace detail
     struct is_signed<detail::int128_t> : public std::true_type
     {};
 #endif
+
+    template <typename T>
+    struct __eval_max_bit_width_helper
+    {
+        EIRIN_ALWAYS_INLINE constexpr const std::size_t eval() const noexcept
+        {
+            if constexpr (std::numeric_limits<T>::is_specialized)
+            {
+                return std::numeric_limits<T>::digits;
+            }
+            else
+            {
+                return sizeof(T) * 8 - 1;
+            }
+        }
+    };
+
+    template <typename T>
+    constexpr inline std::size_t eval_max_bit_width = __eval_max_bit_width_helper<T>::eval();
 } // namespace detail
 
 template <typename Type, unsigned int fraction>
@@ -280,6 +299,21 @@ public:
         return m_value % (static_cast<Type>(1) << fraction);
     }
 
+    template <bool IgnoreSignBit = true>
+    EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
+    {
+        if constexpr (!IgnoreSignBit)
+            return sizeof(Type);
+        const Type mask = m_value >> (sizeof(Type) * 8 - 1);
+        Type u_value = (m_value ^ mask) - mask;
+        for (int i = sizeof(Type) * 8 - 1; i >= 1; --i)
+        {
+            if ((u_value >> static_cast<Type>(i)) & static_cast<Type>(0x1))
+                return i + 1;
+        }
+        return 0;
+    }
+
     /* operator override functions */
 
     fixed_num& operator=(const fixed_num&) noexcept = default;
@@ -414,7 +448,7 @@ public:
     // Fixed point bitwise operation has no math meaning, but still need it.
     // Just operate the internal representation can be good.
 
-    constexpr inline fixed_num operator^(const fixed_num& other) noexcept
+    constexpr inline fixed_num operator^(const fixed_num& other) const noexcept
     {
         return fixed_num(m_value ^ other.m_value, raw_value_construct_tag{});
     }
@@ -425,7 +459,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num operator&(const fixed_num& other) noexcept
+    constexpr inline fixed_num operator&(const fixed_num& other) const noexcept
     {
         return fixed_num(m_value & other.m_value, raw_value_construct_tag{});
     }
@@ -436,7 +470,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num operator|(const fixed_num& other) noexcept
+    constexpr inline fixed_num operator|(const fixed_num& other) const noexcept
     {
         return fixed_num(m_value | other.m_value, raw_value_construct_tag{});
     }
@@ -452,6 +486,59 @@ public:
         m_value = ~m_value;
         return *this;
     }
+    /**
+     * @brief Left Shifting the internal representation of the fixed point with val bits.
+     *        To be noticed that, this operator does not checks overflow and range of n bits.
+     * @see shl
+     * 
+     * @param val n bits to left shift.
+     * @return constexpr fixed_num compute result.
+     */
+    constexpr inline fixed_num operator<<(const std::integral auto& val) const noexcept
+    {
+        return fixed_num(m_value << val, raw_value_construct_tag{});
+    }
+
+    /**
+     * @brief Left Shifting the internal representation of the fixed point with val bits.
+     *        To be noticed that, this operator does not checks overflow and range of n bits.
+     * @see shl_by
+     * 
+     * @param val n bits to left shift.
+     * @return constexpr fixed_num compute result.
+     */
+    constexpr inline fixed_num& operator<<=(const std::integral auto& val) noexcept
+    {
+        m_value <<= val;
+        return *this;
+    }
+
+    /**
+     * @brief Right Shifting the internal representation of the fixed point with val bits.
+     *        To be noticed that, this operator does not checks overflow and range of n bits.
+     * @see shr
+     * 
+     * @param val n bits to right shift.
+     * @return constexpr fixed_num compute result.
+     */
+    constexpr inline fixed_num operator>>(const std::integral auto& val) const noexcept
+    {
+        return fixed_num(m_value >> val, raw_value_construct_tag{});
+    }
+
+    /**
+     * @brief Right Shifting the internal representation of the fixed point with val bits.
+     *        To be noticed that, this operator does not checks overflow and range of n bits.
+     * @see shr_by
+     * 
+     * @param val n bits to right shift.
+     * @return constexpr fixed_num compute result.
+     */
+    constexpr inline fixed_num& operator>>=(const std::integral auto& val) noexcept
+    {
+        m_value >>= val;
+        return *this;
+    }
 
     // END bitwise
 
@@ -460,7 +547,7 @@ public:
         return fixed_num(-m_value, raw_value_construct_tag{});
     }
 
-    constexpr inline fixed_num operator++() noexcept
+    constexpr inline fixed_num& operator++() noexcept
     {
         m_value += Type(1) << fraction;
         return *this;
@@ -473,7 +560,7 @@ public:
         return temp;
     }
 
-    constexpr inline fixed_num operator--() noexcept
+    constexpr inline fixed_num& operator--() noexcept
     {
         m_value -= Type(1) << fraction;
         return *this;
@@ -703,6 +790,56 @@ public:
         {
             m_value = static_cast<Type>((static_cast<IntermediateType>(m_value) << fraction) / other.m_value);
         }
+        return *this;
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr fixed_num shl(const std::integral auto& val) const
+    {
+        if(val < 0) [[unlikely]]
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+        auto n_bits = static_cast<decltype(val)>(bit_width());
+        constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
+        if (val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        if (n_bits != 0 && n_bits + val > max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "will cause overflow after left shifts n bits.");
+        return fixed_num(m_value << val, raw_value_construct_tag{});
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& shl_by(const std::integral auto& val)
+    {
+        if(val < 0) [[unlikely]]
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+        auto n_bits = static_cast<decltype(val)>(bit_width());
+        constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
+        if (val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        if (n_bits != 0 && n_bits + val > max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "will cause overflow after left shifts n bits.");
+        m_value <<= val;
+        return *this;
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr fixed_num shr(const std::integral auto& val) const
+    {
+        if(val < 0) [[unlikely]]
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+        auto n_bits = static_cast<decltype(val)>(bit_width());
+        constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
+        if (val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        return fixed_num(m_value >> val, raw_value_construct_tag{});
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& shr_by(const std::integral auto& val) const
+    {
+        if(val < 0) [[unlikely]]
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+        auto n_bits = static_cast<decltype(val)>(bit_width());
+        constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
+        if (val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        m_value >>= val;
         return *this;
     }
 

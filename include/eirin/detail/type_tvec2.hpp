@@ -5,6 +5,8 @@
 
 #include <limits>
 #include <eirin/detail/type_tvec.hpp>
+#include <eirin/detail/type_tvec3.hpp>
+#include <eirin/detail/type_tvec4.hpp>
 #include <eirin/detail/compute_vec_rel.hpp>
 
 namespace eirin
@@ -13,6 +15,8 @@ template <typename T>
 struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
 {
     using value_type = T;
+    using type = tvec<2, T>;
+    using bool_type = tvec<2, bool>;
 
     // union data_type
     // {
@@ -29,9 +33,24 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
         : x(scalar), y(scalar){};
     EIRIN_ALWAYS_INLINE constexpr tvec(T _x, T _y)
         : x(_x), y(_y){};
+
+    /// Explicit conversions (like GLSL)
+    /// Explicit construct from x,y
     template <typename A, typename B>
     EIRIN_ALWAYS_INLINE constexpr tvec(A _x, B _y)
         : x(static_cast<T>(_x)), y(static_cast<T>(_y)){};
+    /// Explicit construct from xy
+    template <typename A>
+    EIRIN_ALWAYS_INLINE constexpr tvec(tvec<2, A> _xy)
+        : x(static_cast<T>(_xy.x)), y(static_cast<T>(_xy.y)){};
+    /// Explicit construct from xyz
+    template <typename A>
+    EIRIN_ALWAYS_INLINE constexpr tvec(tvec<3, A> _xyz)
+        : x(static_cast<T>(_xyz.x)), y(static_cast<T>(_xyz.y)){};
+    /// Explicit construct from xyzw
+    template <typename A>
+    EIRIN_ALWAYS_INLINE constexpr tvec(tvec<4, A> _xyzw)
+        : x(static_cast<T>(_xyzw.x)), y(static_cast<T>(_xyzw.y)){};
 
     tvec& operator=(const tvec& other) noexcept = default;
 
@@ -56,10 +75,26 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
     }
 
     template <typename U>
+    constexpr inline tvec& operator+=(U scalar) noexcept
+    {
+        this->x += static_cast<T>(scalar);
+        this->y += static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
     constexpr inline tvec& operator+=(const tvec<2, U>& rhs) noexcept
     {
         this->x += static_cast<T>(rhs.x);
         this->y += static_cast<T>(rhs.y);
+        return *this;
+    }
+
+    template <typename U>
+    constexpr inline tvec& operator-=(U scalar) noexcept
+    {
+        this->x -= static_cast<T>(scalar);
+        this->y -= static_cast<T>(scalar);
         return *this;
     }
 
@@ -72,10 +107,26 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
     }
 
     template <typename U>
+    constexpr inline tvec& operator*=(U scalar) noexcept
+    {
+        this->x *= static_cast<T>(scalar);
+        this->y *= static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
     constexpr inline tvec& operator*=(const tvec<2, U>& rhs) noexcept
     {
         this->x *= static_cast<T>(rhs.x);
         this->y *= static_cast<T>(rhs.y);
+        return *this;
+    }
+
+    template <typename U>
+    constexpr inline tvec& operator/=(U scalar) noexcept
+    {
+        this->x /= static_cast<T>(scalar);
+        this->y /= static_cast<T>(scalar);
         return *this;
     }
 
@@ -96,23 +147,31 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
 
     constexpr inline tvec& operator--() noexcept
     {
-        ++this->x;
-        ++this->y;
+        --this->x;
+        --this->y;
         return *this;
     }
 
-    constexpr inline tvec& operator++(int) noexcept
+    constexpr inline tvec operator++(int) noexcept
     {
         tvec res(*this);
         ++*this;
         return res;
     }
 
-    constexpr inline tvec& operator--(int) noexcept
+    constexpr inline tvec operator--(int) noexcept
     {
         tvec res(*this);
         --*this;
         return res;
+    }
+
+    template <typename U>
+    constexpr inline tvec operator%=(U scalar) noexcept
+    {
+        this->x %= static_cast<T>(scalar);
+        this->y %= static_cast<T>(scalar);
+        return *this;
     }
 
     template <typename U>
@@ -124,34 +183,92 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
     }
 
     template <typename U>
-    requires detail::has_operator_bit_xor<U>
-    constexpr inline tvec& operator^=(const tvec& rhs) noexcept
+    constexpr inline tvec& operator^=(U scalar) noexcept
     {
-        x ^= rhs.x;
-        y ^= rhs.y;
+        this->x ^= static_cast<T>(scalar);
+        this->y ^= static_cast<T>(scalar);
         return *this;
     }
 
     template <typename U>
-    requires detail::has_operator_bit_and<U>
-    constexpr inline tvec& operator&=(const tvec& rhs) noexcept
+    requires detail::has_operator_bit_xor<U> && detail::has_operator_bit_xor<T>
+    constexpr inline tvec& operator^=(const tvec<2, U>& rhs) noexcept
     {
-        x &= rhs.x;
-        y &= rhs.y;
+        this->x ^= rhs.x;
+        this->y ^= rhs.y;
         return *this;
     }
 
     template <typename U>
-    requires detail::has_operator_bit_or<U>
-    constexpr inline tvec& operator|=(const tvec& rhs) noexcept
+    constexpr inline tvec& operator&=(U scalar) noexcept
     {
-        x |= rhs.x;
-        y |= rhs.y;
+        this->x &= static_cast<T>(scalar);
+        this->y &= static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
+    requires detail::has_operator_bit_and<U> && detail::has_operator_bit_xor<T>
+    constexpr inline tvec& operator&=(const tvec<2, U>& rhs) noexcept
+    {
+        this->x &= rhs.x;
+        this->y &= rhs.y;
+        return *this;
+    }
+
+    template <typename U>
+    constexpr inline tvec& operator|=(U scalar) noexcept
+    {
+        this->x |= static_cast<T>(scalar);
+        this->y |= static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
+    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    constexpr inline tvec& operator|=(const tvec<2, U>& rhs) noexcept
+    {
+        this->x |= rhs.x;
+        this->y |= rhs.y;
+        return *this;
+    }
+
+    template <typename U>
+    constexpr inline tvec& operator<<=(U scalar) noexcept
+    {
+        this->x <<= static_cast<T>(scalar);
+        this->y <<= static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
+    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    constexpr inline tvec& operator<<=(const tvec<2, U>& rhs) noexcept
+    {
+        this->x <<= rhs.x;
+        this->y <<= rhs.y;
+        return *this;
+    }
+
+    template <typename U>
+    constexpr inline tvec& operator>>=(U scalar) noexcept
+    {
+        this->x >>= static_cast<T>(scalar);
+        this->y >>= static_cast<T>(scalar);
+        return *this;
+    }
+
+    template <typename U>
+    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    constexpr inline tvec& operator>>=(const tvec<2, U>& rhs) noexcept
+    {
+        this->x >>= rhs.x;
+        this->y >>= rhs.y;
         return *this;
     }
 
     template <typename U = T>
-    requires detail::has_operator_bit_not<U>
+    requires detail::has_operator_bit_not<T> && std::same_as<U, T>
     constexpr inline tvec& operator~() noexcept
     {
         return tvec{~this->x, ~this->y};
@@ -164,14 +281,14 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
         return res;
     }
 
-    constexpr inline tvec<2, bool> operator&&(const tvec& rhs) noexcept
+    constexpr inline bool_type operator&&(const tvec& rhs) noexcept
     {
-        return tvec<2, bool>{this->x && rhs.x, this->y && rhs.y};
+        return bool_type{this->x && rhs.x, this->y && rhs.y};
     }
 
-    constexpr inline tvec<2, bool> operator||(const tvec& rhs) noexcept
+    constexpr inline bool_type operator||(const tvec& rhs) noexcept
     {
-        return tvec<2, bool>{this->x || rhs.x, this->y || rhs.y};
+        return bool_type{this->x || rhs.x, this->y || rhs.y};
     }
 };
 
@@ -203,12 +320,6 @@ constexpr inline tvec<2, T> operator+(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-constexpr inline tvec<2, T> operator+(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x + v2.x, v1.y + v2.y);
-}
-
-template <typename T>
 constexpr inline tvec<2, T> operator-(const tvec<2, T>& v, T scalar)
 {
     return tvec<2, T>(v.x - scalar, v.y - scalar);
@@ -218,12 +329,6 @@ template <typename T>
 constexpr inline tvec<2, T> operator-(T scalar, const tvec<2, T>& v)
 {
     return tvec<2, T>(scalar - v.x, scalar - v.y);
-}
-
-template <typename T>
-constexpr inline tvec<2, T> operator-(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x - v2.x, v1.y - v2.y);
 }
 
 template <typename T>
@@ -239,12 +344,6 @@ constexpr inline tvec<2, T> operator*(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-constexpr inline tvec<2, T> operator*(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x * v2.x, v1.y * v2.y);
-}
-
-template <typename T>
 constexpr inline tvec<2, T> operator/(const tvec<2, T>& v, T scalar)
 {
     return tvec<2, T>(v.x / scalar, v.y / scalar);
@@ -257,12 +356,6 @@ constexpr inline tvec<2, T> operator/(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-constexpr inline tvec<2, T> operator/(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x / v2.x, v1.y / v2.y);
-}
-
-template <typename T>
 constexpr inline tvec<2, T> operator%(const tvec<2, T>& v, T scalar)
 {
     return tvec<2, T>(v.x % scalar, v.y % scalar);
@@ -272,12 +365,6 @@ template <typename T>
 constexpr inline tvec<2, T> operator%(T scalar, const tvec<2, T>& v)
 {
     return tvec<2, T>(scalar % v.x, scalar % v.y);
-}
-
-template <typename T>
-constexpr inline tvec<2, T> operator%(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x % v2.x, v1.y % v2.y);
 }
 
 template <typename T>
@@ -295,13 +382,6 @@ constexpr inline tvec<2, T> operator^(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-requires detail::has_operator_bit_xor<T>
-constexpr inline tvec<2, T> operator^(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x ^ v2.x, v1.y ^ v2.y);
-}
-
-template <typename T>
 requires detail::has_operator_bit_and<T>
 constexpr inline tvec<2, T> operator&(const tvec<2, T>& v, T scalar)
 {
@@ -313,13 +393,6 @@ requires detail::has_operator_bit_and<T>
 constexpr inline tvec<2, T> operator&(T scalar, const tvec<2, T>& v)
 {
     return tvec<2, T>(scalar & v.x, scalar & v.y);
-}
-
-template <typename T>
-requires detail::has_operator_bit_and<T>
-constexpr inline tvec<2, T> operator&(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x & v2.x, v1.y & v2.y);
 }
 
 template <typename T>
@@ -337,13 +410,6 @@ constexpr inline tvec<2, T> operator|(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-requires detail::has_operator_bit_or<T>
-constexpr inline tvec<2, T> operator|(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x | v2.x, v1.y | v2.y);
-}
-
-template <typename T>
 requires detail::has_operator_left_shift<T>
 constexpr inline tvec<2, T> operator<<(const tvec<2, T>& v, T scalar)
 {
@@ -358,13 +424,6 @@ constexpr inline tvec<2, T> operator<<(T scalar, const tvec<2, T>& v)
 }
 
 template <typename T>
-requires detail::has_operator_left_shift<T>
-constexpr inline tvec<2, T> operator<<(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x << v2.x, v1.y << v2.y);
-}
-
-template <typename T>
 requires detail::has_operator_right_shift<T>
 constexpr inline tvec<2, T> operator>>(const tvec<2, T>& v, T scalar)
 {
@@ -376,13 +435,6 @@ requires detail::has_operator_right_shift<T>
 constexpr inline tvec<2, T> operator>>(T scalar, const tvec<2, T>& v)
 {
     return tvec<2, T>(scalar >> v.x, scalar >> v.y);
-}
-
-template <typename T>
-requires detail::has_operator_right_shift<T>
-constexpr inline tvec<2, T> operator>>(const tvec<2, T>& v1, const tvec<2, T>& v2)
-{
-    return tvec<2, T>(v1.x >> v2.x, v1.y >> v2.y);
 }
 
 template <typename T>

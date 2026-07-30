@@ -4,8 +4,9 @@
 #pragma once
 
 #include <cstddef>
-#include <eirin/macro.hpp>
 #include <type_traits>
+#include <eirin/macro.hpp>
+#include "eirin/fixed.hpp"
 
 namespace eirin
 {
@@ -69,6 +70,48 @@ struct tvec_base
         return tmp;
     }
 
+    constexpr inline Derived operator%(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp %= rhs;
+        return tmp;
+    }
+
+    constexpr inline Derived operator^(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp ^= rhs;
+        return tmp;
+    }
+
+    constexpr inline Derived operator&(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp ^= rhs;
+        return tmp;
+    }
+
+    constexpr inline Derived operator|(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp ^= rhs;
+        return tmp;
+    }
+
+    constexpr inline Derived operator<<(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp <<= rhs;
+        return tmp;
+    }
+
+    constexpr inline Derived operator>>(const Derived& rhs) const noexcept
+    {
+        Derived tmp(derived());
+        tmp >>= rhs;
+        return tmp;
+    }
+
     EIRIN_ALWAYS_INLINE constexpr value_type dot(const Derived& rhs) const noexcept
     {
         value_type res{0};
@@ -80,6 +123,19 @@ struct tvec_base
 
     EIRIN_ALWAYS_INLINE constexpr bool operator==(const Derived& rhs) const noexcept
     {
+        return derived() == rhs;
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr bool nearly_eq(const Derived& rhs) const noexcept
+    {
+        if constexpr (is_fixed_point_v<T>)
+        {
+            Derived tmp(derived());
+            for(std::size_t i = 0; i < size(); ++i)
+                if(tmp[i].nearly_eq(rhs[i]))
+                    return true;
+            return false;
+        }
         return derived() == rhs;
     }
 
