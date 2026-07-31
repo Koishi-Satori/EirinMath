@@ -17,6 +17,10 @@ template <typename T>
 using vec3 = tvec<3, T>;
 template <typename T>
 using vec4 = tvec<4, T>;
+using ivec2 = vec2<int>;
+using ivec4 = vec4<int>;
+using f32vec4 = vec4<fixed32>;
+using f64vec4 = vec4<fixed64>;
 } // namespace eirin
 
 #endif

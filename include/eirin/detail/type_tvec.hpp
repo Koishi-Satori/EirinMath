@@ -87,14 +87,14 @@ struct tvec_base
     constexpr inline Derived operator&(const Derived& rhs) const noexcept
     {
         Derived tmp(derived());
-        tmp ^= rhs;
+        tmp &= rhs;
         return tmp;
     }
 
     constexpr inline Derived operator|(const Derived& rhs) const noexcept
     {
         Derived tmp(derived());
-        tmp ^= rhs;
+        tmp |= rhs;
         return tmp;
     }
 
@@ -128,13 +128,13 @@ struct tvec_base
 
     EIRIN_ALWAYS_INLINE constexpr bool nearly_eq(const Derived& rhs) const noexcept
     {
-        if constexpr (is_fixed_point_v<T>)
+        if constexpr(is_fixed_point_v<T>)
         {
             Derived tmp(derived());
             for(std::size_t i = 0; i < size(); ++i)
-                if(tmp[i].nearly_eq(rhs[i]))
-                    return true;
-            return false;
+                if(!tmp[i].nearly_eq(rhs[i]))
+                    return false;
+            return true;
         }
         return derived() == rhs;
     }
@@ -150,6 +150,10 @@ private:
         return static_cast<const Derived&>(*this);
     }
 };
+
+#define EIRIN_TVEC2_2_MEMBERS(T, E0, E1)
+
+
 } // namespace eirin
 
 #endif

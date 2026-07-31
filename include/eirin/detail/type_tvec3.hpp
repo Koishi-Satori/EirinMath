@@ -8,6 +8,7 @@
 #include <eirin/detail/type_tvec2.hpp>
 #include <eirin/detail/type_tvec4.hpp>
 #include <eirin/detail/compute_vec_rel.hpp>
+#include <eirin/detail/vec_swizzle.hpp>
 
 namespace eirin
 {
@@ -19,6 +20,12 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     using bool_type = tvec<3, bool>;
 
     T x, y, z;
+
+#if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
+    EIRIN_TVEC_SWIZZLE3_4_MEMBERS_DECL(T, x, y, z)
+    EIRIN_TVEC_SWIZZLE3_3_MEMBERS_DECL(T, x, y, z)
+    EIRIN_TVEC_SWIZZLE3_2_MEMBERS_DECL(T, x, y, z)
+#endif
 
     EIRIN_ALWAYS_INLINE constexpr tvec() = default;
     EIRIN_ALWAYS_INLINE constexpr tvec(const tvec& v) = default;
@@ -57,13 +64,14 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     {
         switch(i)
         {
-        default:
         case 2:
             return z;
         case 1:
             return y;
         case 0:
             return x;
+        default:
+            EIRIN_UNREACHABLE;
         }
     }
 
@@ -71,13 +79,14 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     {
         switch(i)
         {
-        default:
         case 2:
             return z;
         case 1:
             return y;
         case 0:
             return x;
+        default:
+            EIRIN_UNREACHABLE;
         }
     }
 
@@ -91,7 +100,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator+=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator+=(U scalar) noexcept
     {
         this->x += static_cast<T>(scalar);
         this->y += static_cast<T>(scalar);
@@ -109,7 +118,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator-=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator-=(U scalar) noexcept
     {
         this->x -= static_cast<T>(scalar);
         this->y -= static_cast<T>(scalar);
@@ -127,7 +136,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator*=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator*=(U scalar) noexcept
     {
         this->x *= static_cast<T>(scalar);
         this->y *= static_cast<T>(scalar);
@@ -145,7 +154,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator/=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator/=(U scalar) noexcept
     {
         this->x /= static_cast<T>(scalar);
         this->y /= static_cast<T>(scalar);
@@ -193,7 +202,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator%=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator%=(U scalar) noexcept
     {
         this->x %= static_cast<T>(scalar);
         this->y %= static_cast<T>(scalar);
@@ -211,7 +220,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    constexpr inline tvec& operator^=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator^=(U scalar) noexcept
     {
         this->x ^= static_cast<T>(scalar);
         this->y ^= static_cast<T>(scalar);
@@ -223,14 +232,14 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     requires detail::has_operator_bit_xor<U> && detail::has_operator_bit_xor<T>
     constexpr inline tvec& operator^=(const tvec<3, U>& rhs) noexcept
     {
-        this->x ^= rhs.x;
-        this->y ^= rhs.y;
-        this->z ^= rhs.z;
+        this->x ^= static_cast<T>(rhs.x);
+        this->y ^= static_cast<T>(rhs.y);
+        this->z ^= static_cast<T>(rhs.z);
         return *this;
     }
 
     template <typename U>
-    constexpr inline tvec& operator&=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator&=(U scalar) noexcept
     {
         this->x &= static_cast<T>(scalar);
         this->y &= static_cast<T>(scalar);
@@ -239,17 +248,17 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    requires detail::has_operator_bit_and<U> && detail::has_operator_bit_xor<T>
+    requires detail::has_operator_bit_and<U> && detail::has_operator_bit_and<T>
     constexpr inline tvec& operator&=(const tvec<3, U>& rhs) noexcept
     {
-        this->x &= rhs.x;
-        this->y &= rhs.y;
-        this->z &= rhs.z;
+        this->x &= static_cast<T>(rhs.x);
+        this->y &= static_cast<T>(rhs.y);
+        this->z &= static_cast<T>(rhs.z);
         return *this;
     }
 
     template <typename U>
-    constexpr inline tvec& operator|=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator|=(U scalar) noexcept
     {
         this->x |= static_cast<T>(scalar);
         this->y |= static_cast<T>(scalar);
@@ -258,17 +267,17 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_or<T>
     constexpr inline tvec& operator|=(const tvec<3, U>& rhs) noexcept
     {
-        this->x |= rhs.x;
-        this->y |= rhs.y;
-        this->z |= rhs.z;
+        this->x |= static_cast<T>(rhs.x);
+        this->y |= static_cast<T>(rhs.y);
+        this->z |= static_cast<T>(rhs.z);
         return *this;
     }
 
     template <typename U>
-    constexpr inline tvec& operator<<=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator<<=(U scalar) noexcept
     {
         this->x <<= static_cast<T>(scalar);
         this->y <<= static_cast<T>(scalar);
@@ -277,17 +286,17 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    requires detail::has_operator_left_shift<U> && detail::has_operator_left_shift<T>
     constexpr inline tvec& operator<<=(const tvec<3, U>& rhs) noexcept
     {
-        this->x <<= rhs.x;
-        this->y <<= rhs.y;
-        this->z <<= rhs.z;
+        this->x <<= static_cast<T>(rhs.x);
+        this->y <<= static_cast<T>(rhs.y);
+        this->z <<= static_cast<T>(rhs.z);
         return *this;
     }
 
     template <typename U>
-    constexpr inline tvec& operator>>=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator>>=(U scalar) noexcept
     {
         this->x >>= static_cast<T>(scalar);
         this->y >>= static_cast<T>(scalar);
@@ -296,18 +305,18 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     }
 
     template <typename U>
-    requires detail::has_operator_bit_or<U> && detail::has_operator_bit_xor<T>
+    requires detail::has_operator_right_shift<U> && detail::has_operator_right_shift<T>
     constexpr inline tvec& operator>>=(const tvec<3, U>& rhs) noexcept
     {
-        this->x >>= rhs.x;
-        this->y >>= rhs.y;
-        this->z >>= rhs.z;
+        this->x >>= static_cast<T>(rhs.x);
+        this->y >>= static_cast<T>(rhs.y);
+        this->z >>= static_cast<T>(rhs.z);
         return *this;
     }
 
     template <typename U = T>
     requires detail::has_operator_bit_not<T> && std::same_as<U, T>
-    constexpr inline tvec operator~() noexcept
+    constexpr inline tvec operator~() const noexcept
     {
         return tvec{~this->x, ~this->y, ~this->z};
     }
@@ -330,6 +339,39 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
     {
         return bool_type{this->x || rhs.x, this->y || rhs.y, this->z || rhs.z};
     }
+
+        /* These functions are defined for conversion from swizzle_proxy to tvec. 
+       Should contains: +, -, *, /, %, ^, &, |, <<, >>
+    */
+#if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
+#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                     \
+        constexpr inline tvec& operator op##=(const tvec & rhs) noexcept \
+        {                                                                \
+            this->x op## = static_cast<T>(rhs.x);                        \
+            this->y op## = static_cast<T>(rhs.y);                        \
+            this->z op## = static_cast<T>(rhs.z);                        \
+            return *this;                                                \
+        }
+#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(op, name) \
+        template <typename U = T>                                       \
+        requires detail::has_operator_                                  \
+        ##name<T>&& std::same_as<U, T>                                  \
+            EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)
+
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(+)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(-)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(*)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(/)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(%)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(^, bit_xor)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(&, bit_and)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(|, bit_or)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(<<, left_shift)
+    EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(>>, right_shift)
+
+#    undef EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC
+#    undef EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE
+#endif
 };
 
 // unary operators for vec3
