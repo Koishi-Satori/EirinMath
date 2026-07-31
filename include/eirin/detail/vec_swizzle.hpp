@@ -90,7 +90,7 @@ struct swizzle_proxy
         }
 
     template <typename U>
-    requires swizzle_unique<N, E0, E1, E2, E3>
+    requires swizzle_unique<N, E0, E1, E2, E3> && (!detail::is_swizzle_proxy<U>)
     EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator=(const U scalar)
     {
         EIRIN_TVEC_SWIZZLE_PROXY_APPLY_SCALAR_IMPL(=, scalar);
@@ -98,10 +98,18 @@ struct swizzle_proxy
     }
 
     template <std::size_t VecN, typename U>
-    requires(VecN == N) && swizzle_unique<N, E0, E1, E2, E3>
+    requires(VecN >= N) && swizzle_unique<N, E0, E1, E2, E3>
     EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator=(const tvec<VecN, U>& vec)
     {
         EIRIN_TVEC_SWIZZLE_PROXY_APPLY_VECTOR_IMPL(=, vec);
+        return *this;
+    }
+
+    template <typename Proxy>
+    requires swizzle_unique<N, E0, E1, E2, E3> && (detail::is_swizzle_proxy<Proxy>)
+    EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator=(const Proxy& that)
+    {
+        EIRIN_TVEC_SWIZZLE_PROXY_APPLY_VECTOR_IMPL(=, that);
         return *this;
     }
 
@@ -178,8 +186,36 @@ struct swizzle_proxy
         return result;
     }
 
-    EIRIN_SWIZZLE_PROXY_DELETE_FUNC_DUPLICATE_NO_TP
     EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL const T& operator[](std::size_t i) const noexcept
+    {
+        switch(i)
+        {
+        case 0:
+            if constexpr(E0 >= 0)
+                return (*m_data)[E0];
+            break;
+        case 1:
+            if constexpr(E1 >= 0)
+                return (*m_data)[E1];
+            break;
+        case 2:
+            if constexpr(E2 >= 0)
+                return (*m_data)[E2];
+            break;
+        case 3:
+            if constexpr(E3 >= 0)
+                return (*m_data)[E3];
+            break;
+        default:
+            EIRIN_UNREACHABLE;
+            return (*m_data)[0];
+        }
+        EIRIN_UNREACHABLE;
+        return (*m_data)[0];
+    }
+
+    EIRIN_SWIZZLE_PROXY_DELETE_FUNC_DUPLICATE_NO_TP
+    EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL T& operator[](std::size_t i) noexcept
     {
         switch(i)
         {
