@@ -332,10 +332,10 @@ TEST(Vec, SwizzleRead)
 
 TEST(Vec, SwizzleWriteValid)
 {
-    eirin::f64vec4 vf{495, 514_f64, 19, 0};
-    eirin::ivec4 vi{114, 514.0, 0, 0}, vii{1919810};
+    eirin::vec4f64 vf{495, 514_f64, 19, 0};
+    eirin::vec4i vi{114, 514.0, 0, 0}, vii{1919810};
     vf.xyz() += 1_f32;
-    vi.xyzw() = eirin::ivec4{1, 2, 3, 4} + vf.xyxy();
+    vi.xyzw() = eirin::vec4i{1, 2, 3, 4} + vf.xyxy();
     vi.xwzy() = vii.yxxy();
     EXPECT_EQ(vi.x, 1919810);
     EXPECT_EQ(vi.y, 1919810);
