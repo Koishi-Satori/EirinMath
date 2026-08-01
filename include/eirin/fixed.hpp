@@ -28,6 +28,9 @@
 #include "macro.hpp"
 #include "detail/int128.hpp"
 #include "error.hpp"
+#ifdef EIRIN_HAS_STD_BITOPS
+#    include <bit> // for MSVC, we need to include <bit> to use std::bit_width.
+#endif
 
 namespace eirin
 {
