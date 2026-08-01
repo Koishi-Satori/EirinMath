@@ -167,7 +167,7 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
     }
 
     template <typename U>
-    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec operator%=(U scalar) noexcept
+    EIRIN_REQUIRES_NOT_SWIZZLE_PROXY constexpr inline tvec& operator%=(U scalar) noexcept
     {
         this->x %= static_cast<T>(scalar);
         this->y %= static_cast<T>(scalar);
@@ -291,7 +291,7 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
         return bool_type{this->x || rhs.x, this->y || rhs.y};
     }
 
-    /* These functions are defined for conversion from swizzle_proxy to tvec. 
+    /* These functions are defined for conversion from swizzle_proxy to tvec.
        Should contains: +, -, *, /, %, ^, &, |, <<, >>
     */
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
