@@ -25,12 +25,10 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
+#include <bit>
 #include "macro.hpp"
 #include "detail/int128.hpp"
 #include "error.hpp"
-#ifdef EIRIN_HAS_STD_BITOPS
-#    include <bit> // for MSVC, we need to include <bit> to use std::bit_width.
-#endif
 
 namespace eirin
 {
@@ -306,9 +304,6 @@ public:
     EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
     {
         using u_type = std::make_unsigned_t<Type>;
-#ifndef EIRIN_HAS_STD_BITOPS // to prevent the warning of unused variable in the following code.
-        constexpr std::size_t total_bits = sizeof(Type) * 8;
-#endif
         if constexpr(!IgnoreSignBit)
         {
             // actual bit width with sign bit(minimum bit width for two's complement representation)
@@ -319,37 +314,15 @@ public:
             if(m_value >= 0)
             {
                 const u_type u_val = static_cast<u_type>(m_value);
-#ifdef EIRIN_HAS_STD_BITOPS
                 return std::bit_width(u_val) + 1;
-#else
-                std::size_t w = 0;
-                for(std::size_t i = 0; i < total_bits; ++i)
-                {
-                    if((u_val >> i) & u_type(1))
-                        w = i + 1;
-                }
-                return w + 1;
-#endif
             }
             else
             {
                 const u_type u_abs = static_cast<u_type>(-(m_value + 1)) + 1;
-#ifdef EIRIN_HAS_STD_BITOPS
                 const std::size_t w = std::bit_width(u_abs);
                 if(std::has_single_bit(u_abs)) // power of 2
                     return w;
                 return w + 1;
-#else
-                std::size_t w = 0;
-                for(std::size_t i = 0; i < total_bits; ++i)
-                {
-                    if((u_abs >> i) & u_type(1))
-                        w = i + 1;
-                }
-                if(u_abs && ((u_abs & (u_abs - 1)) == 0)) // power of 2
-                    return w;
-                return w + 1;
-#endif
             }
         }
 
@@ -358,17 +331,7 @@ public:
         const u_type mask = m_value < 0 ? static_cast<u_type>(~u_type(0)) : static_cast<u_type>(0);
         u_type u_value = (u ^ mask) - mask;
 
-#ifdef EIRIN_HAS_STD_BITOPS
-        // if std::bit_width is available, use it.
         return std::bit_width(u_value);
-#else
-        for(int i = static_cast<int>(total_bits) - 1; i >= 0; --i)
-        {
-            if((u_value >> i) & u_type(1))
-                return static_cast<std::size_t>(i + 1);
-        }
-        return 0;
-#endif
     }
 
     /* operator override functions */
