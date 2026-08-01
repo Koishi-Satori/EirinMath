@@ -11,6 +11,8 @@ namespace eirin
 {
 namespace detail
 {
+    // the following is a helper struct to compute the epsilon value for compute_nearly_equal.
+    // for those who want to override the epsilon value, they can specialize this struct for their own type.
     template <typename T>
     struct compute_epsilon
     {
@@ -25,13 +27,25 @@ namespace detail
     {
         EIRIN_ALWAYS_INLINE constexpr static bool eval(T a, T b)
         {
-            if constexpr(isFloat)
+            return a == b;
+        }
+    };
+
+    // for floating point types, we need to consider the precision issues
+    template <typename T, bool override>
+    struct compute_nearly_equal
+    {
+        EIRIN_ALWAYS_INLINE constexpr static bool eval(T a, T b)
+        {
+            if constexpr(std::numeric_limits<T>::is_iec559)
             {
                 using std::abs;
                 return abs(a - b) <= compute_epsilon<T>::eval();
             }
             else
+            {
                 return a == b;
+            }
         }
     };
 

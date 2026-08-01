@@ -91,4 +91,8 @@
 #    define EIRIN_UNREACHABLE __builtin_unreachable()
 #endif
 
+#if defined(__cpp_lib_bitops) && __cpp_lib_bitops >= 201907L
+#    define EIRIN_HAS_STD_BITOPS
+#endif
+
 #endif // EIRIN_MATH_MARCO_HPP

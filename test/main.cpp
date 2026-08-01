@@ -120,6 +120,15 @@ TEST(Fixed32, Math)
 {
     using test_math::expect_fixed_eq;
 
+    // 1 bit for 1, 16 bits for fraction.
+    EXPECT_EQ((1_f32).bit_width(), 17);
+    EXPECT_EQ((2_f32).bit_width(), 18);
+    EXPECT_EQ((4_f32).bit_width(), 19);
+    // 1 bit for 1, 16 bits for fraction.
+    EXPECT_EQ((-1_f32).bit_width(), 17);
+    EXPECT_EQ((-2_f32).bit_width(), 18);
+    EXPECT_EQ((-4_f32).bit_width(), 19);
+
     EXPECT_EQ(abs(-114.514_f32), 114.514_f32);
     EXPECT_EQ(sin(0_f32), 0_f32);
     EXPECT_TRUE(expect_fixed_eq(sin(1_f32), 0.841471_f32));

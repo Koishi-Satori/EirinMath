@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <eirin/macro.hpp>
 #include "eirin/fixed.hpp"
+#include "eirin/detail/compute_vec_rel.hpp"
 
 namespace eirin
 {
@@ -136,7 +137,13 @@ struct tvec_base
                     return false;
             return true;
         }
-        return derived() == rhs;
+        // return derived() == rhs;
+        // for-each every element and compare with nearly_eq
+        Derived tmp(derived());
+        for(std::size_t i = 0; i < size(); ++i)
+            if(!detail::compute_nearly_equal<T, true>::eval(tmp[i], rhs[i]))
+                return false;
+        return true;
     }
 
 private:

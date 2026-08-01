@@ -95,7 +95,7 @@ namespace detail
     {
         EIRIN_ALWAYS_INLINE constexpr const std::size_t eval() const noexcept
         {
-            if constexpr (std::numeric_limits<T>::is_specialized)
+            if constexpr(std::numeric_limits<T>::is_specialized)
             {
                 return std::numeric_limits<T>::digits;
             }
@@ -302,16 +302,70 @@ public:
     template <bool IgnoreSignBit = true>
     EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
     {
-        if constexpr (!IgnoreSignBit)
-            return sizeof(Type);
-        const Type mask = m_value >> (sizeof(Type) * 8 - 1);
-        Type u_value = (m_value ^ mask) - mask;
-        for (int i = sizeof(Type) * 8 - 1; i >= 1; --i)
+        using u_type = std::make_unsigned_t<Type>;
+#ifndef EIRIN_HAS_STD_BITOPS // to prevent the warning of unused variable in the following code.
+        constexpr std::size_t total_bits = sizeof(Type) * 8;
+#endif
+        if constexpr(!IgnoreSignBit)
         {
-            if ((u_value >> static_cast<Type>(i)) & static_cast<Type>(0x1))
-                return i + 1;
+            // actual bit width with sign bit(minimum bit width for two's complement representation)
+            // for positive number or zero, res = bit_width(x) + 1 (x=0 -> 1)
+            // for negative number, set y = -x
+            //                      res = bit_width(y), if y is power of 2
+            //                      res = bit_width(y) + 1, else cases.
+            if(m_value >= 0)
+            {
+                const u_type u_val = static_cast<u_type>(m_value);
+#ifdef EIRIN_HAS_STD_BITOPS
+                return std::bit_width(u_val) + 1;
+#else
+                std::size_t w = 0;
+                for(std::size_t i = 0; i < total_bits; ++i)
+                {
+                    if((u_val >> i) & u_type(1))
+                        w = i + 1;
+                }
+                return w + 1;
+#endif
+            }
+            else
+            {
+                const u_type u_abs = static_cast<u_type>(-(m_value + 1)) + 1;
+#ifdef EIRIN_HAS_STD_BITOPS
+                const std::size_t w = std::bit_width(u_abs);
+                if(std::has_single_bit(u_abs)) // power of 2
+                    return w;
+                return w + 1;
+#else
+                std::size_t w = 0;
+                for(std::size_t i = 0; i < total_bits; ++i)
+                {
+                    if((u_abs >> i) & u_type(1))
+                        w = i + 1;
+                }
+                if(u_abs && ((u_abs & (u_abs - 1)) == 0)) // power of 2
+                    return w;
+                return w + 1;
+#endif
+            }
+        }
+
+        // return the actual bit width of absolute value of m_value, ignore the sign bit.
+        const u_type u = static_cast<u_type>(m_value);
+        const u_type mask = m_value < 0 ? static_cast<u_type>(~u_type(0)) : static_cast<u_type>(0);
+        u_type u_value = (u ^ mask) - mask;
+
+#ifdef EIRIN_HAS_STD_BITOPS
+        // if std::bit_width is available, use it.
+        return std::bit_width(u_value);
+#else
+        for(int i = static_cast<int>(total_bits) - 1; i >= 0; --i)
+        {
+            if((u_value >> i) & u_type(1))
+                return static_cast<std::size_t>(i + 1);
         }
         return 0;
+#endif
     }
 
     /* operator override functions */
@@ -481,11 +535,11 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num& operator~() noexcept
+    constexpr inline fixed_num operator~() noexcept
     {
-        m_value = ~m_value;
-        return *this;
+        return fixed_num(~m_value, raw_value_construct_tag{});
     }
+
     /**
      * @brief Left Shifting the internal representation of the fixed point with val bits.
      *        To be noticed that, this operator does not checks overflow and range of n bits.
@@ -799,9 +853,9 @@ public:
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
         auto n_bits = static_cast<decltype(val)>(bit_width());
         constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
-        if (val >= max_bits)
+        if(val >= max_bits)
             EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
-        if (n_bits != 0 && n_bits + val > max_bits)
+        if(n_bits != 0 && n_bits + val > max_bits)
             EIRIN_THROW_EXCEPTION(std::overflow_error, "will cause overflow after left shifts n bits.");
         return fixed_num(m_value << val, raw_value_construct_tag{});
     }
@@ -812,9 +866,9 @@ public:
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
         auto n_bits = static_cast<decltype(val)>(bit_width());
         constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
-        if (val >= max_bits)
+        if(val >= max_bits)
             EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
-        if (n_bits != 0 && n_bits + val > max_bits)
+        if(n_bits != 0 && n_bits + val > max_bits)
             EIRIN_THROW_EXCEPTION(std::overflow_error, "will cause overflow after left shifts n bits.");
         m_value <<= val;
         return *this;
@@ -823,22 +877,22 @@ public:
     EIRIN_ALWAYS_INLINE constexpr fixed_num shr(const std::integral auto& val) const
     {
         if(val < 0) [[unlikely]]
-            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to right shift should be greater than or equal to 0.");
         auto n_bits = static_cast<decltype(val)>(bit_width());
         constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
-        if (val >= max_bits)
-            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        if(val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "right shift bits larger than bit width is undefined.");
         return fixed_num(m_value >> val, raw_value_construct_tag{});
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num& shr_by(const std::integral auto& val) const
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& shr_by(const std::integral auto& val)
     {
         if(val < 0) [[unlikely]]
-            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
+            EIRIN_THROW_EXCEPTION(std::range_error, "n bits to right shift should be greater than or equal to 0.");
         auto n_bits = static_cast<decltype(val)>(bit_width());
         constexpr auto max_bits = static_cast<decltype(val)>(sizeof(Type) * 8 - 1);
-        if (val >= max_bits)
-            EIRIN_THROW_EXCEPTION(std::overflow_error, "left shift bits larger than bit width is undefined.");
+        if(val >= max_bits)
+            EIRIN_THROW_EXCEPTION(std::overflow_error, "right shift bits larger than bit width is undefined.");
         m_value >>= val;
         return *this;
     }
