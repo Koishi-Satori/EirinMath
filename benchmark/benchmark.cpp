@@ -7,10 +7,10 @@
 // on windows/msvc, -Wmaybe-uninitialized is not available
 // so we can use #pragma to ignore the warning there
 #ifdef _MSC_VER
-// save warning levels, and drop it to level 3 
-#pragma warning (push, 3)
+// save warning levels, and drop it to level 3
+#    pragma warning(push, 3)
 // turn two warnings off
-#pragma warning (disable : 4701 4703)
+#    pragma warning(disable : 4701 4703)
 #endif
 
 using namespace eirin;
@@ -420,7 +420,7 @@ static void f64_pow(benchmark::State& state)
     auto fp2 = F64_FROM_BENCH(1);
     for(auto _ : state)
     {
-        auto input1 = fp1, input2 =  fp2;
+        auto input1 = fp1, input2 = fp2;
         benchmark::DoNotOptimize(input1);
         benchmark::DoNotOptimize(input2);
 
@@ -574,5 +574,5 @@ BENCHMARK_MAIN();
 // so we can use #pragma to ignore the warning there
 #ifdef _MSC_VER
 // restore original warning levels.
-#pragma warning (pop)
+#    pragma warning(pop)
 #endif

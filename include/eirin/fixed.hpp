@@ -130,7 +130,7 @@ concept fixed_format_check_scale = requires {
 
 /**
      * @brief The fixed number.
-     * 
+     *
      * @tparam Type the store type.
      * @tparam IntermediateType used for calculation, must be larger than the store type.
      * @tparam fraction the fraction part of the fixed number.
@@ -165,7 +165,7 @@ public:
 
     /**
      * @brief Construct the fixed number from a integer value.
-     * 
+     *
      * @tparam T integral type.
      * @param val the input integer.
      * @return EIRIN_ALWAYS_INLINE constexpr the fixed number converted from the integer.
@@ -510,7 +510,7 @@ public:
      * @brief Left Shifting the internal representation of the fixed point with val bits.
      *        To be noticed that, this operator does not checks overflow and range of n bits.
      * @see shl
-     * 
+     *
      * @param val n bits to left shift.
      * @return constexpr fixed_num compute result.
      */
@@ -523,7 +523,7 @@ public:
      * @brief Left Shifting the internal representation of the fixed point with val bits.
      *        To be noticed that, this operator does not checks overflow and range of n bits.
      * @see shl_by
-     * 
+     *
      * @param val n bits to left shift.
      * @return constexpr fixed_num compute result.
      */
@@ -537,7 +537,7 @@ public:
      * @brief Right Shifting the internal representation of the fixed point with val bits.
      *        To be noticed that, this operator does not checks overflow and range of n bits.
      * @see shr
-     * 
+     *
      * @param val n bits to right shift.
      * @return constexpr fixed_num compute result.
      */
@@ -550,7 +550,7 @@ public:
      * @brief Right Shifting the internal representation of the fixed point with val bits.
      *        To be noticed that, this operator does not checks overflow and range of n bits.
      * @see shr_by
-     * 
+     *
      * @param val n bits to right shift.
      * @return constexpr fixed_num compute result.
      */
@@ -876,7 +876,7 @@ public:
 
     /**
      * @brief internal value, just for NTTP, do not use it.
-     * 
+     *
      */
     Type m_value;
 };
@@ -972,14 +972,14 @@ concept fixed_point = detail::is_fixed_point<std::remove_cv_t<T>>::value;
 /**
  * @brief Predefined fixed32 type, with 16 bits fraction, 15 bits intergal, and 1 bit sign.
  *        This type uses int32_t as store type, and int64_t as intermediate type.
- * 
+ *
  */
 using fixed32 = fixed_num<int32_t, int64_t, 16, false>;
 #ifdef EIRIN_MATH_HAS_INT128
 /**
  * @brief Predefined fixed64 type, with 32 bits fraction, 16 bits intergal, and 1 bit sign.
  *        This type uses int64_t as store type, and 128-bits intergal as intermediate type.
- * 
+ *
  */
 using fixed64 = fixed_num<int64_t, detail::int128_t, 32, false>;
 #endif
@@ -1306,7 +1306,7 @@ std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits>&
 
 /**
  * @brief The default hash function for fixed point type.
- * 
+ *
  * @tparam FixedType fixed point type.
  */
 template <typename FixedType>

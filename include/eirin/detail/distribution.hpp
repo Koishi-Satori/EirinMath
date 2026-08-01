@@ -24,7 +24,7 @@ namespace eirin
  * std::array<fixed32, 10> values_32;
  * std::generate(values_32.begin(), values_32.end(), &[]() { return dist_32(mt_32) });
  * @endcode
- * 
+ *
  * @tparam FixedType Fixed point type, must satisfy concept `is_fixed_point_v`.
  * @tparam DistType Distribution type, must be an integral distribution, and support UniformRandomBitGenerator.
  */
@@ -80,9 +80,9 @@ public:
 
     /**
      * @brief Construct a new uniform fixed distribution object, with given range [a, b].
-     * 
-     * @param a 
-     * @param b 
+     *
+     * @param a
+     * @param b
      */
     explicit fixed_int_distribution_adapter(const FixedType& a = std::numeric_limits<FixedType>::min(), const FixedType& b = std::numeric_limits<FixedType>::max())
         : m_dist(static_cast<value_type>(a.internal_value()), static_cast<value_type>(b.internal_value())), m_param(a, b)
@@ -160,7 +160,7 @@ private:
  * std::array<fixed32, 10> values_32;
  * std::generate(values_32.begin(), values_32.end(), &[]() { return test_dist_adapter(test_adapter) });
  * @endcode
- * 
+ *
  * @tparam FixedType Fixed point type, must satisfy concept `is_fixed_point_v`.
  * @tparam DistType Distribution type, must be an integral distribution, and support UniformRandomBitGenerator.
  */
@@ -216,9 +216,9 @@ public:
 
     /**
      * @brief Construct a new uniform fixed distribution object, with given range [a, b].
-     * 
-     * @param a 
-     * @param b 
+     *
+     * @param a
+     * @param b
      */
     explicit fixed_distribution_adapter(const FixedType& a = std::numeric_limits<FixedType>::min(), const FixedType& b = std::numeric_limits<FixedType>::max())
         : m_dist(static_cast<value_type>(a.internal_value()), static_cast<value_type>(b.internal_value())), m_param(a, b)

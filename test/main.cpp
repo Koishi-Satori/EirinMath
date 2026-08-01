@@ -6,7 +6,7 @@
 #include <eirin/detail/perf.hpp>
 
 #ifdef EIRIN_DEV_TEST_MODE
-#include <eirin/ext/simd_math.hpp>
+#    include <eirin/ext/simd_math.hpp>
 #endif
 
 using namespace eirin;
@@ -204,12 +204,13 @@ TEST(FixedNum, Random)
     eirin::mt19937 mt_32(rd());
     auto tmp_mt_int = std::uniform_int_distribution<>()(mt_32);
     // avoid C4834 on MSVC and unused variable.
-    (void) tmp_mt_int;
+    (void)tmp_mt_int;
     eirin::fixed_int_distribution_adapter<fixed32, std::uniform_int_distribution<>> dist_32;
     std::array<fixed32, 10> values_32;
     auto test_random = [&](auto& engine, auto& dist, auto& values, const char* label)
     {
-        std::generate(values.begin(), values.end(), [&]() { return dist(engine); });
+        std::generate(values.begin(), values.end(), [&]()
+                      { return dist(engine); });
         GTEST_LOG_(INFO) << label << " Random distribution in [" << dist.min() << ", " << dist.max() << "]: ";
         std::cout << "  { ";
         for(size_t i = 0; i < values.size() - 1; ++i)

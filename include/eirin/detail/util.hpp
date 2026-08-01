@@ -45,7 +45,7 @@ static constexpr auto fraction_bits()
  * So we can use 2 bits of integral parts to represent.
  * And what left is 61 bits of fraction parts.
  * The i-th bit represents 2^-i, and add up those bits we got the fraction parts.
- * 
+ *
  * @tparam I integral type
  * @param val the constant value
  * @param fraction the fraction of the fixed number.
@@ -74,7 +74,7 @@ inline constexpr I eval_value(double val, int fraction) noexcept
 
 /**
  * @brief Predefined constants.
- * 
+ *
  */
 inline constexpr long double cst_lst[] = {
     1.442695040888963407359924681001892137L,
@@ -94,7 +94,7 @@ inline constexpr size_t cst_lst_size = sizeof(cst_lst) / sizeof(long double);
 
 /**
  * @brief Names of the predefined constants.
- * 
+ *
  */
 inline constexpr std::array<const char*, cst_lst_size> csl_nme_lst = {
     "log2e",
@@ -112,10 +112,10 @@ inline constexpr std::array<const char*, cst_lst_size> csl_nme_lst = {
 
 /**
  * @brief Auxiliary function to print the constants.
- * 
- * @tparam T 
- * @param fraction 
- * @return requires 
+ *
+ * @tparam T
+ * @param fraction
+ * @return requires
  */
 template <typename T = int64_t>
 requires std::is_integral_v<T>
@@ -151,11 +151,11 @@ namespace pi_calc
 
     /**
  * @brief Calculate the internal fixed value for pi using BBP formula.
- * 
- * @tparam T 
- * @param fraction 
+ *
+ * @tparam T
+ * @param fraction
  * @param N The number of terms to calculate.
- * @return requires 
+ * @return requires
  */
     template <typename T = int64_t, int fraction = 61, int N>
     requires check_valid_fixed_store_type<T, fraction>

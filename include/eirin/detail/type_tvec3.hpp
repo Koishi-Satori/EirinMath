@@ -340,17 +340,17 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
         return bool_type{this->x || rhs.x, this->y || rhs.y, this->z || rhs.z};
     }
 
-        /* These functions are defined for conversion from swizzle_proxy to tvec. 
+    /* These functions are defined for conversion from swizzle_proxy to tvec.
        Should contains: +, -, *, /, %, ^, &, |, <<, >>
     */
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
-#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                     \
-        constexpr inline tvec& operator op##=(const tvec & rhs) noexcept \
-        {                                                                \
-            this->x op## = static_cast<T>(rhs.x);                        \
-            this->y op## = static_cast<T>(rhs.y);                        \
-            this->z op## = static_cast<T>(rhs.z);                        \
-            return *this;                                                \
+#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                      \
+        constexpr inline tvec& operator op## = (const tvec& rhs) noexcept \
+        {                                                                 \
+            this->x op## = static_cast<T>(rhs.x);                         \
+            this->y op## = static_cast<T>(rhs.y);                         \
+            this->z op## = static_cast<T>(rhs.z);                         \
+            return *this;                                                 \
         }
 #    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(op, name) \
         template <typename U = T>                                       \

@@ -190,13 +190,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> f
 
 /**
  * @brief sine function for fixed point number.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp 
+ * @param fp
  * @return sin(fp)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -243,13 +243,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp
 
 /**
  * @brief cosine function for fixed point number.
- * 
- * @tparam T 
- * @tparam I 
- * @tparam f 
- * @tparam r 
+ *
+ * @tparam T
+ * @tparam I
+ * @tparam f
+ * @tparam r
  * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp 
+ * @param fp
  * @return cos(fp)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -275,7 +275,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp
      * @brief Arctangent function for fixed point number, using the fitting
      *        method from the paper "Efficient Approximations for the Arctangent Function".
      * @note reference paper: https://ieeexplore.ieee.org/document/1628884
-     * 
+     *
      * @tparam T @see fixed_num
      * @tparam I @see fixed_num
      * @tparam f @see fixed_num
@@ -352,13 +352,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> f
 
 /**
  * @brief cbrt function for fixed point number, which used newton method to calculate the cbrt.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam iter_max max iteration times, default is 200.
- * @param fp 
+ * @param fp
  * @return cbrt(fp)
  */
 template <typename T, typename I, unsigned int f, bool r, int iter_max = 200>
@@ -381,12 +381,12 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> f
 
 /**
  * @brief log2 function for fixed point number, which used some bit hacks.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp 
+ * @param fp
  * @return log2(fp)
  */
 template <typename T, typename I, unsigned int f, bool r>
@@ -449,13 +449,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> f
 
 /**
  * @brief ln function for fixed point number, which used the log2 function to calculate the ln.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam log2_e the log2(e) value, and its default value is designed for 32bit and 64bit fixed number. if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp 
+ * @param fp
  * @return log(fp)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> log2_e = fixed_num<T, I, f, r>::template from_fixed_num_value<60>(0x171547652B82FE00ll)>
@@ -466,13 +466,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp
 
 /**
  * @brief the log10 function for fixed point number, which used the log2 function to calculate the log10.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam log2_10 the log2(10) value, and its default value is designed for 32bit and 64bit fixed number. if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp 
+ * @param fp
  * @return log10(fp)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> log2_10 = fixed_num<T, I, f, r>::template from_fixed_num_value<60>(0x35269E12F346E200ll)>
@@ -579,13 +579,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> modf(fixed_num<T, I, f, r> f
 
 /**
  * @brief convert radian to degree.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param rad 
+ * @param rad
  * @return deg(rad)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -599,13 +599,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> degrees(fixed_num<T, I, f, r
 
 /**
  * @brief convert degree to radian.
- * 
+ *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param deg 
+ * @param deg
  * @return rad(deg)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -622,6 +622,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> 
 {
     return sqrt(x * x + y * y);
 }
+
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r> y, fixed_num<T, I, f, r> z) noexcept
 {

@@ -59,7 +59,8 @@ struct swizzle_proxy
         requires swizzle_unique<N, E0, E1, E2, E3>
 
 #    define EIRIN_TVEC_SWIZZLE_PROXY_APPLY_SCALAR_IMPL(op, scalar)                    \
-        do {                                                                          \
+        do                                                                            \
+        {                                                                             \
             if constexpr(N >= 1 && E0 != -1) (*m_data)[E0] op static_cast<T>(scalar); \
             if constexpr(N >= 2) (*m_data)[E1] op static_cast<T>(scalar);             \
             if constexpr(N >= 3) (*m_data)[E2] op static_cast<T>(scalar);             \
@@ -67,26 +68,28 @@ struct swizzle_proxy
         } while(0)
 
 #    define EIRIN_TVEC_SWIZZLE_PROXY_APPLY_VECTOR_IMPL(op, vec)             \
-        do {                                                                \
+        do                                                                  \
+        {                                                                   \
             if constexpr(N >= 1) (*m_data)[E0] op static_cast<T>((vec)[0]); \
             if constexpr(N >= 2) (*m_data)[E1] op static_cast<T>((vec)[1]); \
             if constexpr(N >= 3) (*m_data)[E2] op static_cast<T>((vec)[2]); \
             if constexpr(N >= 4) (*m_data)[E3] op static_cast<T>((vec)[3]); \
         } while(0)
-#    define EIRIN_TVEC_SWIZZLE_PROXY_COMPOUND_ASSIGN_FUNC(op)                                               \
-        template <typename U>                                                                               \
-        EIRIN_SWIZZLE_PROXY_DELETE_FUNC_DUPLICATE_TP                                                        \
-            EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator op##=(const U scalar) noexcept       \
-        {                                                                                                   \
-            EIRIN_TVEC_SWIZZLE_PROXY_APPLY_SCALAR_IMPL(op## =, scalar);                                     \
-            return *this;                                                                                   \
-        }                                                                                                   \
-        template <std::size_t VecN, typename U>                                                             \
-        requires(VecN == N) && swizzle_unique<N, E0, E1, E2, E3>                                            \
-        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator op##=(const tvec<VecN, U>& vec) noexcept \
-        {                                                                                                   \
-            EIRIN_TVEC_SWIZZLE_PROXY_APPLY_VECTOR_IMPL(op## =, vec);                                        \
-            return *this;                                                                                   \
+#    define EIRIN_TVEC_SWIZZLE_PROXY_COMPOUND_ASSIGN_FUNC(op)                                                 \
+        template <typename U>                                                                                 \
+        EIRIN_SWIZZLE_PROXY_DELETE_FUNC_DUPLICATE_TP                                                          \
+            EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy&                                                 \
+            operator op## = (const U scalar) noexcept                                                         \
+        {                                                                                                     \
+            EIRIN_TVEC_SWIZZLE_PROXY_APPLY_SCALAR_IMPL(op## =, scalar);                                       \
+            return *this;                                                                                     \
+        }                                                                                                     \
+        template <std::size_t VecN, typename U>                                                               \
+        requires(VecN == N) && swizzle_unique<N, E0, E1, E2, E3>                                              \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL swizzle_proxy& operator op## = (const tvec<VecN, U>& vec) noexcept \
+        {                                                                                                     \
+            EIRIN_TVEC_SWIZZLE_PROXY_APPLY_VECTOR_IMPL(op## =, vec);                                          \
+            return *this;                                                                                     \
         }
 
     template <typename U>
