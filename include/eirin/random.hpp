@@ -16,7 +16,7 @@ namespace eirin
 namespace detail
 {
     template <typename T, T state, T multiplier, T increment, T mix_multiplier, T xor_multiplier>
-    concept pcg_params_check = std::is_unsigned_v<T>;
+    concept pcg_params_check = is_unsigned_v<T>;
 
     template <typename FixedType, typename _RandomNumberEngine>
     concept fixed_random_engine_type_check = requires {

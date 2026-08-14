@@ -23,105 +23,47 @@
 #include <type_traits>
 #include <concepts>
 #include <iostream>
-#include <algorithm>
 #include <iterator>
 #include <bit>
 #include "macro.hpp"
 #include "detail/int128.hpp"
+#include "detail/type_traits_impl.hpp"
 #include "error.hpp"
 
 namespace eirin
 {
 namespace detail
 {
-    template <typename T, unsigned int F, int E>
-    struct sqrt_init_value
-    {
-        static constexpr T value() noexcept
-        {
-            constexpr int half_exp = E / 2;
-            constexpr bool adjust = (E % 2) != 0;
-
-            constexpr T base = static_cast<T>(1) << half_exp;
-            constexpr T value = adjust ? (base | (base >> 1)) : base;
-
-            return value << (F / 2 + F % 2);
-        }
-    };
-
-    template <typename T, unsigned int F, typename S = std::make_index_sequence<sizeof(T) * 8>>
-    struct sqrt_lookup_table;
-
-    template <typename T, unsigned int F, size_t... I>
-    struct sqrt_lookup_table<T, F, std::index_sequence<I...>>
-    {
-        static constexpr std::array<T, sizeof...(I)> generate() noexcept
-        {
-            return {{sqrt_init_value<T, F, I>::value()...}};
-        }
-    };
-
     template <typename T>
-    constexpr int find_msb(T value) noexcept
+    consteval const std::size_t __eval_max_bit_width() noexcept
     {
-        if(value == 0)
-            return -1;
-        if constexpr(std::is_signed_v<T>)
+        if constexpr(std::numeric_limits<T>::is_specialized && std::numeric_limits<T>::radix == 2)
         {
-            using U = std::make_unsigned_t<T>;
-            auto abs_v = value < 0 ? -value : value;
-            return find_msb(static_cast<U>(abs_v));
+            return std::numeric_limits<T>::digits;
+        }
+        else if(is_signed_v<T>)
+        {
+            return sizeof(T) * 8 - 1;
         }
         else
         {
-            int bits = 0;
-            while(value >>= 1)
-                ++bits;
-            return bits;
+            return sizeof(T) * 8;
         }
     }
-
-    template <typename T>
-    struct is_signed : public std::is_signed<T>
-    {};
-
-#ifdef EIRIN_MATH_HAS_INT128
-    template <>
-    struct is_signed<detail::int128_t> : public std::true_type
-    {};
-#endif
-
-    template <typename T>
-    struct __eval_max_bit_width_helper
-    {
-        EIRIN_ALWAYS_INLINE constexpr const std::size_t eval() const noexcept
-        {
-            if constexpr(std::numeric_limits<T>::is_specialized)
-            {
-                return std::numeric_limits<T>::digits;
-            }
-            else
-            {
-                return sizeof(T) * 8 - 1;
-            }
-        }
-    };
-
-    template <typename T>
-    constexpr inline std::size_t eval_max_bit_width = __eval_max_bit_width_helper<T>::eval();
 } // namespace detail
 
+// if the type is unsigned type, then the fraction <= bit width, else <= bit width - 1.
 template <typename Type, unsigned int fraction>
-concept fixed_num_fraction = fraction > 0 && fraction <= sizeof(Type) * 8 - 1;
+concept fixed_num_fraction = fraction > 0 && fraction <= static_cast<int>(detail::__eval_max_bit_width<Type>());
 
 template <typename Type, typename IntermediateType>
 concept fixed_num_size = sizeof(IntermediateType) > sizeof(Type);
 
 template <typename Type, typename IntermediateType>
-concept fixed_num_signness = detail::is_signed<IntermediateType>::value == detail::is_signed<Type>::value;
+concept fixed_num_signness = detail::is_signed_v<IntermediateType> == detail::is_signed_v<Type>;
 
 template <typename Type, typename IntermediateType, unsigned int fraction>
-concept fixed_num_check = std::is_integral_v<Type> && fixed_num_fraction<Type, fraction> && fixed_num_size<Type, IntermediateType> && fixed_num_signness<Type, IntermediateType>;
+concept fixed_num_check = detail::is_integral_v<Type> && fixed_num_fraction<Type, fraction> && fixed_num_size<Type, IntermediateType> && fixed_num_signness<Type, IntermediateType>;
 
 template <int scale>
 concept fixed_format_check_scale = requires {
@@ -140,17 +82,31 @@ template <typename Type, typename IntermediateType, unsigned int fraction, bool 
 requires fixed_num_check<Type, IntermediateType, fraction>
 class fixed_num
 {
-    // static_assert(std::is_integral_v<Type>, "The store type must be a integral type.");
-    // static_assert(fraction > 0, "The fraction must be greater than zero.");
-    // static_assert(fraction <= sizeof(Type) * 8 - 1, "the type must be able to hold the entire fractional part.");
-    // static_assert(sizeof(IntermediateType) > sizeof(Type), "The intermediate type must be larger than the store type.");
-    // static_assert(std::is_signed<IntermediateType>::value == std::is_signed<Type>::value, "The intermediate type must have the same signness as the store type.");
+public:
+    static constexpr inline auto precision = fraction;
+    static constexpr inline bool is_round_enable = rounding;
+    // indicates the binary digits of the fixed number(internal representation)
+    static constexpr inline auto digits = detail::__eval_max_bit_width<Type>();
+    // indicates the binary digits of the integral part of the fixed number
+    static constexpr inline auto digits_int = digits - fraction;
 
+private:
     // just for raw value constructor call.
     struct raw_value_construct_tag
     {};
 
     static constexpr IntermediateType fraction_multiplier = IntermediateType(1) << fraction;
+
+    // represent value 1.0, and for UQ0.n, this shoule always be 0.0.
+    static constexpr Type raw_value_one = (precision == digits) ? static_cast<Type>(0) : static_cast<Type>(1) << fraction;
+
+    static constexpr Type raw_value_max = std::numeric_limits<Type>::is_specialized ?
+                                              std::numeric_limits<Type>::max() :
+                                              static_cast<Type>((static_cast<IntermediateType>(1) << digits) - 1);
+
+    static constexpr Type raw_value_min = std::numeric_limits<Type>::is_specialized ?
+                                              std::numeric_limits<Type>::min() :
+                                              static_cast<Type>(detail::is_signed_v<Type> ? -(static_cast<IntermediateType>(1) << digits) : IntermediateType(0));
 
     constexpr inline fixed_num(Type val, raw_value_construct_tag) noexcept
         : m_value(val) {};
@@ -179,18 +135,22 @@ public:
     {
         if constexpr(std::is_class_v<IntermediateType>)
         {
+            // class-like intermediate types (e.g. arbitrary-precision integers)
+            // have no mixed double*I operator, so scale in double first
             if constexpr(rounding)
             {
                 m_value = static_cast<Type>(
-                    val >= 0.0 ?
-                        (val * T{0.5} * fraction_multiplier) :
-                        (val * fraction_multiplier - T{0.5})
+                    static_cast<IntermediateType>(
+                        val >= 0.0 ?
+                            val * T{0.5} * static_cast<double>(fraction_multiplier) :
+                            val * static_cast<double>(fraction_multiplier) - T{0.5}
+                    )
                 );
             }
             else
             {
                 m_value = static_cast<Type>(
-                    Type(val) * fraction_multiplier
+                    static_cast<IntermediateType>(val * static_cast<double>(fraction_multiplier))
                 );
             }
         }
@@ -259,16 +219,18 @@ public:
         return from_fixed_num_value<64>(0x5000000000000ll);
     }
 
-    static constexpr inline auto precision = fraction;
-
     EIRIN_ALWAYS_INLINE static constexpr Type signbit_mask() noexcept
     {
-        return static_cast<Type>(1) << (sizeof(Type) * 8 - 1);
+        // for signed type, it should be 1 << (sizeof(Type) * 8 - 1)
+        // for unsigned type, it should be 0.
+        if constexpr(detail::is_unsigned_v<Type>)
+            return 0;
+        return static_cast<Type>(1) << digits;
     }
 
     EIRIN_ALWAYS_INLINE friend constexpr bool signbit(const fixed_num& f) noexcept
     {
-        if constexpr(std::is_signed_v<Type>)
+        if constexpr(detail::is_signed_v<Type>)
             return f.m_value & signbit_mask();
         else // unsigned value
             return false;
@@ -303,7 +265,7 @@ public:
     template <bool IgnoreSignBit = true>
     EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
     {
-        using u_type = std::make_unsigned_t<Type>;
+        using u_type = detail::make_unsigned_t<Type>;
         if constexpr(!IgnoreSignBit)
         {
             // actual bit width with sign bit(minimum bit width for two's complement representation)
@@ -314,12 +276,12 @@ public:
             if(m_value >= 0)
             {
                 const u_type u_val = static_cast<u_type>(m_value);
-                return std::bit_width(u_val) + 1;
+                return detail::bit_width(u_val) + 1;
             }
             else
             {
                 const u_type u_abs = static_cast<u_type>(-(m_value + 1)) + 1;
-                const std::size_t w = std::bit_width(u_abs);
+                const std::size_t w = detail::bit_width(u_abs);
                 if(std::has_single_bit(u_abs)) // power of 2
                     return w;
                 return w + 1;
@@ -331,7 +293,7 @@ public:
         const u_type mask = m_value < 0 ? static_cast<u_type>(~u_type(0)) : static_cast<u_type>(0);
         u_type u_value = (u ^ mask) - mask;
 
-        return std::bit_width(u_value);
+        return detail::bit_width(u_value);
     }
 
     /* operator override functions */
@@ -347,9 +309,9 @@ public:
     template <std::floating_point T>
     constexpr inline explicit operator T() const noexcept
     {
-        // MSVC might warn about precision loss here, but it's expected.
-        // SO I JUST FUCK IT BEFORE.
-        return static_cast<T>(static_cast<value_type>(m_value / fraction_multiplier));
+        // convert to floating point first, so the division is not truncated.
+        // MSVC might warn about precision loss when converting the inner value, but it's expected.
+        return static_cast<T>(m_value) / static_cast<T>(fraction_multiplier);
     }
 
     constexpr inline fixed_num operator+(const fixed_num& other) const noexcept
@@ -569,27 +531,83 @@ public:
 
     constexpr inline fixed_num& operator++() noexcept
     {
-        m_value += Type(1) << fraction;
+        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        {
+#if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
+            if(m_value < 0)
+                m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) + fraction_multiplier);
+            else
+                m_value = raw_value_max;
+#elif EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_MODWRAP
+            m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) + fraction_multiplier); // mod 2^N
+#else
+            // do nothing here, just no-op
+            return *this;
+#endif
+        }
+        m_value += raw_value_one;
         return *this;
     }
 
     constexpr inline fixed_num operator++(int) noexcept
     {
         fixed_num temp = *this;
-        m_value += Type(1) << fraction;
+        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        {
+#if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
+            if(m_value < 0)
+                m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) + fraction_multiplier);
+            else
+                m_value = raw_value_max;
+#elif EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_MODWRAP
+            m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) + fraction_multiplier); // mod 2^N
+#else
+            // do nothing here, just no-op
+            return *this;
+#endif
+        }
+        m_value += raw_value_one;
         return temp;
     }
 
     constexpr inline fixed_num& operator--() noexcept
     {
-        m_value -= Type(1) << fraction;
+        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        {
+#if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
+            if(m_value < 0)
+                m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) - fraction_multiplier);
+            else
+                m_value = raw_value_min;
+#elif EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_MODWRAP
+            m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) - fraction_multiplier); // mod 2^N
+#else
+            // do nothing here, just no-op
+            return *this;
+#endif
+        }
+        m_value -= raw_value_one;
         return *this;
     }
 
     constexpr inline fixed_num operator--(int) noexcept
     {
         fixed_num temp = *this;
-        m_value -= Type(1) << fraction;
+        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        {
+#if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
+            if(m_value < 0)
+                m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) - fraction_multiplier);
+            else
+                m_value = raw_value_min
+#elif EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_MODWRAP
+            m_value = static_cast<Type>(static_cast<IntermediateType>(m_value) - fraction_multiplier); // mod 2^N
+#else
+            // do nothing here, just no-op
+            return *this;
+#endif
+        }
+        m_value -= raw_value_one;
         return temp;
     }
 
@@ -665,16 +683,6 @@ public:
     static constexpr fixed_num from_internal_value(Type internal_value) noexcept
     {
         return fixed_num(internal_value, raw_value_construct_tag{});
-    }
-
-    // generate lookup table for sqrt calc.
-    static constexpr auto sqrt_init_table = detail::sqrt_lookup_table<Type, fraction>::generate();
-
-    static constexpr Type get_sqrt_init_value(int exponent) noexcept
-    {
-        constexpr int max_exponent = sizeof(Type) * 8 - 1;
-        const int clamped = std::clamp(exponent, 0, max_exponent);
-        return sqrt_init_table[clamped];
     }
 
     template <typename OutputIter>
@@ -929,7 +937,7 @@ namespace detail
         if(pos < len && str[pos] == '.')
         {
             ++pos;
-            constexpr auto max_fraction = ((std::int64_t)1 << fixed::precision) - 1;
+            constexpr auto max_fraction = (static_cast<I>(1) << fixed::precision) - 1;
             I divisor = I(1);
             while(pos < len)
             {
@@ -960,6 +968,52 @@ namespace detail
         if(negative)
             fp = -fp;
         return true;
+    }
+
+    template <typename CharT, typename T, typename I, unsigned int f, bool r>
+    consteval fixed_num<T, I, f, r> eval_const(const CharT* str)
+    {
+        // eval string size in compile time.
+        // must ensure the string is null terminated, and only has ascii chars.
+        std::size_t len = 0;
+        while(str[len] != '\0')
+            ++len;
+
+        fixed_num<T, I, f, r> fp;
+        if(!parse(str, len, fp))
+        {
+            return fixed_num<T, I, f, r>();
+        }
+        return fp;
+    }
+
+    template <typename Fixed>
+    consteval std::size_t eval_integral_part_max_digits10() noexcept
+    {
+        using T = typename Fixed::value_type;
+        using U = detail::make_unsigned_t<T>;
+        // calculate the max integral part digits10 of the max value of Fixed.
+        // we can use length = floor((bit_width - 1) * log10(2)) to calculate the max digits10 of the integral part.
+        constexpr std::size_t bit_width = sizeof(T) * 8;
+        constexpr std::size_t precision = Fixed::precision;
+        constexpr bool is_signed = detail::is_signed_v<T>;
+        // we need to calculate the max value if using std::numeric_limits::max
+        // due to the fixed has precision bits, the max value of the integral part is not equal to std::numeric_limits::max.
+        constexpr U max_unsigned = static_cast<U>(
+            std::numeric_limits<T>::is_specialized ?
+                std::numeric_limits<T>::max() :
+                (is_signed ? (T(1) << (bit_width - 1)) - 1 : (T(1) << bit_width) - 1)
+        );
+        constexpr U max_int_part = max_unsigned >> precision;
+        constexpr T max_value = static_cast<T>(max_int_part);
+        std::size_t digits = 0;
+        T pow10 = 1;
+        while(pow10 <= max_value)
+        {
+            pow10 *= 10;
+            ++digits;
+        }
+        return digits;
     }
 } // namespace detail
 
@@ -1327,41 +1381,54 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
 {
     using fixed_type = eirin::fixed_num<T, I, f, r>;
 
+    static consteval int calc_digits10() noexcept
+    {
+        // digits10 = floor((sizeof(T) * 8 - 1) * log10(2)).
+        // Use the rational approximation log10(2) ≈ 643 / 2136 (error ~3.3e-8).
+        // For every bit width that can occur in practice (n <= 1024),
+        // n * log10(2) is at least 1.4e-3 away from the nearest integer,
+        // far larger than the accumulated approximation error, so the
+        // integer division yields the exact floor value.
+        constexpr int n = eirin::detail::__eval_max_bit_width<T>();
+        return n * 643 / 2136;
+    }
+
     static constexpr bool is_specialized = true;
-    static constexpr bool is_signed = true;
+    static constexpr bool is_signed = is_signed_v<T>;
     static constexpr bool is_integer = false;
     static constexpr bool is_exact = true;
     static constexpr bool has_infinity = false;
     static constexpr bool has_quiet_NaN = false;
     static constexpr bool has_signaling_NaN = false;
 
-    static constexpr fixed_type radix = fixed_type(2);
+    static constexpr int radix = 2;
     // 1 bit sign + fractions bits + integer bits
-    static constexpr fixed_type digits = fixed_type(sizeof(T) * 8 - 1);
-    // integer bits = sizeof(T) * 8 - 1 - f
-    // fraction bits = f
-    // digits10 = integer bits * log10(2) + fraction bits * log10(2)
-    // we can use log10(2) = 643 / 2136
-    static constexpr fixed_type digits10 = fixed_type(static_cast<T>((sizeof(T) * 8 - 1) * 643L / 2136));
-    static constexpr fixed_type min_exponent = fixed_type(0);
-    static constexpr fixed_type min_exponent10 = fixed_type(10);
+    static constexpr int digits = fixed_type::digits;
+    static constexpr int digits10 = calc_digits10();
+    static constexpr int min_exponent = 0;
+    static constexpr int min_exponent10 = 0;
+    static constexpr int max_exponent = 0;
+    static constexpr int max_exponent10 = 0;
 
     static constexpr float_denorm_style has_denorm = denorm_absent;
     static constexpr bool has_denorm_loss = false;
 
     static constexpr bool is_iec559 = false;
     static constexpr bool is_bounded = true;
-    static constexpr bool is_modulo = false;
+    static constexpr bool is_modulo = is_unsigned_v<T>;
 
+#if defined(EIRIN_ARCH_X86) || defined(EIRIN_ARCH_PNACL) || defined(EIRIN_ARCH_WASM)
+    // Used to describe the if using the fixed point type as operator number might cause hardware traps, for example, divide by zero.
+    // The fixed_num::divide function will check and throw exception, but operator/ will not check, and might cause hardware traps on some architecture.
     static constexpr bool traps = true;
+#else
+    // Used to describe the if using the fixed point type as operator number might cause hardware traps, for example, divide by zero.
+    // In current compile platform, both operator/ and fixed_num::divide will not cause hardware traps.
+    // The fixed_num::divide function will check and throw exception, and operator/ will not trap (such as ARM architecture).
+    static constexpr bool traps = false;
+#endif
     static constexpr bool tinyness_before = false;
-    static constexpr float_round_style round_style = round_toward_zero;
-
-#define EIRIN_SHORT_IMPL(name)         \
-    static constexpr fixed_type name() \
-    {                                  \
-        return fixed_type::name();     \
-    }
+    static constexpr float_round_style round_style = r ? round_to_nearest : round_toward_zero;
 
 #define EIRIN_DIRECT_IMPL(name, value) \
     static constexpr fixed_type name() \
@@ -1369,12 +1436,20 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
         return fixed_type(value);      \
     }
 
-    EIRIN_SHORT_IMPL(epsilon)
-    EIRIN_DIRECT_IMPL(round_error, 0)
     EIRIN_DIRECT_IMPL(infinity, 0)
     EIRIN_DIRECT_IMPL(quiet_NaN, 0)
     EIRIN_DIRECT_IMPL(signaling_NaN, 0)
     EIRIN_DIRECT_IMPL(denorm_min, 0)
+
+    static constexpr fixed_type epsilon() noexcept
+    {
+        return fixed_type::from_internal_value(T(1));
+    }
+
+    static constexpr fixed_type round_error() noexcept
+    {
+        return fixed_type::from_internal_value(T(1));
+    }
 
     static constexpr fixed_type min() noexcept
     {
@@ -1407,7 +1482,6 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
         return min();
     }
 
-#undef EIRIN_SHORT_IMPL
 #undef EIRIN_DIRECT_IMPL
 };
 } // namespace std

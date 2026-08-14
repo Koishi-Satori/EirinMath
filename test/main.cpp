@@ -133,6 +133,8 @@ TEST(Fixed32, Math)
     EXPECT_EQ(sin(0_f32), 0_f32);
     EXPECT_TRUE(expect_fixed_eq(sin(1_f32), 0.841471_f32));
     EXPECT_TRUE(expect_fixed_eq(sin(fixed32::pi() / 6), 0.5_f32));
+    EXPECT_EQ(detail::eval_integral_part_max_digits10<fixed32>(), 5); // max value of fixed32 is 32767.
+    EXPECT_EQ(detail::eval_integral_part_max_digits10<fixed64>(), 10); // max value of fixed64 is 0X7FFFFFFF.
     EXPECT_EQ(cos(0_f32), 1_f32);
     EXPECT_TRUE(expect_fixed_eq(cos(fixed32::pi() / 3), 0.5_f32));
     EXPECT_TRUE(expect_fixed_eq(cos(1_f32), 0.540302_f32));
@@ -153,11 +155,12 @@ TEST(Fixed32, Math)
     EXPECT_EQ(cbrt(8_f32), 2_f32);
     EXPECT_EQ(cbrt(27_f32), 3_f32);
     EXPECT_EQ(log2(2_f32), 1_f32);
-    EXPECT_EQ(log2(10_f32), 3.321928_f32);
+    EXPECT_TRUE(expect_fixed_eq(log2(10_f32), 3.321928_f32));
     EXPECT_TRUE(expect_fixed_eq(log(fixed32::e()), 1_f32));
     EXPECT_TRUE(expect_fixed_eq(log(114.514_f32), 4.740697_f32));
     EXPECT_TRUE(expect_fixed_eq(log10(10_f32), 1_f32));
-    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f32), 2.058859_f32));
+    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f32), 2.05885858494_f32));
+    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f64), 2.05885858494_f64));
     EXPECT_TRUE(expect_fixed_eq(exp(1_f32), fixed32::e()));
     EXPECT_TRUE(expect_fixed_eq(radians(180_f32), numbers::pi));
     EXPECT_TRUE(expect_fixed_eq(degrees(numbers::pi), 180_f32));

@@ -172,6 +172,21 @@ static void f32_pow(benchmark::State& state)
         benchmark::ClobberMemory();
     }
 }
+static void f32_pow_fast(benchmark::State& state)
+{
+    auto fp1 = F32_FROM_BENCH(0);
+    auto fp2 = F32_FROM_BENCH(1);
+    for(auto _ : state)
+    {
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = pow_fast(input1, input2);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
 
 static void f32_sin(benchmark::State& state)
 {
@@ -414,6 +429,22 @@ static void f64_exp(benchmark::State& state)
     }
 }
 
+static void f64_pow_fast(benchmark::State& state)
+{
+    auto fp1 = F64_FROM_BENCH(0);
+    auto fp2 = F64_FROM_BENCH(1);
+    for(auto _ : state)
+    {
+        auto input1 = fp1, input2 = fp2;
+        benchmark::DoNotOptimize(input1);
+        benchmark::DoNotOptimize(input2);
+
+        auto result = pow_fast(input1, input2);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
 static void f64_pow(benchmark::State& state)
 {
     auto fp1 = F64_FROM_BENCH(0);
@@ -540,6 +571,7 @@ BENCHMARK(f32_log)->Args({BENCH_F32_VAL(1145.14)});
 BENCHMARK(f32_log10)->Args({BENCH_F32_VAL(1145.14)});
 BENCHMARK(f32_exp)->Args({BENCH_F32_VAL(11.4514)});
 BENCHMARK(f32_pow)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
+BENCHMARK(f32_pow_fast)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
 BENCHMARK(f32_sin)->Args({BENCH_F32_VAL(1145.14)});
 BENCHMARK(f32_cos)->Args({BENCH_F32_VAL(1145.14)});
 BENCHMARK(f32_tan)->Args({BENCH_F32_VAL(1145.14)});
@@ -559,6 +591,7 @@ BENCHMARK(f64_log)->Args({BENCH_F64_VAL(1145.14)});
 BENCHMARK(f64_log10)->Args({BENCH_F64_VAL(1145.14)});
 BENCHMARK(f64_exp)->Args({BENCH_F64_VAL(11.4514)});
 BENCHMARK(f64_pow)->Args({BENCH_F64_VAL(11.4514), BENCH_F64_VAL(3.5)});
+BENCHMARK(f64_pow_fast)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
 BENCHMARK(f64_sin)->Args({BENCH_F64_VAL(1145.14)});
 BENCHMARK(f64_cos)->Args({BENCH_F64_VAL(1145.14)});
 BENCHMARK(f64_tan)->Args({BENCH_F64_VAL(1145.14)});

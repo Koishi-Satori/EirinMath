@@ -7,8 +7,12 @@
 #    include <utility>
 #endif
 
-#define EIRIN_ENABLE  1
-#define EIRIN_DISABLE 0
+#define EIRIN_ENABLE           1
+#define EIRIN_DISABLE          0
+
+#define EIRIN_OVERFLOW_DEFAULT 0
+#define EIRIN_OVERFLOW_MODWRAP 1
+#define EIRIN_OVERFLOW_SAT     2
 
 #ifdef __GNUC__
 #    ifndef __clang__
@@ -42,7 +46,9 @@
 #endif
 
 // arch detection
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if defined(__pnacl__)
+#    define EIRIN_ARCH_PNACL
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #    define EIRIN_ARCH_X86
 #elif defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
 #    define EIRIN_ARCH_ARM
@@ -89,6 +95,25 @@
 #    define EIRIN_UNREACHABLE __assume(false)
 #else
 #    define EIRIN_UNREACHABLE __builtin_unreachable()
+#endif
+
+// if the ++/-- operator should mod-warp or sat the value when meet UQ(N) or Q(N-1).
+// for best performance, default option is no-op.
+
+#ifdef EIRIN_MODWRAP_FIXED_INC_DEC
+#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_MODWRAP
+#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_MODWRAP
+#endif
+#ifdef EIRIN_SAT_FIXED_INC_DEC
+#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_SAT
+#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_SAT
+#endif
+
+#ifndef EIRIN_FIXED_NUM_SELF_INC_OVERFLOW
+#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
+#endif
+#ifndef EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW
+#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
 #endif
 
 #endif // EIRIN_MATH_MARCO_HPP

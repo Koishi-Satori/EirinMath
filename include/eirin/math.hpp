@@ -6,6 +6,7 @@
 #include "fixed.hpp"
 #include <stdexcept>
 #include "numbers.hpp"
+#include "detail/math_impl.hpp"
 
 namespace eirin
 {
@@ -104,66 +105,25 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> f
     using fixed = fixed_num<T, I, f, r>;
     // test if T is int32_t, if so, we can use the fast sqrt algorithm.
     // if not, using newton method.
-    if constexpr(std::is_same_v<T, int32_t>)
+    if constexpr(std::is_same_v<T, int32_t> && f == 16)
     {
-        uint64_t t, q = 0, b = 0x40000000UL, v;
-        if constexpr(f > 16)
+        if(fp < fixed(0))
+            return fixed(-1);
+        if(fp == fixed(0))
+            return fixed(0);
+        const uint64_t N = static_cast<uint64_t>(static_cast<uint32_t>(fp.internal_value())) << f;
+        uint64_t m = uint64_t(1) << (2 * ((std::bit_width(N) - 1) / 2));
+        uint64_t y = 0, R = N;
+        while(m != 0)
         {
-            constexpr auto move = f - 16;
-            v = fp.internal_value() >> move;
+            const uint64_t b = y | m;
+            y >>= 1;
+            const uint64_t ge = uint64_t(0) - static_cast<uint64_t>(R >= b);
+            R -= b & ge;
+            y |= m & ge;
+            m >>= 2;
         }
-        else
-        {
-            constexpr auto move = 16 - f;
-            v = fp.internal_value() << move;
-        }
-
-        // fix number sqrt using bit hack.
-        if(v < 0x40000200)
-        {
-            while(b != 0x40)
-            {
-                t = q + b;
-                if(v >= t)
-                {
-                    v -= t;
-                    q = t + b;
-                }
-                v <<= 1;
-                b >>= 1;
-            }
-            return fixed::from_internal_value(static_cast<T>(q >> 8));
-        }
-        while(b > 0x40)
-        {
-            t = q + b;
-            if(v >= t)
-            {
-                v -= t;
-                q = t + b;
-            }
-            if((v & 0x80000000) != 0)
-            {
-                q >>= 1;
-                b >>= 1;
-                v >>= 1;
-                while(b > 0x20)
-                {
-                    t = q + b;
-                    if(v >= t)
-                    {
-                        v -= t;
-                        q = t + b;
-                    }
-                    v <<= 1;
-                    b >>= 1;
-                }
-                return fixed::from_internal_value(static_cast<T>(q >> 7));
-            }
-            v <<= 1;
-            b >>= 1;
-        }
-        return fixed::from_internal_value(static_cast<T>(q >> 8));
+        return fixed::from_internal_value(static_cast<T>(y));
     }
     else
     {
@@ -171,74 +131,83 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> f
             return fixed(-1);
         if(fp == fixed(0))
             return fixed(0);
+
         const T val = fp.internal_value();
-        const auto exponent = detail::find_msb(val);
-
-        const auto init_value = fixed::get_sqrt_init_value(exponent);
-        auto x = fixed::from_internal_value(init_value);
-
-        auto eps = fixed::epsilon();
-        for(int i = 0; i < 5; ++i)
+        const int e = static_cast<int>(fp.bit_width()) - 1;
+        int64_t seed;
+        if(e >= 12)
         {
-            x = (x + fp / x) / 2;
-            if(abs(fp - x * x) < eps)
-                break;
+            const int t = static_cast<int>(static_cast<uint64_t>(val) >> (e - 11));
+            seed = detail::sqrt_mantissa_table[t];
+            int sh = (e - 11) / 2 + static_cast<int>(f) / 2 - 16;
+            if((e & 1) == 0)
+            {
+                // round(sqrt(2)·2^15) = 46341
+                seed = (seed * 46341) >> 15; // *sqrt(2)
+            }
+            seed = sh >= 0 ? seed << sh : seed >> (-sh);
         }
+        else
+        {
+            seed = detail::sqrt_mantissa_table[static_cast<int>(static_cast<uint64_t>(val))];
+            const int sh = static_cast<int>(f) / 2 - 16;
+            seed = sh >= 0 ? seed << sh : seed >> (-sh);
+        }
+        auto x = fixed::from_internal_value(static_cast<T>(seed));
+        x = (x + fp / x) / 2;
+        x = (x + fp / x) / 2;
         return x;
     }
 }
 
 /**
- * @brief sine function for fixed point number.
+ * @brief sine function with widened internal precision.
+ *
+ * Computes sin(x) on a fixed point type with more fraction bits when the
+ * fraction of the input type is too small to express the minimax parameters,
+ * so that the minimax polynomial evaluation is carried out with higher
+ * precision before the result is narrowed back to the original type.
+ *
+ * The wide_fraction is chosen as the smallest fraction that can exactly
+ * express the minimax coefficients (currently 32). When the fixed point type
+ * cannot provide that many fraction bits (wide_fraction larger than the
+ * type's feasible fraction), this function falls back to the Taylor sin().
  *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp
- * @return sin(fp)
+ * @param fp the input angle.
+ * @return sin(fp), computed with widened precision when possible.
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    auto x = fixed(fp);
-    x %= fixed::double_pi();
-    x /= fixed::pi_2();
-    constexpr auto fp1 = fixed(1);
-    constexpr auto fp2 = fixed(2);
+    constexpr unsigned int best_wide_fraction = detail::sin_minimax_required_fraction();
 
-    if(x < fixed(0))
-        x += fixed(4);
-
-    auto negative = false;
-    if(x > fp2)
+    if constexpr(f >= best_wide_fraction)
     {
-        negative = true;
-        x -= fp2;
+        return detail::sin_minimax<T, I, f, r, pi>(fp);
     }
-
-    // we reconginzed the sin(x) = x when x is small enough.
-    // sin(0.00015) = 0.000149999999437, so we use 0.0001 as the threshold.
-    // TODO: replace it with fixed::template from_fixed_num_value<61>(0x13A92A0000000)
-    if(abs(fp) < fixed(0.00015))
-        return negative ? -fp : fp;
-
-    // reduce the range to [0, 1] due to sin is
-    // symmetrical around PI / 2 in the domain [0, PI].
-    if(x > fp1)
-        x = fp2 - x;
-
-    // we use tyler series to calculate sin(x).
-    // n = 4 has enough precision.
-    const auto x2 = x * x;
-    constexpr auto a = pi * pi / 24;
-    constexpr auto b = pi * pi / 80;
-    constexpr auto c = pi * pi / 168;
-    constexpr auto d = pi * pi / 288;
-    auto res = fixed::pi() * x * (fp1 - a * x2 * (fp1 - b * x2 * (fp1 - c * x2 * (fp1 - d * x2)))) / 2;
-    return negative ? -res : res;
+    else
+    {
+        constexpr int max_fraction = static_cast<int>(fixed::digits) - 3;
+        if constexpr(max_fraction >= static_cast<int>(best_wide_fraction))
+        {
+            using wide = fixed_num<T, I, best_wide_fraction, r>;
+            constexpr I scale = static_cast<I>(1) << (best_wide_fraction - f);
+            const I scaled = static_cast<I>(fp.internal_value()) * scale;
+            if(scaled >= static_cast<I>(std::numeric_limits<T>::min()) &&
+               scaled <= static_cast<I>(std::numeric_limits<T>::max()))
+            {
+                const wide wx = wide::from_internal_value(static_cast<T>(scaled));
+                const wide wres = detail::sin_minimax<T, I, f, r, pi>(wx);
+                return fixed::from_internal_value(static_cast<T>(wres.internal_value() / scale));
+            }
+        }
+        return detail::sin_taylor<T, I, f, r, pi>(fp);
+    }
 }
 
 /**
@@ -284,13 +253,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp
      * @param fp the x of atan(x)
      * @return atan(x).
      */
-template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
+template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    constexpr auto a = -1 * fixed::template from_fixed_num_value<61>(0X17CE62CE264A340); // 0.0464964749
-    constexpr auto b = fixed::template from_fixed_num_value<61>(0X5191A2296020A80); // 0.15931422
-    constexpr auto c = fixed::template from_fixed_num_value<61>(0XA7BE2BC19C39800); // 0.327622764
+    constexpr auto a = detail::eval_const<char, T, I, f, r>("-0.0464964749");
+    constexpr auto b = detail::eval_const<char, T, I, f, r>("0.15931422");
+    constexpr auto c = detail::eval_const<char, T, I, f, r>("0.327622764");
     // TODO: because fixed point cannot represent infinity, so we need to handle the case when fp is very large.
     auto abs_fp = abs(fp);
     auto x = abs_fp;
@@ -300,24 +269,6 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> f
     if(fp.signbit_mask() & fp.internal_value())
         result = -result;
     return result;
-    // another calc algorithm: x / (1 + 0.28125 * x * x)
-    // constexpr auto factor = fixed::template from_fixed_num_value<61>(0X900000000000000); // 0.28125
-    // constexpr auto fp_1 = fixed(1);
-    // if(abs(fp) > fixed(1))
-    // {
-    //     constexpr auto pi_2 = pi / fixed(2);
-    //     constexpr auto neg_pi_2 = -pi_2;
-    //     auto x = fp_1 / fp;
-    //     if(fp > fixed(0))
-    //         return pi_2 - (x / (fp_1 + factor * x * x));
-    //     else
-    //         return neg_pi_2 - (x / (fp_1 + factor * x * x));
-    // }
-    // return fp / (fp_1 + factor * fp * fp);
-    // constexpr auto a = fixed::template from_fixed_num_value<61>(0X730BE0DED288D00); // 0.2247
-    // constexpr auto b = fixed::template from_fixed_num_value<61>(0X21F212D77318FC0); // 0.0663
-    // constexpr auto pi_4 = pi / fixed(4);
-    // return pi_4 * fp - fp * (abs(fp) - fixed(1)) * (a - b * abs(fp));
 }
 
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -379,108 +330,6 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> f
     return x;
 }
 
-/**
- * @brief log2 function for fixed point number, which used some bit hacks.
- *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @param fp
- * @return log2(fp)
- */
-template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp)
-{
-    using fixed = fixed_num<T, I, f, r>;
-
-    // This implementation is based on Clay. S. Turner's fast binary logarithm[1].
-    // For some unknown reason, the GCC/Clang optimize this code to a very fast implementation,
-    // when using '-O2' optimization and the fixed point number is a constant or literal,
-    // it is even faster than the standard library's floating-point log2 function.
-    // However, '-O3' optimization will not optimize this code to a fast implementation in the
-    // same situation.
-    // To be specific, the third loop(the for loop) will be optimized to the next assembly code:
-    // ```
-    // .L4:
-    //         imul    rax, rax
-    //         mov     rdi, rax
-    //         shr     rax, 16
-    //         cmp     rax, 131071
-    //         jbe     .L3
-    //         mov     rax, rdi
-    //         add     rsi, rcx
-    //         shr     rax, 17
-    // ```
-    // The .L3 code segments is the main function code, and the .L4 code segments is the for loop code.
-    // The assembly code of '-O3' optimization is to expand the for loop code into tons of code segments,
-    // which makes the performance of the code much slower than '-O2' optimization.
-    // I prefer this situation is abnormal, but I don't know why.
-    T b = 1u << (f - 1), y = 0, x = fp.internal_value();
-    if(fp <= fixed(0))
-        EIRIN_THROW_EXCEPTION(std::domain_error, "log2() domain error");
-
-    while(x < (static_cast<T>(1u) << f))
-    {
-        x <<= 1;
-        y -= (static_cast<T>(1u) << f);
-    }
-
-    while(x >= (static_cast<T>(2u) << f))
-    {
-        x >>= 1;
-        y += (static_cast<T>(1u) << f);
-    }
-
-    I z = x;
-    for(size_t i = 0; i < f; ++i)
-    {
-        z = (z * z) >> f;
-        if(z >= (static_cast<T>(2u) << f))
-        {
-            z >>= 1;
-            y += b;
-        }
-        b >>= 1;
-    }
-
-    return fixed::from_internal_value(y);
-}
-
-/**
- * @brief ln function for fixed point number, which used the log2 function to calculate the ln.
- *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @tparam log2_e the log2(e) value, and its default value is designed for 32bit and 64bit fixed number. if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp
- * @return log(fp)
- */
-template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> log2_e = fixed_num<T, I, f, r>::template from_fixed_num_value<60>(0x171547652B82FE00ll)>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp)
-{
-    return log2(fp) / log2_e;
-}
-
-/**
- * @brief the log10 function for fixed point number, which used the log2 function to calculate the log10.
- *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @tparam log2_10 the log2(10) value, and its default value is designed for 32bit and 64bit fixed number. if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp
- * @return log10(fp)
- */
-template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> log2_10 = fixed_num<T, I, f, r>::template from_fixed_num_value<60>(0x35269E12F346E200ll)>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp)
-{
-    return log2(fp) / log2_10;
-}
-
 template <typename T, typename I, unsigned int f, bool r, std::integral E>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, E e) noexcept
 {
@@ -512,56 +361,303 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b,
     return res;
 }
 
-namespace detail
-{
-    template <typename T, typename I, unsigned int f, bool r>
-    EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_expand(fixed_num<T, I, f, r> fp) noexcept
-    {
-        using fixed = fixed_num<T, I, f, r>;
-        // the integer part of the input fixed point number.
-        const T x_int = fp.integral_part();
-        fp -= x_int;
-
-        constexpr auto a = fixed::template from_fixed_num_value<63>(0x01C798ECC0CBC856ll); // 1.3903728105644451e-2
-        constexpr auto b = fixed::template from_fixed_num_value<63>(0x04745859810836DAll); // 3.4800571158543038e-2
-        constexpr auto c = fixed::template from_fixed_num_value<63>(0x15CFBB5C306F85F3ll); // 1.7040197373796334e-1
-        constexpr auto d = fixed::template from_fixed_num_value<63>(0x3FE26186C531F98Ell); // 4.9909609871464493e-1
-        constexpr auto e = fixed::template from_fixed_num_value<63>(0x40014D4407008BB0ll); // 1.0000794567422495
-        constexpr auto _f = fixed::template from_fixed_num_value<63>(0x7FFFF686446F1B43ll); // 9.9999887043019773e-1
-        return pow(numbers::e_v<fixed>(), x_int) * (_f + fp * (e + fp * (d + fp * (c + fp * (b + fp * a)))));
-    }
-} // namespace detail
-
+/**
+ * @brief Exponential function for fixed point number.
+ *
+ * On Q-formats (digits_int == 0, e.g. f == digits) exp(r) >= 1 does not fit
+ * the storage type, so the raw-intermediate detail::exp_inline of pow is used
+ * (with saturation semantics on overflow).
+ */
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-
-    if(fp == fixed(0))
-        return fixed(1);
-    if(fp < fixed(0))
-        return fixed(1) / detail::exp_expand(-fp);
-    return detail::exp_expand(fp);
+    if constexpr(f == static_cast<unsigned int>(fixed::digits))
+        return detail::exp_inline<T, I, f, r>(static_cast<I>(fp.internal_value()), I(0));
+    else
+        return detail::exp_impl<T, I, f, r, overflow_strategy::DEFAULT>(fp);
 }
 
-// TODO: This function has performance issue on MSVC,
-// which is about 5x slower than the result of clang-cl.
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_sat(fixed_num<T, I, f, r> fp) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    if constexpr(f == static_cast<unsigned int>(fixed::digits))
+        return detail::exp_inline<T, I, f, r>(static_cast<I>(fp.internal_value()), I(0));
+    else
+        return detail::exp_impl<T, I, f, r, overflow_strategy::SATURATION>(fp);
+}
+
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_modwarp(fixed_num<T, I, f, r> fp) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    if constexpr(f == static_cast<unsigned int>(fixed::digits))
+        return detail::exp_inline<T, I, f, r>(static_cast<I>(fp.internal_value()), I(0));
+    else
+        return detail::exp_impl<T, I, f, r, overflow_strategy::MODWRAP>(fp);
+}
+
+/**
+ * @brief Fast log2 based on polynomial fitting.
+ *
+ * This function perform exponent-digit decomposition first: x = m*2^e, 1 <= m < 2.
+ * Then exponent e = floor(log2 x), we can use bitwise to get this.
+ * And we use minimax poly to calc log(m).
+ * Finally, according to logarithmic formula, result = e + log(m).
+ *
+ * For Q-formats (digits_int == 0, e.g. f == digits) the polynomial coefficients
+ * would exceed the storage range, so log2 falls back to the raw-intermediate
+ * ln machinery used by pow (detail::log_inline).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x, must be positive.
+ * @return log2(x) as a fixed-point approximation.
+ */
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp)
+{
+    using fixed = fixed_num<T, I, f, r>;
+    if(fp <= fixed(0))
+        EIRIN_THROW_EXCEPTION(std::domain_error, "log2() domain error");
+
+    if constexpr(f == static_cast<unsigned int>(fixed::digits))
+    {
+        // Q-formats (digits_int == 0): the log2 polynomial coefficients exceed
+        // the storage range, so reuse the raw-intermediate ln machinery of pow.
+        const auto ln = detail::log_inline(fp);
+        constexpr auto sc = detail::pow_scales<T, I, f>{};
+        using J = typename detail::make_signed<I>::type;
+        const J hi = static_cast<J>(ln.hi);
+        const J lo = static_cast<J>(ln.lo);
+        // ln(b) at f bits: hi at 2^L, lo at 2^S
+        const J ln_f = (sc.L >= f ? detail::pow_rshift(hi, sc.L - f) : hi << (f - sc.L)) +
+                       detail::pow_rshift(lo, sc.S - f);
+        // log2(b) = ln(b) * log2(e); log2(e)*2^61 = 0x2E2A8ECA5705FC00
+        constexpr J log2e_f = detail::pow_scale_61<J, f>(0x2E2A8ECA5705FC00ll);
+        const J log2_f = detail::pow_rshift(ln_f * log2e_f, f);
+        return fixed::from_internal_value(static_cast<T>(log2_f));
+    }
+
+    constexpr unsigned int max_wide_fraction = static_cast<unsigned int>(fixed::digits) - 2 < 60u ?
+                                                   static_cast<unsigned int>(fixed::digits) - 2 :
+                                                   60u;
+    constexpr unsigned int best_fraction = max_wide_fraction > f ? (2 * f < max_wide_fraction ? 2 * f : max_wide_fraction) : f;
+    using work = fixed_num<T, I, best_fraction, false>;
+    constexpr I isqrt2 = static_cast<I>(numbers::sqrt2_v<work>().internal_value());
+
+    // e = floor(log2(fp)); m = fp / 2^e in [1, 2).
+    const I x_i = static_cast<I>(fp.internal_value());
+    const int e = static_cast<int>(fp.bit_width()) - 1 - static_cast<int>(f);
+    I m_work;
+    if(e >= 0)
+        m_work = static_cast<I>(x_i >> e) << (best_fraction - f);
+    else
+        m_work = static_cast<I>(x_i << (-e)) << (best_fraction - f);
+
+    // Reduce m to [sqrt(2)/2, sqrt(2)) so that t stays in the fit interval.
+    int e2 = e;
+    if(m_work >= isqrt2)
+    {
+        m_work >>= 1;
+        ++e2;
+    }
+
+    const work t = work::from_internal_value(static_cast<T>(m_work - (static_cast<I>(1) << best_fraction)));
+    const auto p = detail::log2_minimax<T, I, best_fraction, false>(t);
+
+    // result = e2 + p, narrowed back to f bits with round-to-nearest.
+    I p_f;
+    if constexpr(best_fraction > f)
+    {
+        constexpr unsigned int shift = best_fraction - f;
+        const I p_work = static_cast<I>(p.internal_value());
+        if(p_work >= 0)
+            p_f = (p_work + (static_cast<I>(1) << (shift - 1))) >> shift;
+        else
+            p_f = -(((-p_work) + (static_cast<I>(1) << (shift - 1))) >> shift);
+    }
+    else
+    {
+        p_f = static_cast<I>(p.internal_value());
+    }
+
+    return fixed::from_internal_value(static_cast<T>(static_cast<I>(e2) << f) + static_cast<T>(p_f));
+}
+
+/**
+ * @brief ln function for fixed point number.
+ *
+ * Computed as log2(fp) * ln(2): the multiply form works for any fraction
+ * width (the old log2_e divisor cannot be represented on formats whose
+ * integer part is empty, e.g. Q127), and the constant is a raw 61-bit dyadic
+ * so no parse limit applies.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp
+ * @return log(fp)
+ */
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp)
+{
+    using fixed = fixed_num<T, I, f, r>;
+    // ln(2)*2^61 = 0x162E42FEFA39EF00
+    constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
+                                       static_cast<T>(detail::pow_scale_61<I, f>(0x162E42FEFA39EF00ll))
+                                   ) :
+                                   numbers::ln2_v<fixed>();
+    return log2(fp) * ln2;
+}
+
+/**
+ * @brief the log10 function for fixed point number.
+ *
+ * Computed as log2(fp) * log10(2), see log for the motivation.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp
+ * @return log10(fp)
+ */
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp)
+{
+    using fixed = fixed_num<T, I, f, r>;
+    // log10(2)*2^61 = 0x9A209A84FBCFF7A
+    constexpr fixed log10_2 = f < 20 ? fixed::from_internal_value(
+                                           static_cast<T>(detail::pow_scale_61<I, f>(0x9A209A84FBCFF7All))
+                                       ) :
+                                       detail::eval_const<char, T, I, f, r>("0.301029995663981195213738894724493027");
+    return log2(fp) * log10_2;
+}
+
+/**
+ * @brief High-precision fixed-point pow, computed as exp(e * ln(b)).
+ *
+ * Follows the same algorithm shape as glibc's double-precision pow
+ * (sysdeps/ieee754/dbl-64/e_pow.c): detail::log_inline evaluates ln(b) as a
+ * hi/lo split, e * ln(b) is formed as one wide product (e*hi + e*lo), and
+ * detail::exp_inline finishes the exponentiation with the residual tail folded
+ * into the argument reduction.
+ *
+ * Implementation notes:
+ *  - The ln(1+t)/t minimax polynomial (degree 17, 60-bit coefficients, error
+ *    ~= 7.4e-16) and the exp minimax polynomial (degree 9, 60-bit
+ *    coefficients, error ~= 1.9e-14) are generated with sollya fpminimax
+ *    following tools/sollya_fpminimax.py, and rescaled at compile time to fit
+ *    the widest scale the intermediate type allows.
+ *  - Out-of-range results saturate (positive overflow to max, negative
+ *    overflow to 0), negative bases are supported for integer exponents.
+ *
+ * Works for any fixed_num<T, I, f, r>, including user-defined and unsigned
+ * types; for unsigned types the base must be >= 1 (same restriction as exp).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param b the base.
+ * @param e the exponent.
+ * @return b^e as a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
+    using UI = typename detail::make_signed<I>::type;
+
+    // special cases
     if(b == fixed(0))
+        return e == fixed(0) ? fixed(1) : fixed(0);
+    if(e == fixed(0))
+        return fixed(1);
+    if(b == fixed(1))
+        return fixed(1);
+    if(e == fixed(1))
+        return b;
+
+    bool sign_neg = false;
+    if constexpr(detail::is_signed_v<I>)
     {
-        if(e == fixed(0))
-            return fixed(1);
-        return fixed(0);
+        if(b < fixed(0))
+        {
+            // a negative base is only defined for integer exponents
+            if(e.fractional_part() != 0)
+                EIRIN_THROW_EXCEPTION(std::domain_error, "pow() domain error");
+            sign_neg = ((static_cast<I>(e.internal_value()) >> f) & 1) != 0;
+            b = -b;
+        }
     }
+    if(b == fixed(1)) // (-1)^e
+        return sign_neg ? fixed(-1) : fixed(1);
 
-    // the integer part of the input exponent.
-    const T e_int = static_cast<T>(e.internal_value() / (I(1) << f));
-    e -= e_int;
+    constexpr auto sc = detail::pow_scales<T, I, f>{};
+    constexpr unsigned int L = sc.L;
+    constexpr unsigned int S = sc.S;
+    constexpr unsigned int Pp = sc.Pp;
+    constexpr unsigned int f_plus_L = f + L;
 
-    return pow(b, e_int) * exp(e * log(b));
+    // ln(b) = hi/2^L + lo/2^S
+    const auto ln = detail::log_inline(b);
+    const UI ln_hi = static_cast<UI>(ln.hi);
+    const UI ln_lo = static_cast<UI>(ln.lo);
+    const UI e_j = static_cast<UI>(e.internal_value());
+
+    // e*ln(b) = e*hi + e*lo, kept at f+L bits; pre-scale lo on very wide types
+    // so that the raw e*lo product always fits in I
+    constexpr unsigned int lo_bits = S - L;
+    constexpr unsigned int elo_sh = (f + lo_bits > sc.I_bits - 1u) ? (f + lo_bits - (sc.I_bits - 1u)) : 0u;
+    constexpr UI elo_bound = static_cast<UI>(1) << (f + sc.di_bits);
+    const UI ln_abs = ln_hi < 0 ? -ln_hi : ln_hi;
+    const UI e_abs = e_j < 0 ? -e_j : e_j;
+    if(ln_abs != 0 && e_abs > (std::numeric_limits<UI>::max() - elo_bound) / ln_abs)
+    {
+        // |e * ln b| is beyond the representable range of the result
+        const bool prod_neg = (ln_hi < 0) != (e_j < 0);
+        fixed sat = prod_neg ? fixed(0) : fixed::from_internal_value(std::numeric_limits<T>::max());
+        return sign_neg ? -sat : sat;
+    }
+    const UI ehi_raw = e_j * ln_hi; // at f+L bits
+    const UI elo_part = detail::pow_rshift(e_j * (ln_lo >> elo_sh), lo_bits - elo_sh); // at f+L bits
+    const UI A = ehi_raw + elo_part;
+
+    // exponent at Pp bits, split into an f-bit head and a residual tail
+    const UI prod = detail::pow_rshift(A, f_plus_L - Pp);
+    const UI hi_exp = detail::pow_rshift(prod, Pp - f);
+    const UI lo_exp = prod - (hi_exp << (Pp - f));
+
+    const fixed res = detail::exp_inline<T, I, f, r>(static_cast<I>(hi_exp), static_cast<I>(lo_exp));
+    return sign_neg ? -res : res;
+}
+
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    // special cases
+    if(b == fixed(0))
+        return e == fixed(0) ? fixed(1) : fixed(0);
+    if(e == fixed(0))
+        return fixed(1);
+    if(b == fixed(1))
+        return fixed(1);
+    if(e == fixed(1))
+        return b;
+
+    constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
+                                       static_cast<T>(detail::pow_scale_61<I, f>(0x162E42FEFA39EF00ll))
+                                   ) :
+                                   numbers::ln2_v<fixed>();
+
+    return exp(e * log2(b * ln2));
 }
 
 template <typename T, typename I, unsigned int f, bool r>

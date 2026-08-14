@@ -131,7 +131,7 @@ public:
         {
             // fractional part
             T frac_val = fp.fractional_part();
-            if constexpr(std::is_signed_v<T>)
+            if constexpr(eirin::detail::is_signed_v<T>)
             {
                 if(frac_val < 0)
                     frac_val = -frac_val;
@@ -196,7 +196,7 @@ private:
         using unsigned_type = std::make_unsigned_t<T>;
         unsigned_type uval;
 
-        if constexpr(std::is_signed_v<T>)
+        if constexpr(eirin::detail::is_signed_v<T>)
         {
             if(int_val < 0)
             {
@@ -255,7 +255,7 @@ private:
 
         using unsigned_type = std::make_unsigned_t<ValType>;
         unsigned_type uval;
-        if constexpr(std::is_signed_v<ValType>)
+        if constexpr(eirin::detail::is_signed_v<ValType>)
         {
             uval = ival < 0 ? static_cast<unsigned_type>(-(ival + 1)) + unsigned_type(1) : static_cast<unsigned_type>(ival);
         }
