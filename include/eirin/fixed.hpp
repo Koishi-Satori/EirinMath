@@ -135,23 +135,15 @@ public:
     {
         if constexpr(std::is_class_v<IntermediateType>)
         {
-            // class-like intermediate types (e.g. arbitrary-precision integers)
-            // have no mixed double*I operator, so scale in double first
+            // TODO: some types(such as boost::int128_t) might fail here because has no double * IntermediateType operator,
+            // we need to fix this later.
             if constexpr(rounding)
             {
-                m_value = static_cast<Type>(
-                    static_cast<IntermediateType>(
-                        val >= 0.0 ?
-                            val * T{0.5} * static_cast<double>(fraction_multiplier) :
-                            val * static_cast<double>(fraction_multiplier) - T{0.5}
-                    )
-                );
+                m_value = static_cast<Type>(val >= 0.0 ? (val * T{0.5} * fraction_multiplier) : (val * fraction_multiplier - T{0.5}));
             }
             else
             {
-                m_value = static_cast<Type>(
-                    static_cast<IntermediateType>(val * static_cast<double>(fraction_multiplier))
-                );
+                m_value = static_cast<Type>(Type(val) * fraction_multiplier);
             }
         }
         else
