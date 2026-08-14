@@ -35,7 +35,7 @@ namespace eirin
 namespace detail
 {
     template <typename T>
-    consteval const std::size_t __eval_max_bit_width() noexcept
+    consteval std::size_t __eval_max_bit_width() noexcept
     {
         if constexpr(std::numeric_limits<T>::is_specialized && std::numeric_limits<T>::radix == 2)
         {
@@ -301,9 +301,17 @@ public:
     template <std::floating_point T>
     constexpr inline explicit operator T() const noexcept
     {
-        // convert to floating point first, so the division is not truncated.
-        // MSVC might warn about precision loss when converting the inner value, but it's expected.
-        return static_cast<T>(m_value) / static_cast<T>(fraction_multiplier);
+        // MSVC might warn about precision loss here, but it's expected.
+        // MSVC's 128-bit integer-class type has no conversion to floating point,
+        // so split into integral and fractional parts in value_type arithmetic.
+        const value_type quot = static_cast<value_type>(m_value / fraction_multiplier);
+        const value_type rem = static_cast<value_type>(m_value % fraction_multiplier);
+        T divisor = T(1);
+        for(unsigned int i = 0; i < fraction; ++i)
+        {
+            divisor *= T(2);
+        }
+        return static_cast<T>(quot) + static_cast<T>(rem) / divisor;
     }
 
     constexpr inline fixed_num operator+(const fixed_num& other) const noexcept
@@ -991,11 +999,23 @@ namespace detail
         constexpr bool is_signed = detail::is_signed_v<T>;
         // we need to calculate the max value if using std::numeric_limits::max
         // due to the fixed has precision bits, the max value of the integral part is not equal to std::numeric_limits::max.
-        constexpr U max_unsigned = static_cast<U>(
-            std::numeric_limits<T>::is_specialized ?
-                std::numeric_limits<T>::max() :
-                (is_signed ? (T(1) << (bit_width - 1)) - 1 : (T(1) << bit_width) - 1)
-        );
+        constexpr U max_unsigned = []() constexpr
+        {
+            if constexpr(std::numeric_limits<T>::is_specialized)
+            {
+                return static_cast<U>(std::numeric_limits<T>::max());
+            }
+            else if constexpr(is_signed)
+            {
+                // 2^(bit_width-1) - 1, computed in unsigned arithmetic.
+                return (U(1) << (bit_width - 1)) - U(1);
+            }
+            else
+            {
+                // 2^bit_width - 1.
+                return ~U(0);
+            }
+        }();
         constexpr U max_int_part = max_unsigned >> precision;
         constexpr T max_value = static_cast<T>(max_int_part);
         std::size_t digits = 0;
@@ -1373,7 +1393,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
 {
     using fixed_type = eirin::fixed_num<T, I, f, r>;
 
-    static consteval int calc_digits10() noexcept
+    static constexpr int calc_digits10() noexcept
     {
         // digits10 = floor((sizeof(T) * 8 - 1) * log10(2)).
         // Use the rational approximation log10(2) ≈ 643 / 2136 (error ~3.3e-8).
@@ -1381,7 +1401,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
         // n * log10(2) is at least 1.4e-3 away from the nearest integer,
         // far larger than the accumulated approximation error, so the
         // integer division yields the exact floor value.
-        constexpr int n = eirin::detail::__eval_max_bit_width<T>();
+        constexpr int n = static_cast<int>(eirin::detail::__eval_max_bit_width<T>());
         return n * 643 / 2136;
     }
 
@@ -1395,7 +1415,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
 
     static constexpr int radix = 2;
     // 1 bit sign + fractions bits + integer bits
-    static constexpr int digits = fixed_type::digits;
+    static constexpr int digits = static_cast<int>(fixed_type::digits);
     static constexpr int digits10 = calc_digits10();
     static constexpr int min_exponent = 0;
     static constexpr int min_exponent10 = 0;
