@@ -3,10 +3,10 @@
 
 // IWYU pragma: begin_exports
 
+#include "macro.hpp"
 #include "fixed.hpp"
 #include "math.hpp"
 #include "io/parse.hpp"
-#include "macro.hpp"
 #include "numbers.hpp"
 #include "random.hpp"
 #include "vec.hpp"

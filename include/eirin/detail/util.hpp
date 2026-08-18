@@ -4,8 +4,8 @@
 #include <cmath>
 #include <array>
 #include <cstdio>
-#include "int128.hpp"
 #include "../eirin.hpp"
+#include "int128.hpp"
 #ifndef EIRIN_MATH_NO_SIMD
 #    include <immintrin.h>
 #endif

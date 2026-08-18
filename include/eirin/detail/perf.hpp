@@ -5,8 +5,8 @@
 
 #include <cmath>
 #include <cstdio>
-#include "int128.hpp"
 #include "../eirin.hpp"
+#include "int128.hpp"
 
 namespace eirin
 {

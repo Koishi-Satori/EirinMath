@@ -8,7 +8,9 @@
 #include <limits>
 #include <type_traits>
 #include "../macro.hpp"
-#include "../detail/type_traits_impl.hpp"
+#if EIRIN_USE_EXT_BUILTIN_INT128 != EIRIN_ENABLE
+#    include "../detail/type_traits_impl.hpp"
+#endif
 
 #if defined(_MSC_VER)
 #    include <intrin.h>
@@ -48,10 +50,7 @@ namespace detail
     }
 
     EIRIN_ALWAYS_INLINE constexpr void udivmod128(
-        uint64_t alo, uint64_t ahi,
-        uint64_t blo, uint64_t bhi,
-        uint64_t& qlo, uint64_t& qhi,
-        uint64_t& rlo, uint64_t& rhi
+        uint64_t alo, uint64_t ahi, uint64_t blo, uint64_t bhi, uint64_t& qlo, uint64_t& qhi, uint64_t& rlo, uint64_t& rhi
     ) noexcept
     {
         qlo = qhi = rlo = rhi = 0;
@@ -199,9 +198,7 @@ public:
         const int128 mb = bneg ? -b : b;
         uint64_t qlo = 0, qhi = 0, rlo = 0, rhi = 0;
         detail::udivmod128(
-            ma.low, static_cast<uint64_t>(ma.high),
-            mb.low, static_cast<uint64_t>(mb.high),
-            qlo, qhi, rlo, rhi
+            ma.low, static_cast<uint64_t>(ma.high), mb.low, static_cast<uint64_t>(mb.high), qlo, qhi, rlo, rhi
         );
         const int128 q = from_words(qlo, static_cast<int64_t>(qhi));
         return (aneg != bneg) ? -q : q;
@@ -215,9 +212,7 @@ public:
         const int128 mb = bneg ? -b : b;
         uint64_t qlo = 0, qhi = 0, rlo = 0, rhi = 0;
         detail::udivmod128(
-            ma.low, static_cast<uint64_t>(ma.high),
-            mb.low, static_cast<uint64_t>(mb.high),
-            qlo, qhi, rlo, rhi
+            ma.low, static_cast<uint64_t>(ma.high), mb.low, static_cast<uint64_t>(mb.high), qlo, qhi, rlo, rhi
         );
         const int128 r = from_words(rlo, static_cast<int64_t>(rhi));
         return aneg ? -r : r;
@@ -273,14 +268,17 @@ public:
     {
         return from_words(a.low & b.low, a.high & b.high);
     }
+
     friend constexpr int128 operator|(int128 a, int128 b) noexcept
     {
         return from_words(a.low | b.low, a.high | b.high);
     }
+
     friend constexpr int128 operator^(int128 a, int128 b) noexcept
     {
         return from_words(a.low ^ b.low, a.high ^ b.high);
     }
+
     friend constexpr int128 operator~(int128 a) noexcept
     {
         return from_words(~a.low, ~a.high);
@@ -292,22 +290,27 @@ public:
     {
         return a.low == b.low && a.high == b.high;
     }
+
     friend constexpr bool operator!=(int128 a, int128 b) noexcept
     {
         return !(a == b);
     }
+
     friend constexpr bool operator<(int128 a, int128 b) noexcept
     {
         return a.high < b.high || (a.high == b.high && a.low < b.low);
     }
+
     friend constexpr bool operator>(int128 a, int128 b) noexcept
     {
         return b < a;
     }
+
     friend constexpr bool operator<=(int128 a, int128 b) noexcept
     {
         return !(b < a);
     }
+
     friend constexpr bool operator>=(int128 a, int128 b) noexcept
     {
         return !(a < b);
@@ -320,48 +323,57 @@ public:
         *this = *this + b;
         return *this;
     }
+
     constexpr int128& operator-=(int128 b) noexcept
     {
         *this = *this - b;
         return *this;
     }
+
     constexpr int128& operator*=(int128 b) noexcept
     {
         *this = *this * b;
         return *this;
     }
+
     constexpr int128& operator/=(int128 b) noexcept
     {
         *this = *this / b;
         return *this;
     }
+
     constexpr int128& operator%=(int128 b) noexcept
     {
         *this = *this % b;
         return *this;
     }
+
     template <std::integral T>
     constexpr int128& operator<<=(T n) noexcept
     {
         *this = *this << n;
         return *this;
     }
+
     template <std::integral T>
     constexpr int128& operator>>=(T n) noexcept
     {
         *this = *this >> n;
         return *this;
     }
+
     constexpr int128& operator&=(int128 b) noexcept
     {
         *this = *this & b;
         return *this;
     }
+
     constexpr int128& operator|=(int128 b) noexcept
     {
         *this = *this | b;
         return *this;
     }
+
     constexpr int128& operator^=(int128 b) noexcept
     {
         *this = *this ^ b;
@@ -373,17 +385,20 @@ public:
         *this += 1;
         return *this;
     }
+
     constexpr int128 operator++(int) noexcept
     {
         const int128 t = *this;
         ++*this;
         return t;
     }
+
     constexpr int128& operator--() noexcept
     {
         *this -= 1;
         return *this;
     }
+
     constexpr int128 operator--(int) noexcept
     {
         const int128 t = *this;
@@ -462,18 +477,21 @@ public:
         const uint64_t carry = lo < a.low ? 1u : 0u;
         return from_words(lo, a.high + b.high + carry);
     }
+
     friend constexpr uint128 operator-(uint128 a, uint128 b) noexcept
     {
         const uint64_t lo = a.low - b.low;
         const uint64_t borrow = a.low < b.low ? 1u : 0u;
         return from_words(lo, a.high - b.high - borrow);
     }
+
     friend constexpr uint128 operator-(uint128 a) noexcept
     {
         const uint64_t lo = uint64_t(0) - a.low;
         const uint64_t hi = uint64_t(0) - a.high - (a.low != 0 ? 1u : 0u);
         return from_words(lo, hi);
     }
+
     friend constexpr uint128 operator*(uint128 a, uint128 b) noexcept
     {
         uint64_t hi = 0;
@@ -482,12 +500,14 @@ public:
         hi += a.low * b.high;
         return from_words(lo, hi);
     }
+
     friend constexpr uint128 operator/(uint128 a, uint128 b) noexcept
     {
         uint64_t qlo = 0, qhi = 0, rlo = 0, rhi = 0;
         detail::udivmod128(a.low, a.high, b.low, b.high, qlo, qhi, rlo, rhi);
         return from_words(qlo, qhi);
     }
+
     friend constexpr uint128 operator%(uint128 a, uint128 b) noexcept
     {
         uint64_t qlo = 0, qhi = 0, rlo = 0, rhi = 0;
@@ -512,6 +532,7 @@ public:
             return from_words(0, a.low << (s - 64));
         return from_words(a.low << s, (a.high << s) | (a.low >> (64 - s)));
     }
+
     template <std::integral T>
     friend constexpr uint128 operator>>(uint128 a, T n) noexcept
     {
@@ -534,14 +555,17 @@ public:
     {
         return from_words(a.low & b.low, a.high & b.high);
     }
+
     friend constexpr uint128 operator|(uint128 a, uint128 b) noexcept
     {
         return from_words(a.low | b.low, a.high | b.high);
     }
+
     friend constexpr uint128 operator^(uint128 a, uint128 b) noexcept
     {
         return from_words(a.low ^ b.low, a.high ^ b.high);
     }
+
     friend constexpr uint128 operator~(uint128 a) noexcept
     {
         return from_words(~a.low, ~a.high);
@@ -551,22 +575,27 @@ public:
     {
         return a.low == b.low && a.high == b.high;
     }
+
     friend constexpr bool operator!=(uint128 a, uint128 b) noexcept
     {
         return !(a == b);
     }
+
     friend constexpr bool operator<(uint128 a, uint128 b) noexcept
     {
         return a.high < b.high || (a.high == b.high && a.low < b.low);
     }
+
     friend constexpr bool operator>(uint128 a, uint128 b) noexcept
     {
         return b < a;
     }
+
     friend constexpr bool operator<=(uint128 a, uint128 b) noexcept
     {
         return !(b < a);
     }
+
     friend constexpr bool operator>=(uint128 a, uint128 b) noexcept
     {
         return !(a < b);
@@ -577,48 +606,57 @@ public:
         *this = *this + b;
         return *this;
     }
+
     constexpr uint128& operator-=(uint128 b) noexcept
     {
         *this = *this - b;
         return *this;
     }
+
     constexpr uint128& operator*=(uint128 b) noexcept
     {
         *this = *this * b;
         return *this;
     }
+
     constexpr uint128& operator/=(uint128 b) noexcept
     {
         *this = *this / b;
         return *this;
     }
+
     constexpr uint128& operator%=(uint128 b) noexcept
     {
         *this = *this % b;
         return *this;
     }
+
     template <std::integral T>
     constexpr uint128& operator<<=(T n) noexcept
     {
         *this = *this << n;
         return *this;
     }
+
     template <std::integral T>
     constexpr uint128& operator>>=(T n) noexcept
     {
         *this = *this >> n;
         return *this;
     }
+
     constexpr uint128& operator&=(uint128 b) noexcept
     {
         *this = *this & b;
         return *this;
     }
+
     constexpr uint128& operator|=(uint128 b) noexcept
     {
         *this = *this | b;
         return *this;
     }
+
     constexpr uint128& operator^=(uint128 b) noexcept
     {
         *this = *this ^ b;
@@ -630,17 +668,20 @@ public:
         *this += 1;
         return *this;
     }
+
     constexpr uint128 operator++(int) noexcept
     {
         const uint128 t = *this;
         ++*this;
         return t;
     }
+
     constexpr uint128& operator--() noexcept
     {
         *this -= 1;
         return *this;
     }
+
     constexpr uint128 operator--(int) noexcept
     {
         const uint128 t = *this;
@@ -662,36 +703,45 @@ private:
 };
 } // namespace eirin::ext
 
+#if EIRIN_USE_EXT_BUILTIN_INT128 != EIRIN_ENABLE
 namespace eirin::detail
 {
 template <>
 struct is_integral<eirin::ext::int128> : public std::true_type
 {};
+
 template <>
 struct is_integral<eirin::ext::uint128> : public std::true_type
 {};
+
 template <>
 struct is_signed<eirin::ext::int128> : public std::true_type
 {};
+
 template <>
 struct is_unsigned<eirin::ext::uint128> : public std::true_type
 {};
+
 template <>
 struct make_signed<eirin::ext::uint128, true>
 {
     using type = eirin::ext::int128;
 };
+
 template <>
 struct make_unsigned<eirin::ext::int128>
 {
     using type = eirin::ext::uint128;
 };
+
 template <>
 struct make_unsigned<eirin::ext::uint128>
 {
     using type = eirin::ext::uint128;
 };
 } // namespace eirin::detail
+
+#endif
 
 namespace std
 {
@@ -727,34 +777,42 @@ public:
     {
         return eirin::ext::int128(static_cast<int64_t>(0x8000000000000000ull), static_cast<int64_t>(0));
     }
+
     static constexpr eirin::ext::int128(max)() noexcept
     {
         return eirin::ext::int128(static_cast<int64_t>(0x7FFFFFFFFFFFFFFFull), static_cast<int64_t>(uint64_t(-1)));
     }
+
     static constexpr eirin::ext::int128 lowest() noexcept
     {
         return (min)();
     }
+
     static constexpr eirin::ext::int128 epsilon() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::int128 round_error() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::int128 infinity() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::int128 quiet_NaN() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::int128 signaling_NaN() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::int128 denorm_min() noexcept
     {
         return 0;
@@ -793,34 +851,42 @@ public:
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128(max)() noexcept
     {
         return eirin::ext::uint128(uint64_t(-1), uint64_t(-1));
     }
+
     static constexpr eirin::ext::uint128 lowest() noexcept
     {
         return (min)();
     }
+
     static constexpr eirin::ext::uint128 epsilon() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128 round_error() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128 infinity() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128 quiet_NaN() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128 signaling_NaN() noexcept
     {
         return 0;
     }
+
     static constexpr eirin::ext::uint128 denorm_min() noexcept
     {
         return 0;

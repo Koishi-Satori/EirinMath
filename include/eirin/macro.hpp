@@ -119,8 +119,10 @@
 // use which type of int128, builtin or extention
 // in MSVC, the default is builtin int128 due to performance issue of _Signed128
 
-#ifdef _MSC_VER
-#    define EIRIN_FORCE_EXT_BUILTIN_INT128
+#ifndef EIRIN_USE_EXT_BUILTIN_INT128
+#    ifdef _MSC_VER
+#        define EIRIN_FORCE_EXT_BUILTIN_INT128
+#    endif
 #endif
 
 #ifdef EIRIN_FORCE_EXT_BUILTIN_INT128

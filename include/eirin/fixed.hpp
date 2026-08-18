@@ -26,8 +26,8 @@
 #include <iterator>
 #include <bit>
 #include "macro.hpp"
-#include "detail/int128.hpp"
 #include "detail/type_traits_impl.hpp"
+#include "detail/int128.hpp"
 #include "error.hpp"
 
 namespace eirin
