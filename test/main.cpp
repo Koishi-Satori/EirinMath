@@ -38,6 +38,36 @@ struct test_ud_int
         return test_ud_int(lo << s);
     }
 
+    // MSVC will check the unused static members, so we need to provide minus operator
+    // in case of preventing compile failed.
+    friend constexpr test_ud_int operator-(test_ud_int a) noexcept
+    {
+        const auto lo_ = 0ull - static_cast<unsigned long long>(a.lo);
+        const auto hi_ = 0ull - static_cast<unsigned long long>(a.hi) - (a.lo != 0 ? 1ull : 0ull);
+        test_ud_int r;
+        r.lo = static_cast<long long>(lo_);
+        r.hi = static_cast<long long>(hi_);
+        return r;
+    }
+
+    friend constexpr test_ud_int operator-(test_ud_int a, test_ud_int b) noexcept
+    {
+        const auto alo = static_cast<unsigned long long>(a.lo);
+        const auto blo = static_cast<unsigned long long>(b.lo);
+        const auto lo_ = alo - blo;
+        const auto hi_ = static_cast<unsigned long long>(a.hi) - static_cast<unsigned long long>(b.hi) -
+                         (alo < blo ? 1ull : 0ull);
+        test_ud_int r;
+        r.lo = static_cast<long long>(lo_);
+        r.hi = static_cast<long long>(hi_);
+        return r;
+    }
+
+    friend constexpr test_ud_int operator-(test_ud_int a, long long b) noexcept
+    {
+        return a - test_ud_int(b);
+    }
+
     explicit constexpr operator long long() const noexcept
     {
         return lo;

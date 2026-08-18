@@ -146,7 +146,7 @@ public:
     {
         if constexpr(std::is_class_v<IntermediateType>)
         {
-            // some class intermediate types (such asMSVC's std::_Signed128, boost::multiprecision
+            // some class intermediate types (such as MSVC's std::_Signed128, boost::multiprecision
             // integers) have no double * IntermediateType operator, and the old
             // Type(val) * fraction_multiplier path truncated val to an integer first
             // (0.5 -> 0). This new implementation should solve both two issues?
