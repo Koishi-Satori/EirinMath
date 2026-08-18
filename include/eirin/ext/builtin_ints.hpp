@@ -228,8 +228,12 @@ public:
     template <std::integral T>
     friend constexpr int128 operator<<(int128 a, T n) noexcept
     {
-        if(n < 0)
-            return a >> static_cast<T>(-n);
+        // Fixed: MSVC C4146 (unary minus on unsigned)
+        if constexpr(std::is_signed_v<T>)
+        {
+            if(n < 0)
+                return a >> static_cast<T>(-n);
+        }
         const uint64_t s = static_cast<uint64_t>(n);
         if(s >= 128)
             return from_words(0, 0);
@@ -244,8 +248,11 @@ public:
     template <std::integral T>
     friend constexpr int128 operator>>(int128 a, T n) noexcept
     {
-        if(n < 0)
-            return a << static_cast<T>(-n);
+        if constexpr(std::is_signed_v<T>)
+        {
+            if(n < 0)
+                return a << static_cast<T>(-n);
+        }
         const uint64_t s = static_cast<uint64_t>(n);
         if(s >= 128)
             return a.high < 0 ? from_words(uint64_t(-1), -1) : from_words(0, 0);
@@ -491,8 +498,11 @@ public:
     template <std::integral T>
     friend constexpr uint128 operator<<(uint128 a, T n) noexcept
     {
-        if(n < 0)
-            return a >> static_cast<T>(-n);
+        if constexpr(std::is_signed_v<T>)
+        {
+            if(n < 0)
+                return a >> static_cast<T>(-n);
+        }
         const uint64_t s = static_cast<uint64_t>(n);
         if(s >= 128)
             return from_words(0, 0);
@@ -505,8 +515,11 @@ public:
     template <std::integral T>
     friend constexpr uint128 operator>>(uint128 a, T n) noexcept
     {
-        if(n < 0)
-            return a << static_cast<T>(-n);
+        if constexpr(std::is_signed_v<T>)
+        {
+            if(n < 0)
+                return a << static_cast<T>(-n);
+        }
         const uint64_t s = static_cast<uint64_t>(n);
         if(s >= 128)
             return from_words(0, 0);
