@@ -116,4 +116,20 @@
 #    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
 #endif
 
+// use which type of int128, builtin or extention
+// in MSVC, the default is builtin int128 due to performance issue of _Signed128
+
+#ifdef _MSC_VER
+#    define EIRIN_FORCE_EXT_BUILTIN_INT128
+#endif
+
+#ifdef EIRIN_FORCE_EXT_BUILTIN_INT128
+ef EIRIN_USE_EXT_BUILTIN_INT128
+#    define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_ENABLE
+#endif
+
+#ifndef EIRIN_USE_EXT_BUILTIN_INT128
+#    define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_DISABLE
+#endif
+
 #endif // EIRIN_MATH_MARCO_HPP
