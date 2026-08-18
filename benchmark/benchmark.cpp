@@ -1,7 +1,11 @@
+#include <random>
+#include <vector>
+#include <utility>
 #include <eirin/fixed.hpp>
 #include <eirin/math.hpp>
 #include <benchmark/benchmark.h>
 #include <eirin/ext/cordic.hpp>
+#include <eirin/ext/builtin_ints.hpp>
 #include <bench.hpp>
 
 // on windows/msvc, -Wmaybe-uninitialized is not available
@@ -11,9 +15,57 @@
 #    pragma warning(push, 3)
 // turn two warnings off
 #    pragma warning(disable : 4701 4703)
+#    include <__msvc_int128.hpp>
 #endif
 
 using namespace eirin;
+
+#if defined(EIRIN_OS_WINDOWS) || defined(EIRIN_OS_LINUX) || defined(EIRIN_OS_MACOS)
+static void eirin_ext_int128_mul(benchmark::State& state)
+{
+    std::vector<std::pair<ext::int128, ext::int128>> vec(1'000'000);
+    std::mt19937_64 mt64;
+    for(auto& [val1, val2] : vec)
+    {
+        val1 = ext::int128(mt64(), mt64());
+        val2 = ext::int128(mt64(), mt64());
+    }
+    auto it = vec.begin();
+    for(auto _ : state)
+    {
+        auto result = it->first * it->second;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+        if(++it == vec.end())
+            it = vec.begin();
+    }
+}
+#endif
+
+#ifdef _MSC_VER
+static void msvc_int128_mul(benchmark::State& state)
+{
+    using int128 = std::_Signed128;
+    std::vector<std::pair<int128, int128>> vec(1'000'000);
+    std::mt19937_64 mt64;
+    for(auto& [val1, val2] : vec)
+    {
+        val1._Word[0] = mt64();
+        val1._Word[1] = mt64();
+        val2._Word[0] = mt64();
+        val2._Word[1] = mt64();
+    }
+    auto it = vec.begin();
+    for(auto _ : state)
+    {
+        auto result = it->first * it->second;
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+        if(++it == vec.end())
+            it = vec.begin();
+    }
+}
+#endif
 
 static void f32_create(benchmark::State& state)
 {
@@ -172,6 +224,7 @@ static void f32_pow(benchmark::State& state)
         benchmark::ClobberMemory();
     }
 }
+
 static void f32_pow_fast(benchmark::State& state)
 {
     auto fp1 = F32_FROM_BENCH(0);
@@ -558,6 +611,13 @@ static void f64_cordic_sin(benchmark::State& state)
         benchmark::ClobberMemory();
     }
 }
+#endif
+
+#if defined(EIRIN_OS_WINDOWS) || defined(EIRIN_OS_LINUX) || defined(EIRIN_OS_MACOS)
+BENCHMARK(eirin_ext_int128_mul)->Args({0x114514, 0x7FFFFFFFFFFFFFFFll, 0x495, 0x1919810});
+#endif
+#ifdef _MSC_VER
+BENCHMARK(msvc_int128_mul)->Args({0x114514, 0x7FFFFFFFFFFFFFFFll, 0x495, 0x1919810});
 #endif
 
 BENCHMARK(f32_create)->Args({1145});

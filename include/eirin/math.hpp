@@ -436,8 +436,8 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> f
         // ln(b) at f bits: hi at 2^L, lo at 2^S
         const J ln_f = (sc.L >= f ? detail::pow_rshift(hi, sc.L - f) : hi << (f - sc.L)) +
                        detail::pow_rshift(lo, sc.S - f);
-        // log2(b) = ln(b) * log2(e); log2(e)*2^61 = 0x2E2A8ECA5705FC00
-        constexpr J log2e_f = detail::pow_scale_61<J, f>(0x2E2A8ECA5705FC00ll);
+        // log2(b) = ln(b) * log2(e); log2(e), exact 61-bit dyadic
+        constexpr J log2e_f = detail::eval_dyadic<J, f>("0x1.71547652b82fep+0");
         const J log2_f = detail::pow_rshift(ln_f * log2e_f, f);
         return fixed::from_internal_value(static_cast<T>(log2_f));
     }
@@ -507,9 +507,9 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp)
 {
     using fixed = fixed_num<T, I, f, r>;
-    // ln(2)*2^61 = 0x162E42FEFA39EF00
+    // ln(2), exact 61-bit dyadic
     constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
-                                       static_cast<T>(detail::pow_scale_61<I, f>(0x162E42FEFA39EF00ll))
+                                       static_cast<T>(detail::eval_dyadic<I, f>("0x1.62e42fefa39efp-1"))
                                    ) :
                                    numbers::ln2_v<fixed>();
     return log2(fp) * ln2;
@@ -531,9 +531,9 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp)
 {
     using fixed = fixed_num<T, I, f, r>;
-    // log10(2)*2^61 = 0x9A209A84FBCFF7A
+    // log10(2), exact 61-bit dyadic
     constexpr fixed log10_2 = f < 20 ? fixed::from_internal_value(
-                                           static_cast<T>(detail::pow_scale_61<I, f>(0x9A209A84FBCFF7All))
+                                           static_cast<T>(detail::eval_dyadic<I, f>("0x1.34413509f79fef4p-2"))
                                        ) :
                                        detail::eval_const<char, T, I, f, r>("0.301029995663981195213738894724493027");
     return log2(fp) * log10_2;
@@ -552,8 +552,9 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> 
  *  - The ln(1+t)/t minimax polynomial (degree 17, 60-bit coefficients, error
  *    ~= 7.4e-16) and the exp minimax polynomial (degree 9, 60-bit
  *    coefficients, error ~= 1.9e-14) are generated with sollya fpminimax
- *    following tools/sollya_fpminimax.py, and rescaled at compile time to fit
- *    the widest scale the intermediate type allows.
+ *    following tools/sollya_fpminimax.py, written as exact hexfloat strings,
+ *    and rescaled at compile time (detail::eval_dyadic) to fit the widest
+ *    scale the intermediate type allows.
  *  - Out-of-range results saturate (positive overflow to max, negative
  *    overflow to 0), negative bases are supported for integer exponents.
  *
@@ -653,7 +654,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, 
         return b;
 
     constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
-                                       static_cast<T>(detail::pow_scale_61<I, f>(0x162E42FEFA39EF00ll))
+                                       static_cast<T>(detail::eval_dyadic<I, f>("0x1.62e42fefa39efp-1"))
                                    ) :
                                    numbers::ln2_v<fixed>();
 

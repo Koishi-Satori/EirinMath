@@ -1,15 +1,219 @@
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <random>
 #include <eirin/eirin.hpp>
 #include <eirin/io/format.hpp>
 #include <eirin/ext/cordic.hpp>
+#include <eirin/ext/builtin_ints.hpp>
 #include <eirin/detail/util.hpp>
 #include <eirin/detail/perf.hpp>
+
+#ifdef _MSC_VER
+#    include <__msvc_int128.hpp>
+#endif
 
 #ifdef EIRIN_DEV_TEST_MODE
 #    include <eirin/ext/simd_math.hpp>
 #endif
 
 using namespace eirin;
+
+// user defined int128 test
+struct test_ud_int
+{
+    long long lo;
+    long long hi;
+
+    constexpr test_ud_int() = default;
+
+    explicit constexpr test_ud_int(long long v)
+        : lo(v), hi(v < 0 ? -1 : 0)
+    {}
+
+    constexpr test_ud_int operator<<(unsigned int s) const
+    {
+        return test_ud_int(lo << s);
+    }
+
+    explicit constexpr operator long long() const noexcept
+    {
+        return lo;
+    }
+
+    explicit constexpr operator unsigned long long() const noexcept
+    {
+        return static_cast<unsigned long long>(lo);
+    }
+
+    explicit constexpr operator long() const noexcept
+    {
+        return static_cast<long>(lo);
+    }
+};
+
+static_assert(sizeof(test_ud_int) > sizeof(std::int64_t));
+
+namespace eirin::detail
+{
+template <>
+struct is_integral<test_ud_int> : public std::true_type
+{};
+
+template <>
+struct is_signed<test_ud_int> : public std::true_type
+{};
+} // namespace eirin::detail
+
+#ifdef _MSC_VER
+namespace
+{
+using msvc_int128 = std::_Signed128;
+using eirin_int128 = eirin::ext::int128;
+
+// build a 128-bit value from hi+lo words.
+template <typename Int>
+Int create_int128(std::uint64_t lo, std::uint64_t hi);
+
+template <>
+inline msvc_int128 create_int128<msvc_int128>(std::uint64_t lo, std::uint64_t hi)
+{
+    msvc_int128 m;
+    m._Word[0] = lo;
+    m._Word[1] = hi;
+    return m;
+}
+
+template <>
+inline eirin_int128 create_int128<eirin_int128>(std::uint64_t lo, std::uint64_t hi)
+{
+    return eirin_int128{static_cast<std::int64_t>(hi), static_cast<std::int64_t>(lo)};
+}
+
+std::uint64_t low_word(const msvc_int128& x) noexcept
+{
+    return x._Word[0];
+}
+
+std::uint64_t high_word(const msvc_int128& x) noexcept
+{
+    return x._Word[1];
+}
+
+std::uint64_t low_word(const eirin_int128& x) noexcept
+{
+    return static_cast<std::uint64_t>(x.low_bits());
+}
+
+std::uint64_t high_word(const eirin_int128& x) noexcept
+{
+    return static_cast<std::uint64_t>(x.high_bits());
+}
+
+void expect_same_int128(const char* what, const msvc_int128& m, const eirin_int128& e)
+{
+    EXPECT_EQ(low_word(m), low_word(e)) << what;
+    EXPECT_EQ(high_word(m), high_word(e)) << what;
+}
+} // namespace
+
+TEST(FixedNum, ValidateSigned128)
+{
+    // eirin::ext::int128 must be a drop-in replacement for the MSVC STL's
+    // std::_Signed128: the same two's-complement (low, high) word layout and
+    // identical modulo-2^128 semantics for every operator both classes share.
+    const auto check_pair = [](std::uint64_t lo_lhs, std::uint64_t hi_lhs, std::uint64_t lo_rhs, std::uint64_t hi_rhs)
+    {
+        const msvc_int128 ma = create_int128<msvc_int128>(lo_lhs, hi_lhs);
+        const msvc_int128 mb = create_int128<msvc_int128>(lo_rhs, hi_rhs);
+        const eirin_int128 ea = create_int128<eirin_int128>(lo_lhs, hi_lhs);
+        const eirin_int128 eb = create_int128<eirin_int128>(lo_rhs, hi_rhs);
+
+        expect_same_int128("a + b", ma + mb, ea + eb);
+        expect_same_int128("a - b", ma - mb, ea - eb);
+        expect_same_int128("-a", -ma, -ea);
+        expect_same_int128("a * b", ma * mb, ea * eb);
+
+        // INT128_MIN / -1 overflows the signed range (the quotient does not
+        // fit), so it is not part of the equivalence contract; a zero divisor
+        // is undefined as well.
+        const bool is_min = lo_lhs == 0 && hi_lhs == 0x8000000000000000ull;
+        const bool is_neg_one = lo_rhs == 0xFFFFFFFFFFFFFFFFull && hi_rhs == 0xFFFFFFFFFFFFFFFFull;
+        if((lo_rhs != 0 || hi_rhs != 0) && !(is_min && is_neg_one))
+        {
+            expect_same_int128("a / b", ma / mb, ea / eb);
+            expect_same_int128("a % b", ma % mb, ea % eb);
+        }
+
+        expect_same_int128("~a", ~ma, ~ea);
+
+        // The STL class narrows the shift count to unsigned char, so the two
+        // classes are only required to agree for counts 0..127.
+        for(const std::uint32_t s : {0u, 1u, 7u, 63u, 64u, 65u, 127u})
+        {
+            expect_same_int128("a << s", ma << create_int128<msvc_int128>(s, 0), ea << s);
+            expect_same_int128("a >> s", ma >> create_int128<msvc_int128>(s, 0), ea >> s);
+        }
+
+        EXPECT_EQ(ma == mb, ea == eb);
+        EXPECT_EQ(ma != mb, ea != eb);
+        EXPECT_EQ(ma < mb, ea < eb);
+        EXPECT_EQ(ma <= mb, ea <= eb);
+        EXPECT_EQ(ma > mb, ea > eb);
+        EXPECT_EQ(ma >= mb, ea >= eb);
+
+        auto m2 = ma;
+        auto e2 = ea;
+        m2 += mb;
+        e2 += eb;
+        expect_same_int128("a += b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        m2 -= mb;
+        e2 -= eb;
+        expect_same_int128("a -= b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        m2 *= mb;
+        e2 *= eb;
+        expect_same_int128("a *= b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        ++m2;
+        ++e2;
+        expect_same_int128("++a", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        --m2;
+        --e2;
+        expect_same_int128("--a", m2, e2);
+    };
+
+    constexpr std::uint64_t lo_edges[] = {0, 1, 0x7FFFFFFFFFFFFFFFull, 0x8000000000000000ull, 0xFFFFFFFFFFFFFFFFull};
+    constexpr std::uint64_t hi_edges[] = {0, 1, 0x7FFFFFFFFFFFFFFFull, 0x8000000000000000ull, 0xFFFFFFFFFFFFFFFFull};
+    for(const auto hi_lhs : hi_edges)
+    {
+        for(const auto lo_lhs : lo_edges)
+        {
+            for(const auto hi_rhs : hi_edges)
+            {
+                for(const auto lo_rhs : lo_edges)
+                {
+                    check_pair(hi_lhs, lo_lhs, hi_rhs, lo_rhs);
+                }
+            }
+        }
+    }
+
+    std::mt19937_64 rng(0x1919810);
+    for(int i = 0; i < 114514; ++i)
+    {
+        check_pair(rng(), rng(), rng(), rng());
+    }
+}
+#endif // _MSC_VER
 
 TEST(FixedNum, Construct)
 {
@@ -23,6 +227,66 @@ TEST(FixedNum, Construct)
     EXPECT_EQ((int)fp2, 0);
     EXPECT_EQ("-114.514"_f64, -114.514_f64);
 #endif
+}
+
+TEST(FixedNum, UserDefinedTypes)
+{
+    // user defined
+    using ud_fixed = fixed_num<std::int64_t, test_ud_int, 32, false>;
+    using ud_fixed_round = fixed_num<std::int64_t, test_ud_int, 32, true>;
+
+    const ud_fixed a(0.5);
+    EXPECT_EQ(a.internal_value(), fixed64(0.5).internal_value());
+
+    const ud_fixed b(114.514);
+    EXPECT_EQ(b.internal_value(), fixed64(114.514).internal_value());
+
+    const ud_fixed c(-114.514);
+    EXPECT_EQ(c.internal_value(), fixed64(-114.514).internal_value());
+
+    // rounding flavour: round-half-away on the scaled value; 0.1*2^16 has a
+    // fractional part of 0.6, so rounding adds exactly 1 raw unit.
+    const ud_fixed_round d(0.1);
+    const ud_fixed_round e(-0.1);
+    const ud_fixed plain(0.1);
+    EXPECT_EQ(d.internal_value(), plain.internal_value() + 1);
+    EXPECT_EQ(e.internal_value(), -plain.internal_value() - 1);
+}
+
+TEST(FixedNum, RoundingConstructor)
+{
+    // Regression: the builtin-intermediate rounding branch used to multiply the
+    // scaled value by 0.5 (val * 2^f * 0.5) instead of adding 0.5, so
+    // fixed_num<..., true>(0.1) produced 0.1*2^(f-1). Both flavours must now
+    // round half-away from zero on the scaled value.
+    using fixed32r = fixed_num<int32_t, int64_t, 16, true>;
+    using fixed64r = fixed_num<int64_t, detail::int128_t, 32, true>;
+
+    EXPECT_EQ(fixed32r(0.1).internal_value(), static_cast<int32_t>(0.1 * 65536.0) + 1);
+    EXPECT_EQ(fixed32r(-0.1).internal_value(), -static_cast<int32_t>(0.1 * 65536.0) - 1);
+    EXPECT_EQ(fixed32r(0.5).internal_value(), fixed32(0.5).internal_value());
+    EXPECT_EQ(fixed32r(1.5).internal_value(), fixed32(1.5).internal_value());
+    EXPECT_EQ(fixed32r(-0.5).internal_value(), fixed32(-0.5).internal_value());
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(fixed64r(0.1).internal_value(), static_cast<int64_t>(0.1 * 4294967296.0) + 1);
+    EXPECT_EQ(fixed64r(-0.1).internal_value(), -static_cast<int64_t>(0.1 * 4294967296.0) - 1);
+#endif
+}
+
+TEST(FixedNum, HexfloatParse)
+{
+    // hexfloat literals parse exactly through detail::parse / eval_const
+    EXPECT_EQ("0x1.8p1"_f32, 3_f32);
+    EXPECT_EQ("-0x1.4p-2"_f32, -0.3125_f32);
+    EXPECT_EQ("0x1.921fb54442d18468p+1"_f64, fixed64::pi());
+
+    // runtime parsing goes through the same detail::parse
+    fixed32 a;
+    EXPECT_TRUE(f32_from_cstring("0x1.62e42fefa39efp-1", sizeof("0x1.62e42fefa39efp-1") - 1, a));
+    EXPECT_EQ(a.internal_value(), 45426); // ln(2) at 16 fraction bits
+    EXPECT_TRUE(f32_from_cstring("0x1.8", sizeof("0x1.8") - 1, a)); // exponent part is optional
+    EXPECT_FALSE(f32_from_cstring("0x1.8q", sizeof("0x1.8q") - 1, a)); // trailing garbage rejected
 }
 
 TEST(Fixed32, Operator)

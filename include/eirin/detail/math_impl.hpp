@@ -20,29 +20,6 @@ enum class overflow_strategy
 
 namespace detail
 {
-    // Rescale a 61-bit dyadic constant (value = k61/2^61) to s fraction bits.
-    template <typename I, unsigned int s>
-    constexpr I pow_scale_61(int64_t k61) noexcept
-    {
-        if constexpr(s >= 61u)
-            return static_cast<I>(k61) << (s - 61u);
-        else
-            return static_cast<I>(static_cast<int64_t>(k61) >> (61u - s));
-    }
-
-    // Rescale a 60-bit dyadic polynomial coefficient (k60 = coeff*2^60) to
-    // cbits fraction bits with round-half-away.
-    template <typename J>
-    constexpr J pow_coeff_60(int64_t k60, unsigned int cbits) noexcept
-    {
-        if(cbits >= 60u)
-            return static_cast<J>(k60) << (cbits - 60u);
-        const int64_t half = int64_t(1) << int(59u - cbits);
-        const int shift = int(60u - cbits);
-        const int64_t v = k60 >= 0 ? (k60 + half) >> shift : -(((-k60) + half) >> shift);
-        return static_cast<J>(v);
-    }
-
     // Signed round-half-away right shift; a no-op for sh == 0.
     template <typename V>
     constexpr V pow_rshift(V v, unsigned int sh) noexcept
@@ -303,10 +280,10 @@ namespace detail
      * To avoid rounding loss on low-precision types, the range reduction and the
      * polynomial evaluation are performed at a wider fraction
      * (work_f = min(2f, digits-2, 60) bits) and narrowed back to f bits in one
-     * final round-to-nearest step. The 60-bit cap matches sin and is imposed by the
-     * int64 parsing inside eval_const. Unlike sin's digits-3 cap, the wide type here
-     * only needs to hold the reduced r (|r| <= ln2), not the original input, so one
-     * extra fraction bit is available.
+     * final round-to-nearest step. The 60-bit cap matches sin and keeps the
+     * work format well inside the intermediate type. Unlike sin's digits-3
+     * cap, the wide type here only needs to hold the reduced r (|r| <= ln2),
+     * not the original input, so one extra fraction bit is available.
      *
      * Works for any fixed_num<T, I, f, r> (including user-defined signed/unsigned
      * types): for unsigned types k is always non-negative and the reduction interval
@@ -512,8 +489,8 @@ namespace detail
         const I b_best = b_i << (bf - f);
         I m = e2 >= 0 ? (b_best >> e2) : (b_best << (-e2));
         int e2_adj = e2;
-        // sqrt(2)*2^61 = 0x2D413CCCFE779A00
-        constexpr I sqrt2_bf = pow_scale_61<I, bf>(0x2D413CCCFE779A00ll);
+        // sqrt(2), exact 61-bit dyadic
+        constexpr I sqrt2_bf = eval_dyadic<I, bf>("0x1.6a09e667f3bcdp+0");
         if(m >= sqrt2_bf)
         {
             m >>= 1;
@@ -522,25 +499,26 @@ namespace detail
         const J t = static_cast<J>(m) - (static_cast<J>(1) << bf);
 
         // ln(1+t)/t, degree 17, sollya fpminimax fixed 60 bits, interval
-        // [sqrt(2)/2-1, sqrt(2)-1], error ~= 7.4e-16
-        constexpr J c0 = pow_coeff_60<J>(1152921504606845043ll, C);
-        constexpr J c1 = pow_coeff_60<J>(-576460752303385276ll, C);
-        constexpr J c2 = pow_coeff_60<J>(384307168204853210ll, C);
-        constexpr J c3 = pow_coeff_60<J>(-288230376170093992ll, C);
-        constexpr J c4 = pow_coeff_60<J>(230584300368830707ll, C);
-        constexpr J c5 = pow_coeff_60<J>(-192153581285657424ll, C);
-        constexpr J c6 = pow_coeff_60<J>(164703116521311305ll, C);
-        constexpr J c7 = pow_coeff_60<J>(-144115392171992599ll, C);
-        constexpr J c8 = pow_coeff_60<J>(128100689551715941ll, C);
-        constexpr J c9 = pow_coeff_60<J>(-115284134418239191ll, C);
-        constexpr J c10 = pow_coeff_60<J>(104843898330878982ll, C);
-        constexpr J c11 = pow_coeff_60<J>(-96255097752277119ll, C);
-        constexpr J c12 = pow_coeff_60<J>(88403978006163229ll, C);
-        constexpr J c13 = pow_coeff_60<J>(-80144740893915366ll, C);
-        constexpr J c14 = pow_coeff_60<J>(76866489725209434ll, C);
-        constexpr J c15 = pow_coeff_60<J>(-85601825389816036ll, C);
-        constexpr J c16 = pow_coeff_60<J>(82859280330190359ll, C);
-        constexpr J c17 = pow_coeff_60<J>(-39584298757743610ll, C);
+        // [sqrt(2)/2-1, sqrt(2)-1], error ~= 7.4e-16. The coefficients are
+        // exact 60-bit dyadics written as hexfloat strings.
+        constexpr J c0 = eval_dyadic<J, C>("0x1.ffffffffffff0e6p-1");
+        constexpr J c1 = eval_dyadic<J, C>("-0x1.ffffffffffdaafp-2");
+        constexpr J c2 = eval_dyadic<J, C>("0x1.555555555f23f68p-2");
+        constexpr J c3 = eval_dyadic<J, C>("-0x1.00000000461f6ap-2");
+        constexpr J c4 = eval_dyadic<J, C>("0x1.999999892210798p-3");
+        constexpr J c5 = eval_dyadic<J, C>("-0x1.555555016ce5a8p-3");
+        constexpr J c6 = eval_dyadic<J, C>("0x1.24924e50d386248p-3");
+        constexpr J c7 = eval_dyadic<J, C>("-0x1.000017c289f30b8p-3");
+        constexpr J c8 = eval_dyadic<J, C>("0x1.c71ae600366e65p-4");
+        constexpr J c9 = eval_dyadic<J, C>("-0x1.99924f383cced7p-4");
+        constexpr J c10 = eval_dyadic<J, C>("0x1.747af854e11406p-4");
+        constexpr J c11 = eval_dyadic<J, C>("-0x1.55f7805d58507fp-4");
+        constexpr J c12 = eval_dyadic<J, C>("0x1.3a12f319c9ef1dp-4");
+        constexpr J c13 = eval_dyadic<J, C>("-0x1.1cbb379b98f8e6p-4");
+        constexpr J c14 = eval_dyadic<J, C>("0x1.1115aa4733cb5ap-4");
+        constexpr J c15 = eval_dyadic<J, C>("-0x1.301e681a7c28e4p-4");
+        constexpr J c16 = eval_dyadic<J, C>("0x1.266013926cee17p-4");
+        constexpr J c17 = eval_dyadic<J, C>("-0x1.19436b8446c7f4p-5");
 
         // with a wide mantissa the per-step truncation is far below the
         // polynomial error, so a plain shift keeps the Horner branch-free
@@ -587,8 +565,8 @@ namespace detail
         }
         const J ln_m = q * t; // exact, at P = C + bf bits
 
-        // ln(b) = e2*ln2 + ln(1+t) at S bits
-        constexpr J ln2_S = pow_scale_61<J, S>(0x162E42FEFA39EF00ll);
+        // ln(b) = e2*ln2 + ln(1+t) at S bits; ln(2), exact 61-bit dyadic
+        constexpr J ln2_S = eval_dyadic<J, S>("0x1.62e42fefa39efp-1");
         const J ln_S = static_cast<J>(e2_adj) * ln2_S + (P > S ? pow_rshift(ln_m, P - S) : ln_m);
 
         const J ln_hi = pow_rshift(ln_S, S - L);
@@ -632,13 +610,13 @@ namespace detail
         const J x_i = static_cast<J>(x_raw);
         const J x_best = x_i << (bf - f);
 
-        // k = floor(x * log2(e)); log2(e)*2^61 = 0x2E2A8ECA5705FC00.
-        // On high-fraction formats the exponent range can be so large that the
+        // k = floor(x * log2(e)); log2(e), exact 61-bit dyadic. On
+        // high-fraction formats the exponent range can be so large that the
         // full product overflows the intermediate type; pre-scaling x_best by
         // k_sh bits only perturbs k slightly, which the reduction loops below
         // correct.
         constexpr unsigned int kc_bits = f < (sc.I_bits - 2u) ? f : (sc.I_bits - 2u);
-        constexpr J log2e_kc = pow_scale_61<J, kc_bits>(0x2E2A8ECA5705FC00ll);
+        constexpr J log2e_kc = eval_dyadic<J, kc_bits>("0x1.71547652b82fep+0");
         constexpr unsigned int k_sh = (bf + kc_bits + sc.exp_bits + 2u > sc.I_bits) ?
                                           (bf + kc_bits + sc.exp_bits + 2u - sc.I_bits) :
                                           0u;
@@ -654,10 +632,11 @@ namespace detail
         }
 
         // r = x - k*ln2 with the tail folded in, reduced to [0, ln2)
+        // ln(2), exact 61-bit dyadic
         J r_work;
         if constexpr(2 * bf <= 61)
         {
-            constexpr J ln2_2w = pow_scale_61<J, 2 * bf>(0x162E42FEFA39EF00ll);
+            constexpr J ln2_2w = eval_dyadic<J, 2 * bf>("0x1.62e42fefa39efp-1");
             constexpr J ln2_hi = ln2_2w >> bf;
             constexpr J ln2_lo = ln2_2w - (ln2_hi << bf);
             J r_2w = ((x_best - k * ln2_hi) << bf) - k * ln2_lo;
@@ -679,7 +658,7 @@ namespace detail
         }
         else
         {
-            constexpr J ln2_best = pow_scale_61<J, bf>(0x162E42FEFA39EF00ll);
+            constexpr J ln2_best = eval_dyadic<J, bf>("0x1.62e42fefa39efp-1");
             r_work = x_best - k * ln2_best;
             r_work += static_cast<J>(lo_raw) >> (Pp - bf);
             while(r_work >= ln2_best)
@@ -698,17 +677,18 @@ namespace detail
         }
 
         // exp(r) on [0, ln2], degree 9, sollya fpminimax fixed 60 bits,
-        // error ~= 1.9e-14
-        constexpr J e0 = pow_coeff_60<J>(1152921504606824971ll, C);
-        constexpr J e1 = pow_coeff_60<J>(1152921504613156941ll, C);
-        constexpr J e2 = pow_coeff_60<J>(576460752004932245ll, C);
-        constexpr J e3 = pow_coeff_60<J>(192153589574804099ll, C);
-        constexpr J e4 = pow_coeff_60<J>(48038345109486436ll, C);
-        constexpr J e5 = pow_coeff_60<J>(9607950726683145ll, C);
-        constexpr J e6 = pow_coeff_60<J>(1600401176479225ll, C);
-        constexpr J e7 = pow_coeff_60<J>(230504170452262ll, C);
-        constexpr J e8 = pow_coeff_60<J>(26512680658222ll, C);
-        constexpr J e9 = pow_coeff_60<J>(4507898505267ll, C);
+        // error ~= 1.9e-14. The coefficients are exact 60-bit dyadics written
+        // as hexfloat strings.
+        constexpr J e0 = eval_dyadic<J, C>("0x1.fffffffffff5416p-1");
+        constexpr J e1 = eval_dyadic<J, C>("0x1.00000000060484dp+0");
+        constexpr J e2 = eval_dyadic<J, C>("0x1.fffffffb8d58a54p-2");
+        constexpr J e3 = eval_dyadic<J, C>("0x1.555555f87611418p-3");
+        constexpr J e4 = eval_dyadic<J, C>("0x1.55553d9fb276c8p-5");
+        constexpr J e5 = eval_dyadic<J, C>("0x1.11130ad0aad048p-7");
+        constexpr J e6 = eval_dyadic<J, C>("0x1.6be39be7d17e4p-10");
+        constexpr J e7 = eval_dyadic<J, C>("0x1.a348de65ea4cp-13");
+        constexpr J e8 = eval_dyadic<J, C>("0x1.81cf6e9a52ep-16");
+        constexpr J e9 = eval_dyadic<J, C>("0x1.0664ec1a0ccp-18");
 
         J q = e9;
         if constexpr(bf >= 45u)

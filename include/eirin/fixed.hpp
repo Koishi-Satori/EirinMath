@@ -70,6 +70,17 @@ concept fixed_format_check_scale = requires {
     scale == 2 || scale == 8 || scale == 10 || scale == 16;
 };
 
+template <typename Type, typename IntermediateType, unsigned int fraction, bool rounding>
+requires fixed_num_check<Type, IntermediateType, fraction>
+class fixed_num;
+
+namespace detail
+{
+    // forward declaration: now we try to use hexfloat literals to represent some constants.
+    template <typename CharT, typename T, typename I, unsigned int f, bool r>
+    consteval fixed_num<T, I, f, r> eval_const(const CharT* str);
+}
+
 /**
      * @brief The fixed number.
      *
@@ -135,21 +146,20 @@ public:
     {
         if constexpr(std::is_class_v<IntermediateType>)
         {
-            // TODO: some types(such as boost::int128_t) might fail here because has no double * IntermediateType operator,
-            // we need to fix this later.
+            // some class intermediate types (such asMSVC's std::_Signed128, boost::multiprecision
+            // integers) have no double * IntermediateType operator, and the old
+            // Type(val) * fraction_multiplier path truncated val to an integer first
+            // (0.5 -> 0). This new implementation should solve both two issues?
+            const T scaled = val * static_cast<T>(static_cast<Type>(fraction_multiplier));
             if constexpr(rounding)
-            {
-                m_value = static_cast<Type>(val >= 0.0 ? (val * T{0.5} * fraction_multiplier) : (val * fraction_multiplier - T{0.5}));
-            }
+                m_value = static_cast<Type>(scaled >= T{0} ? scaled + T{0.5} : scaled - T{0.5});
             else
-            {
-                m_value = static_cast<Type>(Type(val) * fraction_multiplier);
-            }
+                m_value = static_cast<Type>(scaled);
         }
         else
         {
             m_value = static_cast<Type>(
-                rounding ? (val >= 0.0) ? (val * fraction_multiplier * T{0.5}) : (val * fraction_multiplier - T{0.5}) : (val * fraction_multiplier)
+                rounding ? (val >= 0.0) ? (val * fraction_multiplier + T{0.5}) : (val * fraction_multiplier - T{0.5}) : (val * fraction_multiplier)
             );
         }
     };
@@ -172,17 +182,20 @@ public:
 
     static constexpr fixed_num epsilon()
     {
-        return from_fixed_num_value<64>(0x5000000000000ll);
+        // 5/2^16 = 0.0000762939453125
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.4p-14");
     }
 
     static constexpr fixed_num e()
     {
-        return from_fixed_num_value<61>(0x56FC2A2C515DA54Dll);
+        // exact 61-bit dyadic approximation of e
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.5bf0a8b145769534p+1");
     }
 
     static constexpr fixed_num pi()
     {
-        return from_fixed_num_value<61>(0x6487ED5110B4611All);
+        // exact 61-bit dyadic approximation of pi
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.921fb54442d18468p+1");
     }
 
     static constexpr fixed_num pi_2()
@@ -208,7 +221,8 @@ public:
 
     static constexpr fixed_num nearly_compare_epsilon()
     {
-        return from_fixed_num_value<64>(0x5000000000000ll);
+        // 5/2^16 = 0.0000762939453125
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.4p-14");
     }
 
     EIRIN_ALWAYS_INLINE static constexpr Type signbit_mask() noexcept
@@ -899,6 +913,157 @@ namespace detail
     struct is_fixed_point<fixed_num<T, I, f, r>> : public std::true_type
     {};
 
+    // round-half-away signed right shift, used by hexfloat parsing.
+    template <typename V>
+    constexpr V hexfloat_rshift_round(V v, unsigned int sh) noexcept
+    {
+        if(sh == 0)
+            return v;
+        const V half = static_cast<V>(1) << (sh - 1);
+        if(v >= 0)
+            return (v + half) >> sh;
+        return -(((-v) + half) >> sh);
+    }
+
+    // parse a C99-style hexfloat literal "0x<hex>[.<hex>][p<exp>]" (no leading
+    // sign) into the raw fixed-point value.
+    template <typename I>
+    constexpr bool parse_hexfloat(const char* str, size_t len, unsigned int fraction, I& raw) noexcept
+    {
+        size_t pos = 0;
+        if(pos + 1 >= len || str[pos] != '0' || (str[pos + 1] != 'x' && str[pos + 1] != 'X'))
+            return false;
+        pos += 2;
+
+        // Effective value bits of the intermediate. sizeof() is not reliable
+        // for class types: boost::multiprecision::int256_t has padding, so
+        // sizeof * 8 overestimates and a 1 << (bits-4) cap would wrap to 0.
+        constexpr unsigned int I_bits = []() constexpr -> unsigned int
+        {
+            if constexpr(std::numeric_limits<I>::is_specialized && std::numeric_limits<I>::radix == 2)
+                return static_cast<unsigned int>(std::numeric_limits<I>::digits);
+            else
+                return static_cast<unsigned int>(sizeof(I) * 8);
+        }();
+        constexpr unsigned int max_mant_bits = I_bits > 2 ? I_bits - 2 : 1;
+
+        auto hex_val = [](char c) -> int
+        {
+            if('0' <= c && c <= '9')
+                return c - '0';
+            if('a' <= c && c <= 'f')
+                return c - 'a' + 10;
+            if('A' <= c && c <= 'F')
+                return c - 'A' + 10;
+            return -1;
+        };
+
+        I mant = 0;
+        bool any_digit = false;
+        bool truncated = false;
+        unsigned int dropped_nibbles = 0;
+        unsigned int frac_hex = 0;
+        auto append_hex_digit = [&](int d)
+        {
+            if(mant != 0 && mant > (static_cast<I>(1) << (max_mant_bits - 4)))
+            {
+                truncated |= (mant & 0xF) != 0;
+                mant >>= 4;
+                ++dropped_nibbles;
+            }
+            mant = mant * 16 + d;
+        };
+
+        while(pos < len)
+        {
+            const int d = hex_val(str[pos]);
+            if(d < 0)
+                break;
+            append_hex_digit(d);
+            ++pos;
+            any_digit = true;
+        }
+        if(pos < len && str[pos] == '.')
+        {
+            ++pos;
+            while(pos < len)
+            {
+                const int d = hex_val(str[pos]);
+                if(d < 0)
+                    break;
+                append_hex_digit(d);
+                ++frac_hex;
+                ++pos;
+                any_digit = true;
+            }
+        }
+        if(!any_digit)
+            return false;
+
+        int exp2 = 0;
+        if(pos < len && (str[pos] == 'p' || str[pos] == 'P'))
+        {
+            ++pos;
+            bool exp_negative = false;
+            if(pos < len && (str[pos] == '+' || str[pos] == '-'))
+            {
+                exp_negative = str[pos] == '-';
+                ++pos;
+            }
+            if(pos >= len || !('0' <= str[pos] && str[pos] <= '9'))
+                return false;
+            while(pos < len && '0' <= str[pos] && str[pos] <= '9')
+            {
+                exp2 = exp2 * 10 + (str[pos] - '0');
+                if(exp2 > 4096)
+                    return false;
+                ++pos;
+            }
+            if(exp_negative)
+                exp2 = -exp2;
+        }
+
+        // raw = mant * 2^(fraction + exp2 - 4 * frac_hex + 4 * dropped_nibbles)
+        const long long sh = static_cast<long long>(fraction) + exp2 -
+                             4LL * static_cast<long long>(frac_hex) +
+                             4LL * static_cast<long long>(dropped_nibbles);
+        if(sh >= 0)
+        {
+            if(sh > static_cast<long long>(I_bits))
+                return false;
+            raw = mant << static_cast<unsigned int>(sh);
+        }
+        else
+        {
+            const unsigned int rsh = static_cast<unsigned int>(-sh);
+            if(rsh > I_bits)
+                return false;
+            raw = hexfloat_rshift_round(mant, rsh);
+        }
+        (void)truncated;
+        return pos == len;
+    }
+
+    // parse hexfloat literals format string and store as const.
+    template <typename I, unsigned int fraction>
+    constexpr I eval_dyadic(const char* str)
+    {
+        std::size_t len = 0;
+        while(str[len] != '\0')
+            ++len;
+        std::size_t pos = 0;
+        bool negative = false;
+        if(pos < len && (str[pos] == '-' || str[pos] == '+'))
+        {
+            negative = str[pos] == '-';
+            ++pos;
+        }
+        I raw = 0;
+        if(!parse_hexfloat(str + pos, len - pos, fraction, raw))
+            return I(0);
+        return negative ? -raw : raw;
+    }
+
     template <typename CharT, typename T, typename I, unsigned int f, bool r>
     constexpr bool parse(const CharT* str, size_t len, fixed_num<T, I, f, r>& fp) noexcept
     {
@@ -908,7 +1073,6 @@ namespace detail
 
         auto check_ch = [](char ch) -> bool
         {
-            // This should be faster than isdigit
             return '0' <= ch && ch <= '9';
         };
 
@@ -923,39 +1087,48 @@ namespace detail
             next();
         }
 
-        I int_part = I(0), dec_part = I(0);
-        // parse the integer part.
-        while(pos < len && str[pos] != '.')
-        {
-            if(!check_ch(str[pos]))
-                return false;
-            int_part = int_part * 10 + (next() - '0');
-        }
-
         I fixed_value;
-        // parse the decimal part.
-        if(pos < len && str[pos] == '.')
+        if(pos + 1 < len && str[pos] == '0' && (str[pos + 1] == 'x' || str[pos + 1] == 'X'))
         {
-            ++pos;
-            constexpr auto max_fraction = (static_cast<I>(1) << fixed::precision) - 1;
-            I divisor = I(1);
-            while(pos < len)
-            {
-                if(!check_ch(str[pos]))
-                    return false;
-                if(dec_part > max_fraction / 10)
-                {
-                    break;
-                }
-                auto digit = next() - '0';
-                dec_part = dec_part * 10 + digit;
-                divisor *= 10;
-            }
-            fixed_value = (int_part << fixed::precision) + (dec_part << fixed::precision) / divisor;
+            // we guess this is hexfloat literals format string.
+            if(!parse_hexfloat(str + pos, len - pos, fixed::precision, fixed_value))
+                return false;
         }
         else
         {
-            fixed_value = int_part << fixed::precision;
+            I int_part = I(0), dec_part = I(0);
+            // parse the integer part.
+            while(pos < len && str[pos] != '.')
+            {
+                if(!check_ch(str[pos]))
+                    return false;
+                int_part = int_part * 10 + (next() - '0');
+            }
+
+            // parse the decimal part.
+            if(pos < len && str[pos] == '.')
+            {
+                ++pos;
+                constexpr auto max_fraction = (static_cast<I>(1) << fixed::precision) - 1;
+                I divisor = I(1);
+                while(pos < len)
+                {
+                    if(!check_ch(str[pos]))
+                        return false;
+                    if(dec_part > max_fraction / 10)
+                    {
+                        break;
+                    }
+                    auto digit = next() - '0';
+                    dec_part = dec_part * 10 + digit;
+                    divisor *= 10;
+                }
+                fixed_value = (int_part << fixed::precision) + (dec_part << fixed::precision) / divisor;
+            }
+            else
+            {
+                fixed_value = int_part << fixed::precision;
+            }
         }
 
         // check overflow
@@ -1161,80 +1334,8 @@ constexpr inline fixed_num<T, I, f, r> operator%(const std::integral auto& val, 
 
 inline bool f32_from_cstring(const char* str, size_t len, fixed32& fp) noexcept
 {
-    size_t pos = 0;
-    bool negative = false;
-    auto peek = [&]() -> char
-    {
-        return str[pos];
-    };
-    auto next = [&]() -> char
-    {
-        return str[pos++];
-    };
-    auto has_next = [&]() -> bool
-    {
-        return pos < len;
-    };
-    auto check_ch = [](char ch) -> bool
-    {
-        // This should be faster than isdigit
-        return '0' <= ch && ch <= '9';
-    };
-
-    if(has_next() && peek() == '-')
-    {
-        negative = true;
-        next();
-    }
-
-    int64_t int_part = 0, dec_part = 0;
-    // parse the integer part.
-    while(has_next() && peek() != '.')
-    {
-        if(!check_ch(peek()))
-        {
-            return false;
-        }
-        int_part = int_part * 10 + (next() - '0');
-    }
-    int64_t fixed_value;
-    // parse the decimal part.
-    if(has_next() && peek() == '.')
-    {
-        ++pos;
-        constexpr auto max_fraction = (1 << fixed32::precision) - 1;
-        int64_t divisor = 1;
-        while(has_next())
-        {
-            if(!check_ch(peek()))
-            {
-                return false;
-            }
-            if(dec_part > max_fraction / 10)
-            {
-                break;
-            }
-            auto digit = next() - '0';
-            dec_part = dec_part * 10 + digit;
-            divisor *= 10;
-        }
-        fixed_value = (int_part << fixed32::precision) + (dec_part << fixed32::precision) / divisor;
-    }
-    else
-    {
-        fixed_value = int_part << fixed32::precision;
-    }
-
-    // check overflow
-    if(fixed_value > static_cast<int64_t>(std::numeric_limits<int32_t>::max()) || fixed_value < static_cast<int64_t>(std::numeric_limits<int32_t>::min()))
-    {
-        return false;
-    }
-
-    fp = fixed32::from_internal_value(static_cast<int32_t>(fixed_value));
-    if(negative)
-        fp = -fp;
-    return true;
+    // detail::parse should has same behavior as f32_from_cstring.
+    return detail::parse(str, len, fp);
 }
 
 template <typename T, typename I, unsigned int f, bool r>
