@@ -331,6 +331,16 @@ TEST(Fixed32, Operator)
     EXPECT_EQ(fp2.divide(2), 257_f32);
     EXPECT_EQ(515_f32 % 2_f32, 1_f32);
     EXPECT_EQ(--fp1, 0.14_f32);
+    fp2 = fp2 + 1;
+    EXPECT_EQ(fp2, 515_f32);
+    fp2 = 515_f32 / fp2;
+    EXPECT_EQ(fp2, 1_f32);
+    fp2 = fp2 * 2;
+    EXPECT_EQ(fp2, 2_f32);
+    fp2 = 6 / fp2;
+    EXPECT_EQ(fp2, 3_f32);
+    fp2 = 120_f32 / fp2;
+    EXPECT_EQ(fp2, 40_f32);
 
 #ifndef EIRIN_NO_EXCEPTIONS
 

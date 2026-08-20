@@ -557,11 +557,11 @@ EIRIN_BENCH_PERF_ACCURACY(TRI, BM_TaylorSinF32_Accuracy, BM_SinWithAccuracy, fix
 EIRIN_BENCH_PERF_ACCURACY(TRI, BM_MinimaxSinF32_Accuracy, BM_SinWithAccuracy, fixed32, detail::sin_minimax, double, std::sin, minimax_f32_accuracy, MinimaxSinF32, "Minimax Sin (fixed32)")
 EIRIN_BENCH_PERF_ACCURACY(TRI, BM_BestSinF32_Accuracy, BM_SinWithAccuracy, fixed32, sin, double, std::sin, best_f32_accuracy, AutoFitSinF32, "AutoFit Sin (fixed32)")
 EIRIN_BENCH_PERF_ACCURACY(SQRT, BM_BestSqrt_Accuracy, BM_SqrtWithAccuracy, fixed64, sqrt, double, std::sqrt, sqrt_accuracy, AutoFitSqrt, "AutoFit Sqrt (fixed64)")
-EIRIN_BENCH_PERF_ACCURACY(SQRT_32, BM_BestSqrtF32_Accuracy, BM_SqrtWithAccuracy, fixed32, sqrt, double, std::sqrt, sqrt_f32_accuracy, AutoFitSqrt, "AutoFit Sqrt (fixed32)")
+EIRIN_BENCH_PERF_ACCURACY(SQRT_32, BM_BestSqrtF32_Accuracy, BM_SqrtWithAccuracy, fixed32, sqrt, double, std::sqrt, sqrt_f32_accuracy, AutoFitSqrtF32, "AutoFit Sqrt (fixed32)")
 EIRIN_BENCH_PERF_ACCURACY(EXP, BM_BestExp_Accuracy, BM_ExpWithAccuracy, fixed64, exp, double, std::exp, exp_accuracy, PloyExp, "Poly Exp (fixed64)")
-EIRIN_BENCH_PERF_ACCURACY(EXP, BM_BestExpF32_Accuracy, BM_ExpWithAccuracy, fixed32, exp, double, std::exp, exp_f32_accuracy, PloyExp, "Poly Exp (fixed32)")
+EIRIN_BENCH_PERF_ACCURACY(EXP, BM_BestExpF32_Accuracy, BM_ExpWithAccuracy, fixed32, exp, double, std::exp, exp_f32_accuracy, PloyExpF32, "Poly Exp (fixed32)")
 EIRIN_BENCH_PERF_ACCURACY(LOG2, BM_BestLog2_Accuracy, BM_Log2WithAccuracy, fixed64, log2, double, std::log2, log2_accuracy, PloyLog2, "Poly Log2 (fixed64)")
-EIRIN_BENCH_PERF_ACCURACY(LOG2_32, BM_BestLog2F32_Accuracy, BM_Log2WithAccuracy, fixed32, log2, double, std::log2, log2_f32_accuracy, PloyLog2, "Poly Log2 (fixed32)")
+EIRIN_BENCH_PERF_ACCURACY(LOG2_32, BM_BestLog2F32_Accuracy, BM_Log2WithAccuracy, fixed32, log2, double, std::log2, log2_f32_accuracy, PloyLog2F32, "Poly Log2 (fixed32)")
 
 // two-input (pow) accuracy benchmark
 #    define EIRIN_BENCH_PERF_ACCURACY_TEST_POW(name)                                                                                                    \

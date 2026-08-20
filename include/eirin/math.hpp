@@ -241,34 +241,40 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp
 }
 
 /**
-     * @brief Arctangent function for fixed point number, using the fitting
-     *        method from the paper "Efficient Approximations for the Arctangent Function".
-     * @note reference paper: https://ieeexplore.ieee.org/document/1628884
-     *
-     * @tparam T @see fixed_num
-     * @tparam I @see fixed_num
-     * @tparam f @see fixed_num
-     * @tparam r @see fixed_num
-     * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
-     * @param fp the x of atan(x)
-     * @return atan(x).
-     */
+ * @brief We use different simulation function in different range.
+ * for x < 0: atan(x) = -atan(-x), which reduce x to [0, max]
+ * for x > 1: atan(x) = pi / 2 - atan(1 / x), which reduce x to [0, 1].
+ * Then atan(x) = x * (c0 + c1 * t + c2 * t^2 + cn * t^n), t = x^2.
+ * we use different n for different f:
+ * f <= 14 -> deg7;
+ * 15 <= f <= 20 -> deg7/9;
+ * f >= 21 -> deg/7/9/11;
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the x of atan(x)
+ * @return atan(x).
+ */
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    constexpr auto a = detail::eval_const<char, T, I, f, r>("-0.0464964749");
-    constexpr auto b = detail::eval_const<char, T, I, f, r>("0.15931422");
-    constexpr auto c = detail::eval_const<char, T, I, f, r>("0.327622764");
-    // TODO: because fixed point cannot represent infinity, so we need to handle the case when fp is very large.
-    auto abs_fp = abs(fp);
-    auto x = abs_fp;
-    auto x2 = x * x;
-    fixed result = ((a * x2 + b) * x2 - c) * x2 * x + x;
-    // if the input is negative, return negative result.
-    if(fp.signbit_mask() & fp.internal_value())
-        result = -result;
-    return result;
+    if constexpr(fixed::digits_int == 0)
+        return fp;
+    constexpr auto half_pi = numbers::pi_v<fixed>() / 2;
+    const bool negative = (fp.signbit_mask() & fp.internal_value()) != 0;
+    fixed x = abs(fp);
+    if(x > fixed(1))
+    {
+        constexpr auto one = fixed(1);
+        return negative ? -(half_pi - detail::atan_impl(one / x)) : (half_pi - detail::atan_impl(one / x));
+    }
+    else
+    {
+        return negative ? -detail::atan_impl(x) : detail::atan_impl(x);
+    }
 }
 
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -639,6 +645,17 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b,
     return sign_neg ? -res : res;
 }
 
+/**
+ * @brief Fast pow, use a^b = e^(b*log2(a) * ln2).
+ * 
+ * @tparam T 
+ * @tparam I 
+ * @tparam f 
+ * @tparam r 
+ * @param b 
+ * @param e 
+ * @return EIRIN_ALWAYS_INLINE constexpr 
+ */
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) noexcept
 {
@@ -658,7 +675,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, 
                                    ) :
                                    numbers::ln2_v<fixed>();
 
-    return exp(e * log2(b * ln2));
+    return exp(e * log2(b) * ln2);
 }
 
 template <typename T, typename I, unsigned int f, bool r>
