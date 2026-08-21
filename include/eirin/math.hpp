@@ -100,6 +100,100 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> max(fixed_num<T, I, f, r> a,
 }
 
 template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>& exponent) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    using U = detail::make_unsigned_t<T>;
+
+    auto X = x.internal_value();
+    if(X == 0)
+    {
+        exponent = fixed(0);
+        return x;
+    }
+
+    const bool neg = X < 0;
+    const U mag = neg ? U(0) - static_cast<U>(X) : static_cast<U>(X);
+    auto msb = detail::bit_width(mag);
+    const int xe = static_cast<int>(msb) - static_cast<int>(f);
+    T xm = xe >= 0 ? static_cast<T>(mag >> xe) : static_cast<T>(mag << static_cast<unsigned>(-xe));
+    exponent.m_value = static_cast<T>(static_cast<I>(xe) << f);
+    return fixed::from_internal_value(neg ? -xm : xm);
+}
+
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>* exponent) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    using U = detail::make_unsigned_t<T>;
+
+    if(exponent == nullptr)
+        return x;
+
+    auto X = x.internal_value();
+    if(X == 0)
+    {
+        *exponent = fixed(0);
+        return x;
+    }
+
+    const bool neg = X < 0;
+    const U mag = neg ? U(0) - static_cast<U>(X) : static_cast<U>(X);
+    auto msb = detail::bit_width(mag);
+    const int xe = static_cast<int>(msb) - static_cast<int>(f);
+    T xm = xe >= 0 ? static_cast<T>(mag >> xe) : static_cast<T>(mag << static_cast<unsigned>(-xe));
+    exponent->m_value = static_cast<T>(static_cast<I>(xe) << f);
+    return fixed::from_internal_value(neg ? -xm : xm);
+}
+
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto& exponent) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    using U = detail::make_unsigned_t<T>;
+
+    auto X = x.internal_value();
+    if(X == 0)
+    {
+        exponent = 0;
+        return x;
+    }
+
+    const bool neg = X < 0;
+    const U mag = neg ? U(0) - static_cast<U>(X) : static_cast<U>(X);
+    auto msb = detail::bit_width(mag);
+    const int xe = static_cast<int>(msb) - static_cast<int>(f);
+    T xm = xe >= 0 ? static_cast<T>(mag >> xe) : static_cast<T>(mag << static_cast<unsigned>(-xe));
+    exponent = static_cast<std::remove_reference_t<decltype(exponent)>>(xe);
+    return fixed::from_internal_value(neg ? -xm : xm);
+}
+
+template <typename T, typename I, unsigned int f, bool r>
+EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto* exponent) noexcept
+{
+    using fixed = fixed_num<T, I, f, r>;
+    using U = detail::make_unsigned_t<T>;
+
+    if(exponent == nullptr)
+        return x;
+
+    auto X = x.internal_value();
+    if(X == 0)
+    {
+        *exponent = 0;
+        return x;
+    }
+
+    const bool neg = X < 0;
+    const U mag = neg ? U(0) - static_cast<U>(X) : static_cast<U>(X);
+    auto msb = detail::bit_width(mag);
+    const int xe = static_cast<int>(msb) - static_cast<int>(f);
+    T xm = xe >= 0 ? static_cast<T>(mag >> xe) : static_cast<T>(mag << static_cast<unsigned>(-xe));
+    *exponent = static_cast<std::remove_reference_t<decltype(*exponent)>>(xe);
+    return fixed::from_internal_value(neg ? -xm : xm);
+}
+
+template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
@@ -287,7 +381,42 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> f
         return pi / fixed(2);
     else if(fp == fixed(-1))
         return -pi / fixed(2);
-    return atan(fp / sqrt(fixed(1) - fp * fp));
+
+    constexpr auto inv_sqrt2 = detail::eval_const<char, T, I, f, r>("0x1.6a09e667f3bcdp-1");
+    const auto a = abs(fp);
+    if(a > inv_sqrt2)
+    {
+        // near-1 branch
+        if constexpr(f <= 32)
+        {
+            using U = detail::make_unsigned_t<T>;
+            const auto A = static_cast<U>(a.internal_value());
+            const U D = (static_cast<U>(1) << f) - A; // (1 - a)·2^f
+            const auto z = fixed::from_internal_value(static_cast<T>(detail::pow_rshift(static_cast<T>(D), 1u)));
+            const U N = D << (f + 1); // N < 2^64 for a > 1/sqrt(2), f <= 32
+            const auto w = fixed::from_internal_value(static_cast<T>(detail::fast_isqrt_u64(N)));
+            constexpr auto p1 = detail::eval_const<char, T, I, f, r>("0x1.555554f8p-3");
+            constexpr auto p2 = detail::eval_const<char, T, I, f, r>("0x1.3333811p-4");
+            constexpr auto p3 = detail::eval_const<char, T, I, f, r>("0x1.6d9e81ap-5");
+            constexpr auto p4 = detail::eval_const<char, T, I, f, r>("0x1.f560b18p-6");
+            constexpr auto p5 = detail::eval_const<char, T, I, f, r>("0x1.4c26f0cp-6");
+            constexpr auto p6 = detail::eval_const<char, T, I, f, r>("0x1.b855294p-6");
+            const auto p = z * (p1 + z * (p2 + z * (p3 + z * (p4 + z * (p5 + z * p6)))));
+            const auto res = pi / fixed(2) - w * (fixed(1) + p);
+            return (fp.signbit_mask() & fp.internal_value()) ? -res : res;
+        }
+        else
+        {
+            const auto u = fixed(1) - a;
+            const auto v = fixed(1) + a;
+            const I uv = static_cast<I>(u.internal_value()) * static_cast<I>(v.internal_value());
+            const auto s = fixed::from_internal_value(static_cast<T>(detail::isqrt_bits(uv)));
+            const auto w = pi / fixed(2) - detail::asin_impl(s);
+            return (fp.signbit_mask() & fp.internal_value()) ? -w : w;
+        }
+    }
+    const auto v = detail::asin_impl(a);
+    return (fp.signbit_mask() & fp.internal_value()) ? -v : v;
 }
 
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -305,38 +434,77 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> f
     return pi / 2 - asin(fp);
 }
 
-//TODO: Implement asin and acos functions with CORDIC, and optimize other functions with CORDIC.
-
 /**
- * @brief cbrt function for fixed point number, which used newton method to calculate the cbrt.
+ * @brief Cube root for fixed point number.
  *
  * @tparam T @see fixed_num
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @tparam iter_max max iteration times, default is 200.
  * @param fp
  * @return cbrt(fp)
  */
-template <typename T, typename I, unsigned int f, bool r, int iter_max = 200>
+template <typename T, typename I, unsigned int f, bool r>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    if(abs(fp) < fixed::epsilon())
-        return fixed(0);
-    auto x = (fixed(fp) + 2) / 3;
-    auto iter_count = 0;
-    constexpr auto precision = fixed::nearly_compare_epsilon() * 2;
+    constexpr auto F = detail::cbrt_frexp_scales<T, I, f>::fraction;
 
-    while(abs(fp - (x * x * x)) >= precision && iter_count <= iter_max)
-    {
-        x = (fp / (x * x) + x * 2) / 3;
-        ++iter_count;
-    }
-    return x;
+    if(fp == fixed(0))
+        return fp;
+    int xe = 0;
+    I m = detail::cbrt_frexp(fp, xe); // extract mantissa and exponent
+    const bool neg = m < 0;
+    const I a = neg ? -m : m; // improves mantissa
+
+    // u = cbrt(a)·2^F horner
+    constexpr auto c0 = detail::eval_dyadic<I, F>("0x1.6b69cba168ff2p-2"); //  0.354895765043919842
+    constexpr auto c1 = detail::eval_dyadic<I, F>("0x1.8218dde9028b4p0"); //  1.508191937815849037
+    constexpr auto c2 = detail::eval_dyadic<I, F>("-0x1.0eb8277cd8d5dp1"); // -2.114994941673713047
+    constexpr auto c3 = detail::eval_dyadic<I, F>("0x1.39350adad51ecp1"); //  2.446931225635344376
+    constexpr auto c4 = detail::eval_dyadic<I, F>("-0x1.d5ae6cfa20f0cp0"); // -1.834692774836130802
+    constexpr auto c5 = detail::eval_dyadic<I, F>("0x1.91e2a6fe7e984p-1"); //  0.784932344976639218
+    constexpr auto c6 = detail::eval_dyadic<I, F>("-0x1.29801e893366dp-3"); // -0.145263899385486367
+    I u = c6;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c5;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c4;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c3;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c2;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c1;
+    u = detail::multiply_fixed_internal<I, F, r>(u, a) + c0;
+
+    // Halley Algorithm:
+    // for y = f(x), y' = f'(x), y'' = f''(x), we have:
+    // x_n+1 = x_n - (y / y') / (1 - (y * y'') / (2y' * y'))
+    // so we noticed that:
+    // u = u*(u^3 + 2a) / (2u^3 + a)
+    const I u2 = detail::multiply_fixed_internal<I, F, r>(u, u);
+    const I u3 = detail::multiply_fixed_internal<I, F, r>(u2, u);
+    const I num = u3 + (a << 1);
+    const I den = (u3 << 1) + a;
+    const I ratio = ((num << F) + (den >> 1)) / den;
+    u = detail::multiply_fixed_internal<I, F, r>(u, ratio);
+
+    // rebuild exponent
+    const int q = xe / 3;
+    constexpr I factor[5] = {
+        detail::eval_dyadic<I, F>("0x1.428a2f98d728ap-1"), // 2^(-2/3)
+        detail::eval_dyadic<I, F>("0x1.965fea53d6e3dp-1"), // 2^(-1/3)
+        I(1) << F, // 1
+        detail::eval_dyadic<I, F>("0x1.428a2f98d728ap0"), // 2^(1/3)
+        detail::eval_dyadic<I, F>("0x1.965fea53d6e3dp0"), // 2^(2/3)
+    };
+    u = detail::multiply_fixed_internal<I, F, r>(u, factor[2 + xe % 3]);
+
+    // build result
+    const int sh = static_cast<int>(F) - static_cast<int>(f) - q;
+    I raw = detail::pow_rshift(u, static_cast<unsigned int>(sh));
+    if(neg)
+        raw = -raw;
+    return fixed::from_internal_value(static_cast<T>(raw));
 }
 
-template <typename T, typename I, unsigned int f, bool r, std::integral E>
+template <typename T, typename I, unsigned int f, bool r, detail::integral E>
 EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, E e) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;

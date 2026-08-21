@@ -449,8 +449,15 @@ TEST(Fixed32, Math)
     EXPECT_TRUE(expect_fixed_eq(atan(1_f32), 0.785398_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(asin(0_f32), 0_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(asin(0.5_f32), 0.523598_f32, test_math::arc_triangle_max_error));
+    EXPECT_EQ(asin(1_f32), numbers::pi / 2);
+    EXPECT_EQ(asin(-1_f32), -numbers::pi / 2);
     EXPECT_TRUE(expect_fixed_eq(acos(0_f32), 1.570796_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(acos(0.5_f32), 1.047197_f32, test_math::arc_triangle_max_error));
+    EXPECT_EQ(acos(1_f32), 0_f32);
+    EXPECT_EQ(acos(-1_f32), numbers::pi);
+    // glibc e_asin.c style near-1 branch (z = (1-x)/2, asin(x) = pi/2 - 2*asin(sqrt(z))).
+    EXPECT_TRUE(expect_fixed_eq(asin(1_f32 - 1_f32 / (1 << 16)), 1.5652721_f32));
+    EXPECT_TRUE(expect_fixed_eq(acos(1_f32 - 1_f32 / (1 << 16)), 0.00552427_f32));
     EXPECT_EQ(sqrt(0_f32), 0_f32);
     EXPECT_EQ(sqrt(4_f32), 2_f32);
     EXPECT_EQ(sqrt(114.514_f32), 10.701121_f32);
@@ -614,8 +621,15 @@ TEST(Fixed64, Math)
     EXPECT_TRUE(expect_fixed_eq(atan(1_f64), 0.785398_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(asin(0_f64), 0_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(asin(0.5_f64), 0.523598_f64, test_math::arc_triangle_max_error_64));
+    EXPECT_EQ(asin(1_f64), numbers::pi_f64 / 2);
+    EXPECT_EQ(asin(-1_f64), -numbers::pi_f64 / 2);
     EXPECT_TRUE(expect_fixed_eq(acos(0_f64), 1.570796_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(acos(0.5_f64), 1.047197_f64, test_math::arc_triangle_max_error_64));
+    EXPECT_EQ(acos(1_f64), 0_f64);
+    EXPECT_EQ(acos(-1_f64), numbers::pi_f64);
+    // glibc e_asin.c style near-1 branch (z = (1-x)/2, asin(x) = pi/2 - 2*asin(sqrt(z))).
+    EXPECT_TRUE(expect_fixed_eq(asin(1_f64 - 1_f64 / (1LL << 32)), 1.57077475_f64));
+    EXPECT_TRUE(expect_fixed_eq(acos(1_f64 - 1_f64 / (1LL << 32)), 0.000021579_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(0_f64), 0_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(4_f64), 2_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(114.514_f64), 10.701121_f64));

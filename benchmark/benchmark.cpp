@@ -42,6 +42,110 @@ static void eirin_ext_int128_mul(benchmark::State& state)
 }
 #endif
 
+template <typename Fixed>
+static std::vector<Fixed> make_random_cbrt_set(std::size_t n)
+{
+    std::vector<Fixed> vec(n);
+    std::mt19937_64 mt64(0x114514);
+    using T = typename Fixed::value_type;
+    for(auto& v : vec)
+        v = Fixed::from_internal_value(static_cast<T>(mt64()));
+    return vec;
+}
+
+
+template <typename Fixed>
+static std::vector<Fixed> make_random_fixed_set(std::size_t n, double lo, double hi, uint64_t seed = 0x114514)
+{
+    std::vector<Fixed> vec(n);
+    std::mt19937_64 mt64(seed);
+    std::uniform_real_distribution<double> dist(lo, hi);
+    for(auto& v : vec)
+        v = Fixed(dist(mt64));
+    return vec;
+}
+
+template <typename Fixed, typename MathFunc>
+static void bench_random_1(benchmark::State& state, MathFunc func, double lo, double hi)
+{
+    const auto vec = make_random_fixed_set<Fixed>(state.range(0), lo, hi);
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto input = vec[i++ % vec.size()];
+        benchmark::DoNotOptimize(input);
+        auto result = func(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
+template <typename Fixed, typename MathFunc>
+static void bench_random_2(benchmark::State& state, MathFunc func, double lo1, double hi1, double lo2, double hi2)
+{
+    const auto a = make_random_fixed_set<Fixed>(state.range(0), lo1, hi1, 0x114514);
+    const auto b = make_random_fixed_set<Fixed>(state.range(0), lo2, hi2, 0x1919810);
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto x = a[i % a.size()];
+        auto y = b[i % b.size()];
+        ++i;
+        benchmark::DoNotOptimize(x);
+        benchmark::DoNotOptimize(y);
+        auto result = func(x, y);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
+static void f32_cbrt(benchmark::State& state)
+{
+    const auto vec = make_random_cbrt_set<fixed32>(state.range(0));
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto input = vec[i++ % vec.size()];
+        benchmark::DoNotOptimize(input);
+        auto result = cbrt(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
+static void double_cbrt(benchmark::State& state)
+{
+    std::vector<double> vec(state.range(0));
+    std::mt19937_64 mt64(0xC0FFEE);
+    for(auto& v : vec)
+        v = static_cast<double>(static_cast<std::int64_t>(mt64())) / 4294967296.0;
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto input = vec[i++ % vec.size()];
+        benchmark::DoNotOptimize(input);
+        auto result = std::cbrt(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
+#ifdef EIRIN_MATH_HAS_INT128
+static void f64_cbrt(benchmark::State& state)
+{
+    const auto vec = make_random_cbrt_set<fixed64>(state.range(0));
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto input = vec[i++ % vec.size()];
+        benchmark::DoNotOptimize(input);
+        auto result = cbrt(input);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+#endif
+
 #ifdef _MSC_VER
 static void msvc_int128_mul(benchmark::State& state)
 {
@@ -69,548 +173,258 @@ static void msvc_int128_mul(benchmark::State& state)
 
 static void f32_create(benchmark::State& state)
 {
-    double arg = state.range(0);
+    std::vector<double> vec(state.range(0));
+    std::mt19937_64 mt64(0xC0FFEE);
+    std::uniform_real_distribution<double> dist(-30000, 30000);
+    for(auto& v : vec)
+        v = dist(mt64);
+    std::size_t i = 0;
     for(auto _ : state)
     {
-        auto input = arg;
+        auto input = vec[i++ % vec.size()];
         benchmark::DoNotOptimize(input);
-
         auto result = fixed32(input);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
 }
 
+
 static void f32_divide(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    auto fp2 = F32_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 / input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x / y; }, -30000, 30000, 1, 30000);
 }
+
 
 static void f32_multiple(benchmark::State& state)
 {
-    auto fp1 = "4.95"_f32;
-    auto fp2 = "1145.14"_f32;
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 * input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x * y; }, -150, 150, -150, 150);
 }
+
 
 static void f32_add(benchmark::State& state)
 {
-    auto fp1 = "4.95"_f32;
-    auto fp2 = "1145.14"_f32;
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 + input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x + y; }, -15000, 15000, -15000, 15000);
 }
+
 
 static void f32_minus(benchmark::State& state)
 {
-    auto fp1 = "4.95"_f32;
-    auto fp2 = "1145.14"_f32;
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 - input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x - y; }, -15000, 15000, -15000, 15000);
 }
+
 
 static void f32_sqrt(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = sqrt(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return sqrt(x); }, 0, 30000);
 }
+
 
 static void f32_log2(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto result = log2(fp1);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return log2(x); }, 0.001, 30000);
 }
+
 
 static void f32_log(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = log(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return log(x); }, 0.001, 30000);
 }
+
 
 static void f32_log10(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto result = log10(fp1);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return log10(x); }, 0.001, 30000);
 }
+
 
 static void f32_exp(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = exp(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return exp(x); }, -5, 5);
 }
+
 
 static void f32_pow(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    auto fp2 = F32_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = pow(input1, input2);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return pow(x, y); }, 0.5, 50, -2, 2);
 }
+
 
 static void f32_pow_fast(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    auto fp2 = F32_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = pow_fast(input1, input2);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return pow(x, y); }, 0.5, 50, -2, 2);
 }
+
 
 static void f32_sin(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = sin(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return sin(x); }, -10, 10);
 }
+
 
 static void f32_cos(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = cos(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return cos(x); }, -10, 10);
 }
+
 
 static void f32_tan(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = tan(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return tan(x); }, -1.5, 1.5);
 }
+
 
 static void f32_atan(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = atan(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return atan(x); }, -30000, 30000);
 }
+
 
 static void f32_asin(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = asin(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return asin(x); }, -1, 1);
 }
+
 
 static void f32_acos(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = acos(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return acos(x); }, -1, 1);
 }
+
 
 static void f32_cordic_sin(benchmark::State& state)
 {
-    auto fp1 = F32_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = cordic_sine(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed32>(state, [](fixed32 x) { return cordic_sine(x); }, -10, 10);
 }
+
 
 #ifdef EIRIN_MATH_HAS_INT128
 static void f64_create(benchmark::State& state)
 {
-    double arg = state.range(0);
+    std::vector<double> vec(state.range(0));
+    std::mt19937_64 mt64(0xC0FFEE);
+    std::uniform_real_distribution<double> dist(-2000000000.0, 2000000000.0);
+    for(auto& v : vec)
+        v = dist(mt64);
+    std::size_t i = 0;
     for(auto _ : state)
     {
-        auto input = arg;
+        auto input = vec[i++ % vec.size()];
         benchmark::DoNotOptimize(input);
-
-        auto fp1 = fixed64(input);
-        benchmark::DoNotOptimize(fp1);
+        auto result = fixed64(input);
+        benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
 }
+
 
 static void f64_divide(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 / input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x / y; }, -2000000000.0, 2000000000.0, 1, 2000000000.0);
 }
+
 
 static void f64_multiple(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 * input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x * y; }, -10000.0, 10000.0, -10000.0, 10000.0);
 }
+
 
 static void f64_add(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 + input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x + y; }, -1000000000.0, 1000000000.0, -1000000000.0, 1000000000.0);
 }
+
 
 static void f64_minus(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = input1 - input2;
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x - y; }, -1000000000.0, 1000000000.0, -1000000000.0, 1000000000.0);
 }
+
 
 static void f64_sqrt(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = sqrt(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return sqrt(x); }, 0, 2000000000.0);
 }
+
 
 static void f64_log2(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto result = log2(fp1);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return log2(x); }, 0.001, 2000000000.0);
 }
+
 
 static void f64_log(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = log(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return log(x); }, 0.001, 2000000000.0);
 }
+
 
 static void f64_log10(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto result = log10(fp1);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return log10(x); }, 0.001, 2000000000.0);
 }
+
 
 static void f64_exp(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = exp(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return exp(x); }, -20, 20);
 }
+
 
 static void f64_pow_fast(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = pow_fast(input1, input2);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return pow(x, y); }, 0.5, 10000.0, -2, 2);
 }
+
 
 static void f64_pow(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    auto fp2 = F64_FROM_BENCH(1);
-    for(auto _ : state)
-    {
-        auto input1 = fp1, input2 = fp2;
-        benchmark::DoNotOptimize(input1);
-        benchmark::DoNotOptimize(input2);
-
-        auto result = pow(input1, input2);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return pow(x, y); }, 0.5, 10000.0, -2, 2);
 }
+
 
 static void f64_sin(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = sin(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return sin(x); }, -10, 10);
 }
+
 
 static void f64_cos(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = cos(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return cos(x); }, -10, 10);
 }
+
 
 static void f64_tan(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = tan(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return tan(x); }, -1.5, 1.5);
 }
+
 
 static void f64_atan(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = atan(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return atan(x); }, -2000000000.0, 2000000000.0);
 }
+
 
 static void f64_asin(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = asin(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return asin(x); }, -1, 1);
 }
+
 
 static void f64_acos(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = acos(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return acos(x); }, -1, 1);
 }
+
 
 static void f64_cordic_sin(benchmark::State& state)
 {
-    auto fp1 = F64_FROM_BENCH(0);
-    for(auto _ : state)
-    {
-        auto input = fp1;
-        benchmark::DoNotOptimize(input);
-
-        auto result = cordic_sine(input);
-        benchmark::DoNotOptimize(result);
-        benchmark::ClobberMemory();
-    }
+    bench_random_1<fixed64>(state, [](fixed64 x) { return cordic_sine(x); }, -10, 10);
 }
+
 #endif
 
 #if defined(EIRIN_OS_WINDOWS) || defined(EIRIN_OS_LINUX) || defined(EIRIN_OS_MACOS)
@@ -620,45 +434,48 @@ BENCHMARK(eirin_ext_int128_mul)->Args({0x114514, 0x7FFFFFFFFFFFFFFFll, 0x495, 0x
 BENCHMARK(msvc_int128_mul)->Args({0x114514, 0x7FFFFFFFFFFFFFFFll, 0x495, 0x1919810});
 #endif
 
-BENCHMARK(f32_create)->Args({1145});
-BENCHMARK(f32_divide)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_multiple)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_add)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_minus)->Args({BENCH_F32_VAL(4.95), BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_sqrt)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_log2)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_log)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_log10)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_exp)->Args({BENCH_F32_VAL(11.4514)});
-BENCHMARK(f32_pow)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
-BENCHMARK(f32_pow_fast)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
-BENCHMARK(f32_sin)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_cos)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_tan)->Args({BENCH_F32_VAL(1145.14)});
-BENCHMARK(f32_atan)->Args({BENCH_F32_VAL(0.5)});
-BENCHMARK(f32_acos)->Args({BENCH_F32_VAL(0.5)});
-BENCHMARK(f32_asin)->Args({BENCH_F32_VAL(0.5)});
-BENCHMARK(f32_cordic_sin)->Args({BENCH_F32_VAL(1145.14)});
+BENCHMARK(f32_create)->Args({4096});
+BENCHMARK(f32_divide)->Args({4096});
+BENCHMARK(f32_multiple)->Args({4096});
+BENCHMARK(f32_add)->Args({4096});
+BENCHMARK(f32_minus)->Args({4096});
+BENCHMARK(f32_sqrt)->Args({4096});
+BENCHMARK(f32_log2)->Args({4096});
+BENCHMARK(f32_log)->Args({4096});
+BENCHMARK(f32_log10)->Args({4096});
+BENCHMARK(f32_exp)->Args({4096});
+BENCHMARK(f32_pow)->Args({4096});
+BENCHMARK(f32_pow_fast)->Args({4096});
+BENCHMARK(f32_sin)->Args({4096});
+BENCHMARK(f32_cos)->Args({4096});
+BENCHMARK(f32_tan)->Args({4096});
+BENCHMARK(f32_atan)->Args({4096});
+BENCHMARK(f32_acos)->Args({4096});
+BENCHMARK(f32_asin)->Args({4096});
+BENCHMARK(f32_cordic_sin)->Args({4096});
+BENCHMARK(f32_cbrt)->Args({4096});
+BENCHMARK(double_cbrt)->Args({4096});
 #ifdef EIRIN_MATH_HAS_INT128
-BENCHMARK(f64_create)->Args({1145});
-BENCHMARK(f64_divide)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
-BENCHMARK(f64_multiple)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
-BENCHMARK(f64_add)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
-BENCHMARK(f64_minus)->Args({BENCH_F64_VAL(1145.14), BENCH_F64_VAL(4.95)});
-BENCHMARK(f64_sqrt)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_log2)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_log)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_log10)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_exp)->Args({BENCH_F64_VAL(11.4514)});
-BENCHMARK(f64_pow)->Args({BENCH_F64_VAL(11.4514), BENCH_F64_VAL(3.5)});
-BENCHMARK(f64_pow_fast)->Args({BENCH_F32_VAL(11.4514), BENCH_F32_VAL(3.5)});
-BENCHMARK(f64_sin)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_cos)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_tan)->Args({BENCH_F64_VAL(1145.14)});
-BENCHMARK(f64_atan)->Args({BENCH_F64_VAL(0.5)});
-BENCHMARK(f64_acos)->Args({BENCH_F64_VAL(0.5)});
-BENCHMARK(f64_asin)->Args({BENCH_F64_VAL(0.5)});
-BENCHMARK(f64_cordic_sin)->Args({BENCH_F64_VAL(1145.14)});
+BENCHMARK(f64_create)->Args({4096});
+BENCHMARK(f64_divide)->Args({4096});
+BENCHMARK(f64_multiple)->Args({4096});
+BENCHMARK(f64_add)->Args({4096});
+BENCHMARK(f64_minus)->Args({4096});
+BENCHMARK(f64_sqrt)->Args({4096});
+BENCHMARK(f64_log2)->Args({4096});
+BENCHMARK(f64_log)->Args({4096});
+BENCHMARK(f64_log10)->Args({4096});
+BENCHMARK(f64_exp)->Args({4096});
+BENCHMARK(f64_pow)->Args({4096});
+BENCHMARK(f64_pow_fast)->Args({4096});
+BENCHMARK(f64_sin)->Args({4096});
+BENCHMARK(f64_cos)->Args({4096});
+BENCHMARK(f64_tan)->Args({4096});
+BENCHMARK(f64_atan)->Args({4096});
+BENCHMARK(f64_acos)->Args({4096});
+BENCHMARK(f64_asin)->Args({4096});
+BENCHMARK(f64_cordic_sin)->Args({4096});
+BENCHMARK(f64_cbrt)->Args({4096});
 #endif
 
 BENCHMARK_MAIN();

@@ -10,6 +10,7 @@
 #include <bit>
 #include <limits>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -143,6 +144,9 @@ EIRIN_BENCH_PERF_SIMPLE(exp_f32, fixed32, exp, BENCH_F32_VAL(1145.14))
 EIRIN_BENCH_PERF_SIMPLE(double_sin, double, std::sin, BM_DOUBLE_PARAM_IN(11.4514))
 EIRIN_BENCH_PERF_SIMPLE(float_sin, float, std::sin, BM_FLOAT_PARAM_IN(11.4514f))
 EIRIN_BENCH_PERF_SIMPLE(double_sqrt, double, std::sqrt, BM_DOUBLE_PARAM_IN(1145.14))
+EIRIN_BENCH_PERF_SIMPLE(cbrt_f64, fixed64, cbrt, BENCH_F64_VAL(1145.14))
+EIRIN_BENCH_PERF_SIMPLE(cbrt_f32, fixed32, cbrt, BENCH_F32_VAL(1145.14))
+EIRIN_BENCH_PERF_SIMPLE(double_cbrt, double, std::cbrt, BM_DOUBLE_PARAM_IN(1145.14))
 EIRIN_BENCH_PERF_SIMPLE(float_sqrt, float, std::sqrt, BM_FLOAT_PARAM_IN(1145.14f))
 EIRIN_BENCH_PERF_SIMPLE(double_exp, double, std::exp, BM_DOUBLE_PARAM_IN(1145.14))
 EIRIN_BENCH_PERF_SIMPLE(float_exp, float, std::exp, BM_FLOAT_PARAM_IN(1145.14f))
@@ -527,6 +531,20 @@ static inline eirin_test_register push_accuracy_stats(const char* name, Accuracy
         EIRIN_BENCH_PERF_PUT_ARGS(-1, 1, 2000)     \
         EIRIN_BENCH_PERF_PUT_ARGS(-1.5, 1.5, 2000);
 
+#    define EIRIN_BENCH_PERF_ACCURACY_ARGS_CBRT   \
+        EIRIN_BENCH_PERF_PUT_ARGS(0, 1, 1500)     \
+        EIRIN_BENCH_PERF_PUT_ARGS(1, 10, 1500)    \
+        EIRIN_BENCH_PERF_PUT_ARGS(10, 1000, 3000) \
+        EIRIN_BENCH_PERF_PUT_ARGS(1000, 2100000000, 5000) \
+        EIRIN_BENCH_PERF_PUT_ARGS(-2100000000, -1, 5000);
+
+#    define EIRIN_BENCH_PERF_ACCURACY_ARGS_CBRT_32 \
+        EIRIN_BENCH_PERF_PUT_ARGS(0, 1, 1500)      \
+        EIRIN_BENCH_PERF_PUT_ARGS(1, 10, 1500)     \
+        EIRIN_BENCH_PERF_PUT_ARGS(10, 1000, 3000)  \
+        EIRIN_BENCH_PERF_PUT_ARGS(1000, 32767, 4000) \
+        EIRIN_BENCH_PERF_PUT_ARGS(-32767, -1, 4000);
+
 // wrapper functions
 #    define EIRIN_BENCH_PERF_ACCURACY_FUNC(name, bench_func, test_type, test_func, ref_type, ref_func, result, label)                                          \
         static void name /**/ (benchmark::State & state)                                                                                                       \
@@ -547,6 +565,7 @@ EIRIN_BENCH_PERF_ACCURACY_TEST(BM_SqrtWithAccuracy, , 0, 1, 2, 4, 9, 16, 25, 36,
 EIRIN_BENCH_PERF_ACCURACY_TEST(BM_ExpWithAccuracy, , 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -11.090354888959125, -9.704060527839234, -6.931471805599453, -3.4657359027997265, -0.6931471805599453, 0.6931471805599453, 1.3862943611198906, 2.772588722239781, 4.1588830833596715, 5.545177444479562, 6.931471805599453, 8.317766166719343, 9.704060527839234, 10.39720770839918, 11.090354888959125)
 EIRIN_BENCH_PERF_ACCURACY_TEST(BM_Log2WithAccuracy, , 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 1.5, 3, 5, 10, 100, 1000, 10000, 32767)
 EIRIN_BENCH_PERF_ACCURACY_TEST(BM_AtanWithAccuracy, , 0, 1, -1, 0.5, -0.5, 0.5773502691896258, -0.5773502691896258, 1.7320508075688772, -1.7320508075688772, 2, -2)
+EIRIN_BENCH_PERF_ACCURACY_TEST(BM_CbrtWithAccuracy, , 0, 1, 8, 27, 64, 125, 216, 343, 512, 729, 1000, -1, -8, -27, -64, -125, -216, -343, -512, -729, -1000)
 
 EIRIN_BENCH_PERF_ACCURACY(TRI, BM_TaylorSin_Accuracy, BM_SinWithAccuracy, fixed64, detail::sin_taylor, double, std::sin, taylor_accuracy, TaylorSin, "Taylor Series Sin (fixed64)")
 EIRIN_BENCH_PERF_ACCURACY(TRI, BM_CordicSin_Accuracy, BM_SinWithAccuracy, fixed64, cordic_sine, double, std::sin, cordic_accuracy, CordicSin, "CORDIC Sin (fixed64)")
@@ -652,6 +671,8 @@ EIRIN_BENCH_PERF_ACCURACY_POW(BM_PowNew_Accuracy, BM_PowWithAccuracy, fixed64, p
 
 EIRIN_BENCH_PERF_ACCURACY(ATAN, BM_Atan_Accuracy, BM_AtanWithAccuracy, fixed64, atan, double, std::atan, atan_accuracy, Atan, "Atan (fixed64)")
 EIRIN_BENCH_PERF_ACCURACY(ATAN, BM_AtanF32_Accuracy, BM_AtanWithAccuracy, fixed32, atan, double, std::atan, atan_f32_accuracy, Atan32, "Atan (fixed32)")
+EIRIN_BENCH_PERF_ACCURACY(CBRT, BM_Cbrt_Accuracy, BM_CbrtWithAccuracy, fixed64, cbrt, double, std::cbrt, cbrt_accuracy, Cbrt, "Cbrt (fixed64)")
+EIRIN_BENCH_PERF_ACCURACY(CBRT_32, BM_CbrtF32_Accuracy, BM_CbrtWithAccuracy, fixed32, cbrt, double, std::cbrt, cbrt_f32_accuracy, Cbrt32, "Cbrt (fixed32)")
 
 int main(int argc, char** argv)
 {

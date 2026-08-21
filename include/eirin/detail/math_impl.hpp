@@ -930,119 +930,217 @@ namespace detail
                 constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.2420a37c73d54c3p-3"); // x^7
                 return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * c3)));
             }
-#if 0
-            constexpr auto b_1_32 = detail::eval_const<char, T, I, f, r>("0x1p-5");   // 1/32 = 1 << (f - 5)
-            constexpr auto b_1_8 = detail::eval_const<char, T, I, f, r>("0x1p-3");    // 1/8 = 1 << (f - 3)
-            constexpr auto b_1_4 = detail::eval_const<char, T, I, f, r>("0x1p-2");    // 1/4 = 1 << (f - 2)
-            constexpr auto b_3_8 = detail::eval_const<char, T, I, f, r>("0x1.8p-2");  // 3/8
-            constexpr auto b_1_2 = detail::eval_const<char, T, I, f, r>("0x1p-1");    // 1/2 = 1 << (f - 1)
-            constexpr auto b_5_8 = detail::eval_const<char, T, I, f, r>("0x1.4p-1");  // 5/8
-            constexpr auto b_3_4 = detail::eval_const<char, T, I, f, r>("0x1.8p-1");  // 3/4
-            constexpr auto b_7_8 = detail::eval_const<char, T, I, f, r>("0x1.cp-1");  // 7/8
-            constexpr auto b_15_16 = detail::eval_const<char, T, I, f, r>("0x1.ep-1"); // 15/16
+        }
+    }
 
-            if(x < b_1_32)
+    // r(x) = 1/sqrt(1 - x^2)，x in [0, 1/sqrt(2)] (t = x^2 in [0, 1/2]).
+    // use deg-12 64-bit minimax.
+    template <typename T, typename I, unsigned int f, bool r>
+    EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> rsqrt_1mx2(fixed_num<T, I, f, r> x) noexcept
+    {
+        using fixed = fixed_num<T, I, f, r>;
+        constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.000000002e7f1741p0");
+        constexpr auto c1 = detail::eval_const<char, T, I, f, r>("0x1.fffffe2a167e8b3cp-2");
+        constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.8000c496e59f5064p-2");
+        constexpr auto c3 = detail::eval_const<char, T, I, f, r>("0x1.3fdfc026d8211784p-2");
+        constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.1abd34bdae38fe14p-2");
+        constexpr auto c5 = detail::eval_const<char, T, I, f, r>("0x1.b17db49337d3362p-3");
+        constexpr auto c6 = detail::eval_const<char, T, I, f, r>("0x1.03fdc0798f519c3p-1");
+        constexpr auto c7 = detail::eval_const<char, T, I, f, r>("-0x1.52af9d452468acd1p0");
+        constexpr auto c8 = detail::eval_const<char, T, I, f, r>("0x1.72f0c8a911148a2ap2");
+        constexpr auto c9 = detail::eval_const<char, T, I, f, r>("-0x1.afc259ad0b5d2a6cp3");
+        constexpr auto c10 = detail::eval_const<char, T, I, f, r>("0x1.5bcdd247118febe1p4");
+        constexpr auto c11 = detail::eval_const<char, T, I, f, r>("-0x1.3e85661d469d3e26p4");
+        constexpr auto c12 = detail::eval_const<char, T, I, f, r>("0x1.19cea1d47abf3b81p3");
+        const auto t = x * x;
+        fixed res = c12;
+        res = res * t + c11;
+        res = res * t + c10;
+        res = res * t + c9;
+        res = res * t + c8;
+        res = res * t + c7;
+        res = res * t + c6;
+        res = res * t + c5;
+        res = res * t + c4;
+        res = res * t + c3;
+        res = res * t + c2;
+        res = res * t + c1;
+        res = res * t + c0;
+        return res;
+    }
+
+    // integral sqrt without division.
+    template <typename I>
+    constexpr I isqrt_bits(I N) noexcept
+    {
+        if(N <= 0)
+            return 0;
+        const int nb = static_cast<int>(detail::bit_width(static_cast<detail::make_unsigned_t<I>>(N)));
+        I m = static_cast<I>(1) << (2 * ((nb - 1) / 2));
+        I s = 0;
+        I R = N;
+        while(m != 0)
+        {
+            const I b = s | m;
+            s >>= 1;
+            const I ge = static_cast<I>(0) - static_cast<I>(R >= b);
+            R -= b & ge;
+            s |= m & ge;
+            m >>= 2;
+        }
+        return s;
+    }
+
+    // fast integer sqrt for N in [1, 2^64), returns floor(sqrt(N)).
+    // table-seeded Newton; the divisor fits 32 bits, so on x64 this is a
+    // 64/32-bit division. Used by the glibc-style near-1 asin branch.
+    constexpr uint64_t fast_isqrt_u64(uint64_t N) noexcept
+    {
+        if(N <= 1)
+            return N;
+        const int nb = static_cast<int>(detail::bit_width(N));
+        uint64_t g0;
+        if(nb < 12)
+        {
+            g0 = static_cast<uint64_t>(sqrt_mantissa_table[static_cast<unsigned int>(N)]) >> 16;
+        }
+        else
+        {
+            const unsigned int idx = static_cast<unsigned int>(N >> (nb - 12));
+            g0 = static_cast<uint64_t>(sqrt_mantissa_table[idx]);
+            if((nb & 1) == 0)
             {
-                // [0, 1/32) deg7
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.ffffffffffff8e74p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.55555554e3c2c398p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.999987d9962ce7p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.2420a37c73d54c3p-3"); // x^7
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * c3)));
+                const int sh = (nb - 44) / 2;
+                g0 = sh >= 0 ? g0 << sh : g0 >> static_cast<unsigned>(-sh);
             }
-            if(x < b_1_8)
+            else
             {
-                // [1/32, 1/8) deg7
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.fffffffeb1a32d0ep-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.55554b35e0788014p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.99852a887a2d7a18p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.1d2820673633c27p-3"); // x^7
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * c3)));
+                // sqrt_mantissa_table[idx] ≈ 2^16·sqrt(idx), multiply by sqrt(2) ≈ 46341/2^15.
+                const int sh = (nb - 45) / 2;
+                const int total = 15 - sh;
+                g0 = total >= 0 ? (g0 * 46341u) >> total : (g0 * 46341u) << static_cast<unsigned>(-total);
             }
-            if(x < b_1_4)
-            {
-                // [1/8, 1/4) deg9
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.ffffffdc8b727784p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.555528b9bffbea64p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.998479ff66759dp-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.2232f7522f8055f8p-3"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.854d86ab77e7fcdp-4"); // x^9
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * c4))));
-            }
-            if(x < b_3_8)
-            {
-                // [1/4, 3/8) deg9
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.ffffee189f6bdbc6p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.554dbf4b72f9b33p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.9854775ae48b7c1p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.17012448538f94d8p-3"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.32c430e846079a9p-4"); // x^9
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * c4))));
-            }
-            if(x < b_1_2)
-            {
-                // [3/8, 1/2) deg11
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.ffffce07d95dd5e6p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.55487f2347ca9afcp-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.9838bccce20199ap-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.1a58620785d0b83p-3"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.6ef3f98a2f0e369p-4"); // x^9
-                constexpr auto c5 = detail::eval_const<char, T, I, f, r>("-0x1.2db77880b84e1fap-5"); // x^11
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * c5)))));
-            }
-            if(x < b_5_8)
-            {
-                // [1/2, 5/8) deg11
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.fffda0d68f67850ep-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.54f62e8511fafb28p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.934c98558fcdf18p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.07427adcea1b308p-3"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.23ed8cff398f50cp-4"); // x^9
-                constexpr auto c5 = detail::eval_const<char, T, I, f, r>("-0x1.6c2430b3b0880bp-6"); // x^11
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * c5)))));
-            }
-            if(x < b_3_4)
-            {
-                // [5/8, 3/4) deg11
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.fff1514e3da0f304p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.53c4b6d4d435a7f8p-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.875afe16326edfbp-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.d2360b44c784a9ap-4"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.ae346d93cc4dfe6p-5"); // x^9
-                constexpr auto c5 = detail::eval_const<char, T, I, f, r>("-0x1.9c3af99ac2b2088p-7"); // x^11
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * c5)))));
-            }
-            if(x < b_7_8)
-            {
-                // [3/4, 7/8) deg11
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.ffc5cfeaa7dada7ep-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.50ccf3e25acba19cp-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.727ede291047ca28p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.886fce7c8d59fdfp-4"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.2ae8c57b3d6619ep-5"); // x^9
-                constexpr auto c5 = detail::eval_const<char, T, I, f, r>("-0x1.c0342d26ebc0bfp-8"); // x^11
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * c5)))));
-            }
-            if(x < b_15_16)
-            {
-                // [7/8, 15/16) deg9
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.fea8def47638e9d2p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.42df60310cc3d50cp-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.2c9fe78c7c9d85bp-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.b17b9ec5b80f08p-5"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.3596c9ae62b7f7p-7"); // x^9
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * c4))));
-            }
-            // [15/16, 1] deg9
-            {
-                constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.fe013fadc1b4faf4p-1"); // x
-                constexpr auto c1 = detail::eval_const<char, T, I, f, r>("-0x1.3ceb8135bb1193fcp-2"); // x^3
-                constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.184ff9ded6e66358p-3"); // x^5
-                constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.73d0c48fa374424p-5"); // x^7
-                constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.dea201ffac30c3p-8"); // x^9
-                return x * (c0 + x2 * (c1 + x2 * (c2 + x2 * (c3 + x2 * c4))));
-            }
-#endif
+        }
+        uint64_t g1 = (g0 + N / g0) >> 1;
+        uint64_t g2 = (g1 + N / g1) >> 1;
+        while(N / g2 < g2) // g2 > sqrt(N)
+            --g2;
+        while(g2 + 1 <= N / (g2 + 1)) // g2 < sqrt(N) - 1
+            ++g2;
+        return g2;
+    }
+
+    // eval extended fractions for cbrt version of frexp.
+    template <typename T, typename I, unsigned int f>
+    struct cbrt_frexp_scales
+    {
+        static constexpr unsigned int digits = static_cast<unsigned int>(detail::__eval_max_bit_width<T>());
+        // extend to f + e_max / 3 + 4
+        static constexpr unsigned int fraction = f + (digits - f) / 3u + 4u;
+    };
+
+    // extended frexp: x = m·2^e, m ∈ [0.5, 1), and keep the sign.
+    // return: m_raw = m·2^F (F = cbrt_scales::F), exponent is given by e.
+    // this version should has enough precision for cbrt.
+    template <typename T, typename I, unsigned int f, bool r>
+    EIRIN_ALWAYS_INLINE constexpr I cbrt_frexp(fixed_num<T, I, f, r> x, int& e) noexcept
+    {
+        using U = detail::make_unsigned_t<T>;
+        constexpr unsigned int F = cbrt_frexp_scales<T, I, f>::fraction;
+        auto X = x.internal_value();
+        if(X == 0)
+        {
+            e = 0;
+            return 0;
+        }
+        const bool neg = X < 0;
+        const U mag = neg ? U(0) - static_cast<U>(X) : static_cast<U>(X);
+        const auto msb = detail::bit_width(mag);
+        e = static_cast<int>(msb) - static_cast<int>(f);
+        U m_raw;
+        if(msb > F)
+        {
+            const unsigned int sh = msb - F;
+            m_raw = (mag + (U(1) << (sh - 1))) >> sh;
+        }
+        else
+        {
+            m_raw = mag << (F - msb);
+        }
+        if(m_raw == (U(1) << F)) // re-normalize to (0.5, 1].
+        {
+            m_raw = U(1) << (F - 1);
+            ++e;
+        }
+        return neg ? -static_cast<I>(m_raw) : static_cast<I>(m_raw);
+    }
+
+    template <typename I, unsigned int f, bool r>
+    EIRIN_ALWAYS_INLINE constexpr I multiply_fixed_internal(const I& a, const I& b) noexcept
+    {
+        if constexpr(r)
+        {
+            constexpr auto fraction_multiplier = I(1) << f;
+            auto _value = a * b / (fraction_multiplier / 2);
+            return (_value + (_value % 2)) >> 1;
+        }
+        else
+        {
+            return (a * b) >> f;
+        }
+    }
+
+    template <typename T, typename I, unsigned int f, bool r>
+    EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> asin_impl(fixed_num<T, I, f, r> x) noexcept
+    {
+        // glibc-style piecewise polynomial (e_asin.c): asin(x) = x·Q(t), t = x².
+        //   Q1 on [0, 1/4]   (|x| <= 1/2),   deg 8, 32-bit coeff err ~2^-37
+        //   Q2 on [1/4, 1/2] (|x| <= 1/√2), deg 8, 32-bit coeff err ~2^-35
+        using fixed = fixed_num<T, I, f, r>;
+        const auto t = x * x;
+        if(x <= fixed(1) / 2) // this branch is small enough - no need to optimize.
+        {
+            constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1p0");
+            constexpr auto c1 = detail::eval_const<char, T, I, f, r>("0x1.5555554p-3");
+            constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.333343bp-4");
+            constexpr auto c3 = detail::eval_const<char, T, I, f, r>("0x1.6db1b8ap-5");
+            constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.f293224p-6");
+            constexpr auto c5 = detail::eval_const<char, T, I, f, r>("0x1.65bd03p-6");
+            constexpr auto c6 = detail::eval_const<char, T, I, f, r>("0x1.547bcb8p-6");
+            constexpr auto c7 = detail::eval_const<char, T, I, f, r>("0x1.b5667cp-10");
+            constexpr auto c8 = detail::eval_const<char, T, I, f, r>("0x1.10043d4p-5");
+            fixed q = c8;
+            q = q * t + c7;
+            q = q * t + c6;
+            q = q * t + c5;
+            q = q * t + c4;
+            q = q * t + c3;
+            q = q * t + c2;
+            q = q * t + c1;
+            q = q * t + c0;
+            return x * q;
+        }
+        else
+        {
+            constexpr auto c0 = detail::eval_const<char, T, I, f, r>("0x1.000303ffp0");
+            constexpr auto c1 = detail::eval_const<char, T, I, f, r>("0x1.5306ed58p-3");
+            constexpr auto c2 = detail::eval_const<char, T, I, f, r>("0x1.64912ebp-4");
+            constexpr auto c3 = detail::eval_const<char, T, I, f, r>("-0x1.ddd3acp-6");
+            constexpr auto c4 = detail::eval_const<char, T, I, f, r>("0x1.41730df8p-2");
+            constexpr auto c5 = detail::eval_const<char, T, I, f, r>("-0x1.5c16ae92p-1");
+            constexpr auto c6 = detail::eval_const<char, T, I, f, r>("0x1.1e796198p0");
+            constexpr auto c7 = detail::eval_const<char, T, I, f, r>("-0x1.ff6b941ep-1");
+            constexpr auto c8 = detail::eval_const<char, T, I, f, r>("0x1.c5e212bp-2");
+            fixed q = c8;
+            q = q * t + c7;
+            q = q * t + c6;
+            q = q * t + c5;
+            q = q * t + c4;
+            q = q * t + c3;
+            q = q * t + c2;
+            q = q * t + c1;
+            q = q * t + c0;
+            return x * q;
         }
     }
 } // namespace detail

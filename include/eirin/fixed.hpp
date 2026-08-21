@@ -50,6 +50,9 @@ namespace detail
             return sizeof(T) * 8;
         }
     }
+
+    template <typename T>
+    concept integral = is_integral_v<T>;
 } // namespace detail
 
 // if the type is unsigned type, then the fraction <= bit width, else <= bit width - 1.
@@ -137,7 +140,7 @@ public:
      * @param val the input integer.
      * @return EIRIN_ALWAYS_INLINE constexpr the fixed number converted from the integer.
      */
-    template <std::integral T>
+    template <detail::integral T>
     EIRIN_ALWAYS_INLINE constexpr explicit fixed_num(T val) noexcept
         : m_value(static_cast<Type>(val) << fraction){};
 
@@ -306,7 +309,7 @@ public:
 
     fixed_num& operator=(const fixed_num&) noexcept = default;
 
-    template <std::integral T>
+    template <detail::integral T>
     constexpr inline explicit operator T() const noexcept
     {
         return static_cast<T>(m_value >> fraction);
@@ -339,7 +342,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num& operator+=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator+=(const detail::integral auto& val) noexcept
     {
         m_value += static_cast<Type>(val) << fraction;
         return *this;
@@ -356,7 +359,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num& operator-=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator-=(const detail::integral auto& val) noexcept
     {
         m_value -= static_cast<Type>(val) << fraction;
         return *this;
@@ -367,7 +370,8 @@ public:
         if constexpr(rounding)
         {
             auto _value = (static_cast<IntermediateType>(m_value) * other.m_value) / (fraction_multiplier / 2);
-            return fixed_num(static_cast<Type>(_value + (_value % 2)), raw_value_construct_tag{});
+            _value = (_value + (_value % 2)) >> 1;
+            return fixed_num(static_cast<Type>(_value), raw_value_construct_tag{});
         }
         else
         {
@@ -380,7 +384,8 @@ public:
         if constexpr(rounding)
         {
             auto _value = (static_cast<IntermediateType>(m_value) * other.m_value) / (fraction_multiplier / 2);
-            m_value = static_cast<Type>(_value + (_value % 2));
+            _value = (_value + (_value % 2)) >> 1;
+            m_value = static_cast<Type>(_value);
         }
         else
         {
@@ -390,7 +395,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num& operator*=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator*=(const detail::integral auto& val) noexcept
     {
         m_value *= val;
         return *this;
@@ -401,7 +406,8 @@ public:
         if constexpr(rounding)
         {
             auto _value = ((static_cast<IntermediateType>(m_value) << fraction) * 2) / other.m_value;
-            return fixed_num(static_cast<Type>(_value + (_value % 2)), raw_value_construct_tag{});
+            _value = (_value + (_value % 2)) >> 1;
+            return fixed_num(static_cast<Type>(_value), raw_value_construct_tag{});
         }
         else
         {
@@ -414,7 +420,8 @@ public:
         if constexpr(rounding)
         {
             auto _value = ((static_cast<IntermediateType>(m_value) << fraction) * 2) / other.m_value;
-            m_value = static_cast<Type>(_value + (_value % 2));
+            _value = (_value + (_value % 2)) >> 1;
+            m_value = static_cast<Type>(_value);
         }
         else
         {
@@ -423,7 +430,7 @@ public:
         return *this;
     }
 
-    constexpr inline fixed_num& operator/=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator/=(const detail::integral auto& val) noexcept
     {
         m_value /= val;
         return *this;
@@ -490,7 +497,7 @@ public:
      * @param val n bits to left shift.
      * @return constexpr fixed_num compute result.
      */
-    constexpr inline fixed_num operator<<(const std::integral auto& val) const noexcept
+    constexpr inline fixed_num operator<<(const detail::integral auto& val) const noexcept
     {
         return fixed_num(m_value << val, raw_value_construct_tag{});
     }
@@ -503,7 +510,7 @@ public:
      * @param val n bits to left shift.
      * @return constexpr fixed_num compute result.
      */
-    constexpr inline fixed_num& operator<<=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator<<=(const detail::integral auto& val) noexcept
     {
         m_value <<= val;
         return *this;
@@ -517,7 +524,7 @@ public:
      * @param val n bits to right shift.
      * @return constexpr fixed_num compute result.
      */
-    constexpr inline fixed_num operator>>(const std::integral auto& val) const noexcept
+    constexpr inline fixed_num operator>>(const detail::integral auto& val) const noexcept
     {
         return fixed_num(m_value >> val, raw_value_construct_tag{});
     }
@@ -530,7 +537,7 @@ public:
      * @param val n bits to right shift.
      * @return constexpr fixed_num compute result.
      */
-    constexpr inline fixed_num& operator>>=(const std::integral auto& val) noexcept
+    constexpr inline fixed_num& operator>>=(const detail::integral auto& val) noexcept
     {
         m_value >>= val;
         return *this;
@@ -785,7 +792,7 @@ public:
         return out;
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num divide(const std::integral auto& val) const
+    EIRIN_ALWAYS_INLINE constexpr fixed_num divide(const detail::integral auto& val) const
     {
         if(val == 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(divide_by_zero);
@@ -809,7 +816,7 @@ public:
         }
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num& divide_by(const std::integral auto& val)
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& divide_by(const detail::integral auto& val)
     {
         if(val == 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(divide_by_zero);
@@ -835,7 +842,7 @@ public:
         return *this;
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num shl(const std::integral auto& val) const
+    EIRIN_ALWAYS_INLINE constexpr fixed_num shl(const detail::integral auto& val) const
     {
         if(val < 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
@@ -848,7 +855,7 @@ public:
         return fixed_num(m_value << val, raw_value_construct_tag{});
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num& shl_by(const std::integral auto& val)
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& shl_by(const detail::integral auto& val)
     {
         if(val < 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to left shift should be greater than or equal to 0.");
@@ -862,7 +869,7 @@ public:
         return *this;
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num shr(const std::integral auto& val) const
+    EIRIN_ALWAYS_INLINE constexpr fixed_num shr(const detail::integral auto& val) const
     {
         if(val < 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to right shift should be greater than or equal to 0.");
@@ -873,7 +880,7 @@ public:
         return fixed_num(m_value >> val, raw_value_construct_tag{});
     }
 
-    EIRIN_ALWAYS_INLINE constexpr fixed_num& shr_by(const std::integral auto& val)
+    EIRIN_ALWAYS_INLINE constexpr fixed_num& shr_by(const detail::integral auto& val)
     {
         if(val < 0) [[unlikely]]
             EIRIN_THROW_EXCEPTION(std::range_error, "n bits to right shift should be greater than or equal to 0.");
@@ -1273,61 +1280,61 @@ inline namespace literals
 } // namespace literals
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator+(const fixed_num<T, I, f, r>& fp, const std::integral auto& val) noexcept
+constexpr inline fixed_num<T, I, f, r> operator+(const fixed_num<T, I, f, r>& fp, const detail::integral auto& val) noexcept
 {
     return fixed_num<T, I, f, r>(fp) += val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator+(const std::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
+constexpr inline fixed_num<T, I, f, r> operator+(const detail::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
 {
     return fixed_num<T, I, f, r>(fp) += val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator-(const fixed_num<T, I, f, r>& fp, const std::integral auto& val) noexcept
+constexpr inline fixed_num<T, I, f, r> operator-(const fixed_num<T, I, f, r>& fp, const detail::integral auto& val) noexcept
 {
     return fixed_num<T, I, f, r>(fp) -= val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator-(const std::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
+constexpr inline fixed_num<T, I, f, r> operator-(const detail::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
 {
     return fixed_num<T, I, f, r>(val) -= fp;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator*(const fixed_num<T, I, f, r>& fp, const std::integral auto& val) noexcept
+constexpr inline fixed_num<T, I, f, r> operator*(const fixed_num<T, I, f, r>& fp, const detail::integral auto& val) noexcept
 {
     return fixed_num<T, I, f, r>(fp) *= val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator*(const std::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
+constexpr inline fixed_num<T, I, f, r> operator*(const detail::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
 {
     return fixed_num<T, I, f, r>(fp) *= val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator/(const fixed_num<T, I, f, r>& fp, const std::integral auto& val)
+constexpr inline fixed_num<T, I, f, r> operator/(const fixed_num<T, I, f, r>& fp, const detail::integral auto& val)
 {
     return fixed_num<T, I, f, r>(fp) /= val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator/(const std::integral auto& val, const fixed_num<T, I, f, r>& fp)
+constexpr inline fixed_num<T, I, f, r> operator/(const detail::integral auto& val, const fixed_num<T, I, f, r>& fp)
 {
     return fixed_num<T, I, f, r>(val) /= fp;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator%(const fixed_num<T, I, f, r>& fp, const std::integral auto& val) noexcept
+constexpr inline fixed_num<T, I, f, r> operator%(const fixed_num<T, I, f, r>& fp, const detail::integral auto& val) noexcept
 {
     return fixed_num<T, I, f, r>(fp) %= val;
 }
 
 template <typename T, typename I, unsigned int f, bool r>
-constexpr inline fixed_num<T, I, f, r> operator%(const std::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
+constexpr inline fixed_num<T, I, f, r> operator%(const detail::integral auto& val, const fixed_num<T, I, f, r>& fp) noexcept
 {
     return fixed_num<T, I, f, r>(val) %= fp;
 }
