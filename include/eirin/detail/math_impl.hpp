@@ -1060,7 +1060,7 @@ namespace detail
         U m_raw;
         if(msb > F)
         {
-            const unsigned int sh = msb - F;
+            const unsigned int sh = static_cast<unsigned int>(msb) - F;
             m_raw = (mag + (U(1) << (sh - 1))) >> sh;
         }
         else
