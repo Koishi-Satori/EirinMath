@@ -133,4 +133,13 @@
 #    define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_DISABLE
 #endif
 
+// exposed math functions
+#ifdef EIRIN_MATH_FUNC_FORCE_INLINE
+#    define EIRIN_MATH_FUNC_API EIRIN_ALWAYS_INLINE constexpr
+#else
+#    define EIRIN_MATH_FUNC_API inline constexpr
+#endif
+// small func can force inline.
+#define EIRIN_MATH_SMALL_FUNC_API EIRIN_ALWAYS_INLINE constexpr
+
 #endif // EIRIN_MATH_MARCO_HPP

@@ -10,27 +10,62 @@
 
 namespace eirin
 {
+// Domain-error policy:
+//   tan/asin/acos/log2/log/log10/pow/pow_fast throw std::domain_error when the
+//   input is out of the function domain (or call std::terminate() when built
+//   with EIRIN_NO_EXCEPTIONS). Define EIRIN_MATH_DOMAIN_SILENT to make these
+//   functions return a sentinel value instead:
+//     - asin/acos/tan/pow, and pow_fast with b < 0
+//                                  -> the maximum representable value (NaN-like);
+//     - log2/log/log10 with x <= 0 -> the minimum representable value (log(0) -> -inf).
+
+/// @brief The maximum representable fixed32 value.
 constexpr inline fixed32 f32_max = fixed32::from_internal_value(0x7FFFFFFF);
+/// @brief The minimum representable fixed32 value.
 constexpr inline fixed32 f32_min = fixed32::from_internal_value(0x80000000);
 #ifdef EIRIN_MATH_HAS_INT128
+/// @brief The maximum representable fixed64 value.
 constexpr inline fixed64 f64_max = fixed64::from_internal_value(0x7FFFFFFFFFFFFFFF);
+/// @brief The minimum representable fixed64 value.
 constexpr inline fixed64 f64_min = fixed64::from_internal_value(0x8000000000000000);
 #endif
 
+/**
+ * @brief Return the maximum representable value of the fixed-point type.
+ *
+ * @tparam T @see fixed_num
+ * @return the maximum representable value.
+ */
 template <fixed_point T>
-EIRIN_ALWAYS_INLINE constexpr T max_value() noexcept
+EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 {
     return std::numeric_limits<T>::max();
 }
 
+/**
+ * @brief Return the minimum representable value of the fixed-point type.
+ *
+ * @tparam T @see fixed_num
+ * @return the minimum representable value.
+ */
 template <fixed_point T>
-EIRIN_ALWAYS_INLINE constexpr T min_value() noexcept
+EIRIN_MATH_SMALL_FUNC_API T min_value() noexcept
 {
     return std::numeric_limits<T>::min();
 }
 
+/**
+ * @brief Ceiling function of fixed-point number.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return ceil(x) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> ceil(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> ceil(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr auto frac_mult = T(1) << f;
@@ -43,8 +78,18 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> ceil(fixed_num<T, I, f, r> f
     return fixed::from_internal_value(value / frac_mult * frac_mult);
 }
 
+/**
+ * @brief Floor function of fixed-point number.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return floor(x) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> floor(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> floor(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr auto frac_mult = T(1) << f;
@@ -58,16 +103,36 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> floor(fixed_num<T, I, f, r> 
     return fixed::from_internal_value(value / frac_mult * frac_mult);
 }
 
+/**
+ * @brief Truncation function of fixed-point number (round toward zero).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return trunc(x) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> trunc(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> trunc(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr auto frac_mult = T(1) << f;
     return fixed::from_internal_value(fp.internal_value() / frac_mult * frac_mult);
 }
 
+/**
+ * @brief Rounding function of fixed-point number (round half away from zero).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return round(x) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> round(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> round(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     auto frac_mult = T(1) << f;
@@ -75,32 +140,78 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> round(fixed_num<T, I, f, r> 
     return fixed::from_internal_value((value / 2 + (value % 2)) << f);
 }
 
+/**
+ * @brief Absolute value function of fixed-point number.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return |x|.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> abs(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> abs(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     auto value = fp.internal_value();
     return fixed::from_internal_value(value < 0 ? -value : value);
 }
 
+/**
+ * @brief Minimum function of two fixed-point numbers.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param a the first input.
+ * @param b the second input.
+ * @return the smaller of `a` and `b`.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> min(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> min(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
 {
     auto a_i = a.internal_value();
     auto b_i = b.internal_value();
     return a_i < b_i ? a : b;
 }
 
+/**
+ * @brief Maximum function of two fixed-point numbers.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param a the first input.
+ * @param b the second input.
+ * @return the larger of `a` and `b`.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> max(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> max(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
 {
     auto a_i = a.internal_value();
     auto b_i = b.internal_value();
     return a_i > b_i ? a : b;
 }
 
+/**
+ * @brief Break x into a normalized fraction and an exponent, like std::frexp.
+ *
+ * Returns m with |m| in [0.5, 1) and writes e with x = m * 2^e. When x == 0,
+ * m == 0 and e == 0.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the input.
+ * @param exponent the output exponent, stored as a fixed-point value.
+ * @return the normalized fraction m.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>& exponent) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>& exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     using U = detail::make_unsigned_t<T>;
@@ -121,8 +232,23 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> 
     return fixed::from_internal_value(neg ? -xm : xm);
 }
 
+/**
+ * @brief Break x into a normalized fraction and an exponent, like std::frexp.
+ *
+ * Returns m with |m| in [0.5, 1) and writes e with x = m * 2^e. When x == 0,
+ * m == 0 and e == 0. A null exponent pointer is ignored and the function only
+ * returns the normalized fraction.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the input.
+ * @param exponent the output exponent, stored as a fixed-point value.
+ * @return the normalized fraction m.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>* exponent) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>* exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     using U = detail::make_unsigned_t<T>;
@@ -146,8 +272,22 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> 
     return fixed::from_internal_value(neg ? -xm : xm);
 }
 
+/**
+ * @brief Break x into a normalized fraction and an integral exponent.
+ *
+ * Same as the fixed-point exponent overload, but writes the exponent to a
+ * native integral type.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the input.
+ * @param exponent the output exponent, stored as an integral value.
+ * @return the normalized fraction m.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto& exponent) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto& exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     using U = detail::make_unsigned_t<T>;
@@ -168,8 +308,23 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> 
     return fixed::from_internal_value(neg ? -xm : xm);
 }
 
+/**
+ * @brief Break x into a normalized fraction and an integral exponent.
+ *
+ * Same as the fixed-point exponent overload, but writes the exponent to a
+ * native integral type. A null exponent pointer is ignored and the function
+ * only returns the normalized fraction.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the input.
+ * @param exponent the output exponent, stored as an integral value.
+ * @return the normalized fraction m.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto* exponent) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto* exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     using U = detail::make_unsigned_t<T>;
@@ -193,8 +348,20 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> 
     return fixed::from_internal_value(neg ? -xm : xm);
 }
 
+/**
+ * @brief Square root function of fixed-point number.
+ *
+ * Negative inputs do not throw; they return fixed(-1) as an invalid result.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x, must be non-negative.
+ * @return sqrt(x) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     // test if T is int32_t, if so, we can use the fast sqrt algorithm.
@@ -271,11 +438,11 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> f
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp the input angle.
- * @return sin(fp), computed with widened precision when possible.
+ * @param fp the input angle x.
+ * @return sin(fp) in a fixed-point approximation.
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr unsigned int best_wide_fraction = detail::sin_minimax_required_fraction();
@@ -307,16 +474,16 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp
 /**
  * @brief cosine function for fixed point number.
  *
- * @tparam T
- * @tparam I
- * @tparam f
- * @tparam r
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
  * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param fp
- * @return cos(fp)
+ * @param fp the input angle x.
+ * @return cos(x) in a fixed-point approximation.
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cos(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> cos(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr auto pi_2 = pi / fixed(2);
@@ -324,18 +491,36 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cos(fixed_num<T, I, f, r> fp
     return sin(fp.internal_value() > 0 ? fp - (double_pi - pi_2) : fp + pi_2);
 }
 
+/**
+ * @brief Tangent function of fixed-point number.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input angle x.
+ * @return tan(x) in a fixed-point approximation.
+ * @note When cos(x) is within 1 ulp of zero the function throws
+ *       `std::domain_error` (or calls `std::terminate()` with
+ *       `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *       maximum representable value instead.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     auto cosx = cos(fp);
     if(abs(cosx).internal_value() > 1)
         return sin(fp) / cosx;
     else
-        EIRIN_THROW_EXCEPTION(std::domain_error, "tan() domain error");
+        EIRIN_MATH_DOMAIN_ERROR(
+            "tan() domain error",
+            (fixed_num<T, I, f, r>::from_internal_value(std::numeric_limits<T>::max()))
+        );
 }
 
 /**
- * @brief We use different simulation function in different range.
+ * @brief Arctan function of fixed-point number.
+ * We use different simulation function in different range.
  * for x < 0: atan(x) = -atan(-x), which reduce x to [0, max]
  * for x > 1: atan(x) = pi / 2 - atan(1 / x), which reduce x to [0, 1].
  * Then atan(x) = x * (c0 + c1 * t + c2 * t^2 + cn * t^n), t = x^2.
@@ -348,11 +533,13 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp the x of atan(x)
- * @return atan(x).
+ * @param fp the input x.
+ * @return atan(x) in a fixed-point approximation.
+ * @note To be noticed that, if `decltype(fp)` has no enough precision to store integral part, this function
+ *       will directly return `fp`.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     if constexpr(fixed::digits_int == 0)
@@ -371,12 +558,27 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> f
     }
 }
 
+/**
+ * @brief Arcsin function of fixed-point number.
+ * We use different simulation function in different range, similar to `atan`
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return asin(x) in a fixed-point approximation.
+ * @note To be noticed that, if `fp` is out of the domain (of arcsin), this
+ *       function will throw `std::domain_error` (or call `std::terminate()`
+ *       with `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns
+ *       the maximum representable value instead.
+ */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
     if(abs(fp) > fixed(1))
-        EIRIN_THROW_EXCEPTION(std::domain_error, "asin() domain error");
+        EIRIN_MATH_DOMAIN_ERROR("asin() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
     if(fp == fixed(1))
         return pi / fixed(2);
     else if(fp == fixed(-1))
@@ -419,12 +621,27 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> f
     return (fp.signbit_mask() & fp.internal_value()) ? -v : v;
 }
 
+/**
+ * @brief Arccos function of fixed-point number.
+ * We use different simulation function in different range, similar to `atan`
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @return acos(x) in a fixed-point approximation.
+ * @note To be noticed that, if `fp` is out of the domain (of arccos), this
+ *       function will throw `std::domain_error` (or call `std::terminate()`
+ *       with `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns
+ *       the maximum representable value instead.
+ */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
     if(abs(fp) > fixed(1))
-        EIRIN_THROW_EXCEPTION(std::domain_error, "acos() domain error");
+        EIRIN_MATH_DOMAIN_ERROR("acos() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
     if(fp == fixed(1))
         return fixed(0);
     else if(fp == fixed(-1))
@@ -441,11 +658,11 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> f
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp
- * @return cbrt(fp)
+ * @param fp the input x.
+ * @return cbrt(x) in a fixed-point approximation.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr auto F = detail::cbrt_frexp_scales<T, I, f>::fraction;
@@ -504,8 +721,24 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> f
     return fixed::from_internal_value(static_cast<T>(raw));
 }
 
+/**
+ * @brief Power function with an integral exponent.
+ *
+ * Computes b^e with binary exponentiation; the base is squared at each step,
+ * so `b` must not overflow the type's intermediate storage. 0^0 is defined as
+ * 1, matching the IEEE convention.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @tparam E integral type, must fit concept `detail::integral`.
+ * @param b the pow base.
+ * @param e the pow exponent.
+ * @return b^e in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r, detail::integral E>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, E e) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, E e) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     if(b == fixed(0))
@@ -541,9 +774,17 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b,
  * On Q-formats (digits_int == 0, e.g. f == digits) exp(r) >= 1 does not fit
  * the storage type, so the raw-intermediate detail::exp_inline of pow is used
  * (with saturation semantics on overflow).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input exponent.
+ * @return exp(x) in a fixed-point approximation.
+ * @note This function will perform a default behavior when overflow, means UB.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     if constexpr(f == static_cast<unsigned int>(fixed::digits))
@@ -552,8 +793,23 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp(fixed_num<T, I, f, r> fp
         return detail::exp_impl<T, I, f, r, overflow_strategy::DEFAULT>(fp);
 }
 
+/**
+ * @brief Exponential function for fixed point number.
+ *
+ * On Q-formats (digits_int == 0, e.g. f == digits) exp(r) >= 1 does not fit
+ * the storage type, so the raw-intermediate detail::exp_inline of pow is used
+ * (with saturation semantics on overflow).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input exponent.
+ * @return exp(x) in a fixed-point approximation.
+ * @note This function will perform a saturation behavior when overflow.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_sat(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp_sat(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     if constexpr(f == static_cast<unsigned int>(fixed::digits))
@@ -562,8 +818,23 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_sat(fixed_num<T, I, f, r
         return detail::exp_impl<T, I, f, r, overflow_strategy::SATURATION>(fp);
 }
 
+/**
+ * @brief Exponential function for fixed point number.
+ *
+ * On Q-formats (digits_int == 0, e.g. f == digits) exp(r) >= 1 does not fit
+ * the storage type, so the raw-intermediate detail::exp_inline of pow is used
+ * (with saturation semantics on overflow).
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input exponent.
+ * @return exp(x) in a fixed-point approximation.
+ * @note This function will perform a mod-warp behavior when overflow.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_modwarp(fixed_num<T, I, f, r> fp) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp_modwarp(fixed_num<T, I, f, r> fp) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     if constexpr(f == static_cast<unsigned int>(fixed::digits))
@@ -589,14 +860,18 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_modwarp(fixed_num<T, I, 
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
  * @param fp the input x, must be positive.
- * @return log2(x) as a fixed-point approximation.
+ * @return log2(x) in a fixed-point approximation.
+ * @note If `fp` is out of the domain (<= 0), this function will throw
+ *       `std::domain_error` (or call `std::terminate()` with
+ *       `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *       minimum representable value instead (log2(0) -> -inf).
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
     if(fp <= fixed(0))
-        EIRIN_THROW_EXCEPTION(std::domain_error, "log2() domain error");
+        EIRIN_MATH_DOMAIN_ERROR("log2() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
 
     if constexpr(f == static_cast<unsigned int>(fixed::digits))
     {
@@ -674,13 +949,19 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> f
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp
- * @return log(fp)
+ * @param fp the input x, must be positive.
+ * @return log(fp) in a fixed-point approximation.
+ * @note If `fp` is out of the domain (<= 0), this function will throw
+ *       `std::domain_error` (or call `std::terminate()` with
+ *       `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *       minimum representable value instead.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
+    if(fp <= fixed(0))
+        EIRIN_MATH_DOMAIN_ERROR("log() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
     // ln(2), exact 61-bit dyadic
     constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
                                        static_cast<T>(detail::eval_dyadic<I, f>("0x1.62e42fefa39efp-1"))
@@ -698,13 +979,19 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp
  * @tparam I @see fixed_num
  * @tparam f @see fixed_num
  * @tparam r @see fixed_num
- * @param fp
- * @return log10(fp)
+ * @param fp the input x, must be positive.
+ * @return log10(fp) in a fixed-point approximation.
+ * @note If `fp` is out of the domain (<= 0), this function will throw
+ *       `std::domain_error` (or call `std::terminate()` with
+ *       `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *       minimum representable value instead.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp)
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
+    if(fp <= fixed(0))
+        EIRIN_MATH_DOMAIN_ERROR("log10() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
     // log10(2), exact 61-bit dyadic
     constexpr fixed log10_2 = f < 20 ? fixed::from_internal_value(
                                            static_cast<T>(detail::eval_dyadic<I, f>("0x1.34413509f79fef4p-2"))
@@ -731,6 +1018,10 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> 
  *    scale the intermediate type allows.
  *  - Out-of-range results saturate (positive overflow to max, negative
  *    overflow to 0), negative bases are supported for integer exponents.
+ *  - A negative base with a fractional exponent is a domain error: the
+ *    function throws `std::domain_error` (or calls `std::terminate()` with
+ *    `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *    maximum representable value instead.
  *
  * Works for any fixed_num<T, I, f, r>, including user-defined and unsigned
  * types; for unsigned types the base must be >= 1 (same restriction as exp).
@@ -744,7 +1035,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> 
  * @return b^e as a fixed-point approximation.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
     using UI = typename detail::make_signed<I>::type;
@@ -766,7 +1057,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b,
         {
             // a negative base is only defined for integer exponents
             if(e.fractional_part() != 0)
-                EIRIN_THROW_EXCEPTION(std::domain_error, "pow() domain error");
+                EIRIN_MATH_DOMAIN_ERROR("pow() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
             sign_neg = ((static_cast<I>(e.internal_value()) >> f) & 1) != 0;
             b = -b;
         }
@@ -814,20 +1105,27 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b,
 }
 
 /**
- * @brief Fast pow, use a^b = e^(b*log2(a) * ln2).
+ * @brief Fast pow, use a^b = e^(b * log2(a) * ln2).
+ * This function is faster than `pow`, but has accuracy loss.
  * 
- * @tparam T 
- * @tparam I 
- * @tparam f 
- * @tparam r 
- * @param b 
- * @param e 
- * @return EIRIN_ALWAYS_INLINE constexpr 
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param b the pow base
+ * @param e the pow exponent
+ * @return b^e as a fixed-point approximation.
+ * @note If `b` is out of the domain (< 0), this function will throw
+ *       `std::domain_error` (or call `std::terminate()` with
+ *       `EIRIN_NO_EXCEPTIONS`). With `EIRIN_MATH_DOMAIN_SILENT` it returns the
+ *       maximum representable value instead.
  */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) noexcept
+EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
+    if(b < fixed(0))
+        EIRIN_MATH_DOMAIN_ERROR("pow_fast() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
     // special cases
     if(b == fixed(0))
         return e == fixed(0) ? fixed(1) : fixed(0);
@@ -846,14 +1144,36 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, 
     return exp(e * log2(b) * ln2);
 }
 
+/**
+ * @brief Remainder of the division of two fixed-point numbers, like std::fmod.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param a the dividend.
+ * @param b the divisor.
+ * @return a mod b with the sign of `a`.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> fmod(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> fmod(fixed_num<T, I, f, r> a, fixed_num<T, I, f, r> b) noexcept
 {
     return a - b * floor(a / b);
 }
 
+/**
+ * @brief Split a fixed-point number into its integer and fractional parts.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param fp the input x.
+ * @param int_part the output integer part (floor(x)).
+ * @return the fractional part (x - floor(x)).
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> modf(fixed_num<T, I, f, r> fp, fixed_num<T, I, f, r>& int_part) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> modf(fixed_num<T, I, f, r> fp, fixed_num<T, I, f, r>& int_part) noexcept
 {
     int_part = floor(fp);
     return fp - int_part;
@@ -871,7 +1191,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> modf(fixed_num<T, I, f, r> f
  * @return deg(rad)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> degrees(fixed_num<T, I, f, r> rad) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> degrees(fixed_num<T, I, f, r> rad) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr fixed factor = fixed(180);
@@ -891,7 +1211,7 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> degrees(fixed_num<T, I, f, r
  * @return rad(deg)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> radians(fixed_num<T, I, f, r> deg) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> radians(fixed_num<T, I, f, r> deg) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
     constexpr fixed factor = fixed(180);
@@ -899,14 +1219,37 @@ EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> radians(fixed_num<T, I, f, r
     return rad;
 }
 
+/**
+ * @brief Euclidean norm (length) of a 2D vector, like std::hypot.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the x component.
+ * @param y the y component.
+ * @return sqrt(x^2 + y^2) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r> y) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r> y) noexcept
 {
     return sqrt(x * x + y * y);
 }
 
+/**
+ * @brief Euclidean norm (length) of a 3D vector, like std::hypot.
+ *
+ * @tparam T @see fixed_num
+ * @tparam I @see fixed_num
+ * @tparam f @see fixed_num
+ * @tparam r @see fixed_num
+ * @param x the x component.
+ * @param y the y component.
+ * @param z the z component.
+ * @return sqrt(x^2 + y^2 + z^2) in a fixed-point approximation.
+ */
 template <typename T, typename I, unsigned int f, bool r>
-EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r> y, fixed_num<T, I, f, r> z) noexcept
+EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r> y, fixed_num<T, I, f, r> z) noexcept
 {
     return sqrt(x * x + y * y + z * z);
 }

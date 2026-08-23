@@ -53,7 +53,6 @@ static std::vector<Fixed> make_random_cbrt_set(std::size_t n)
     return vec;
 }
 
-
 template <typename Fixed>
 static std::vector<Fixed> make_random_fixed_set(std::size_t n, double lo, double hi, uint64_t seed = 0x114514)
 {
@@ -189,112 +188,160 @@ static void f32_create(benchmark::State& state)
     }
 }
 
-
 static void f32_divide(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x / y; }, -30000, 30000, 1, 30000);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return x / y; },
+                            -30000,
+                            30000,
+                            1,
+                            30000);
 }
-
 
 static void f32_multiple(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x * y; }, -150, 150, -150, 150);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return x * y; },
+                            -150,
+                            150,
+                            -150,
+                            150);
 }
-
 
 static void f32_add(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x + y; }, -15000, 15000, -15000, 15000);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return x + y; },
+                            -15000,
+                            15000,
+                            -15000,
+                            15000);
 }
-
 
 static void f32_minus(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return x - y; }, -15000, 15000, -15000, 15000);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return x - y; },
+                            -15000,
+                            15000,
+                            -15000,
+                            15000);
 }
-
 
 static void f32_sqrt(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return sqrt(x); }, 0, 30000);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return sqrt(x); },
+                            0,
+                            30000);
 }
-
 
 static void f32_log2(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return log2(x); }, 0.001, 30000);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return log2(x); },
+                            0.001,
+                            30000);
 }
-
 
 static void f32_log(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return log(x); }, 0.001, 30000);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return log(x); },
+                            0.001,
+                            30000);
 }
-
 
 static void f32_log10(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return log10(x); }, 0.001, 30000);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return log10(x); },
+                            0.001,
+                            30000);
 }
-
 
 static void f32_exp(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return exp(x); }, -5, 5);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return exp(x); },
+                            -5,
+                            5);
 }
-
 
 static void f32_pow(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return pow(x, y); }, 0.5, 50, -2, 2);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return pow(x, y); },
+                            0.5,
+                            50,
+                            -2,
+                            2);
 }
-
 
 static void f32_pow_fast(benchmark::State& state)
 {
-    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y) { return pow(x, y); }, 0.5, 50, -2, 2);
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return pow(x, y); },
+                            0.5,
+                            50,
+                            -2,
+                            2);
 }
-
 
 static void f32_sin(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return sin(x); }, -10, 10);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return sin(x); },
+                            -10,
+                            10);
 }
-
 
 static void f32_cos(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return cos(x); }, -10, 10);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return cos(x); },
+                            -10,
+                            10);
 }
-
 
 static void f32_tan(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return tan(x); }, -1.5, 1.5);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return tan(x); },
+                            -1.5,
+                            1.5);
 }
-
 
 static void f32_atan(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return atan(x); }, -30000, 30000);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return atan(x); },
+                            -30000,
+                            30000);
 }
-
 
 static void f32_asin(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return asin(x); }, -1, 1);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return asin(x); },
+                            -1,
+                            1);
 }
-
 
 static void f32_acos(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return acos(x); }, -1, 1);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return acos(x); },
+                            -1,
+                            1);
 }
-
 
 static void f32_cordic_sin(benchmark::State& state)
 {
-    bench_random_1<fixed32>(state, [](fixed32 x) { return cordic_sine(x); }, -10, 10);
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return cordic_sine(x); },
+                            -10,
+                            10);
 }
 
 
@@ -317,112 +364,160 @@ static void f64_create(benchmark::State& state)
     }
 }
 
-
 static void f64_divide(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x / y; }, -2000000000.0, 2000000000.0, 1, 2000000000.0);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return x / y; },
+                            -2000000000.0,
+                            2000000000.0,
+                            1,
+                            2000000000.0);
 }
-
 
 static void f64_multiple(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x * y; }, -10000.0, 10000.0, -10000.0, 10000.0);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return x * y; },
+                            -10000.0,
+                            10000.0,
+                            -10000.0,
+                            10000.0);
 }
-
 
 static void f64_add(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x + y; }, -1000000000.0, 1000000000.0, -1000000000.0, 1000000000.0);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return x + y; },
+                            -1000000000.0,
+                            1000000000.0,
+                            -1000000000.0,
+                            1000000000.0);
 }
-
 
 static void f64_minus(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return x - y; }, -1000000000.0, 1000000000.0, -1000000000.0, 1000000000.0);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return x - y; },
+                            -1000000000.0,
+                            1000000000.0,
+                            -1000000000.0,
+                            1000000000.0);
 }
-
 
 static void f64_sqrt(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return sqrt(x); }, 0, 2000000000.0);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return sqrt(x); },
+                            0,
+                            2000000000.0);
 }
-
 
 static void f64_log2(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return log2(x); }, 0.001, 2000000000.0);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return log2(x); },
+                            0.001,
+                            2000000000.0);
 }
-
 
 static void f64_log(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return log(x); }, 0.001, 2000000000.0);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return log(x); },
+                            0.001,
+                            2000000000.0);
 }
-
 
 static void f64_log10(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return log10(x); }, 0.001, 2000000000.0);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return log10(x); },
+                            0.001,
+                            2000000000.0);
 }
-
 
 static void f64_exp(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return exp(x); }, -20, 20);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return exp(x); },
+                            -20,
+                            20);
 }
-
 
 static void f64_pow_fast(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return pow(x, y); }, 0.5, 10000.0, -2, 2);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return pow(x, y); },
+                            0.5,
+                            10000.0,
+                            -2,
+                            2);
 }
-
 
 static void f64_pow(benchmark::State& state)
 {
-    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y) { return pow(x, y); }, 0.5, 10000.0, -2, 2);
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return pow(x, y); },
+                            0.5,
+                            10000.0,
+                            -2,
+                            2);
 }
-
 
 static void f64_sin(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return sin(x); }, -10, 10);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return sin(x); },
+                            -10,
+                            10);
 }
-
 
 static void f64_cos(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return cos(x); }, -10, 10);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return cos(x); },
+                            -10,
+                            10);
 }
-
 
 static void f64_tan(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return tan(x); }, -1.5, 1.5);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return tan(x); },
+                            -1.5,
+                            1.5);
 }
-
 
 static void f64_atan(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return atan(x); }, -2000000000.0, 2000000000.0);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return atan(x); },
+                            -2000000000.0,
+                            2000000000.0);
 }
-
 
 static void f64_asin(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return asin(x); }, -1, 1);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return asin(x); },
+                            -1,
+                            1);
 }
-
 
 static void f64_acos(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return acos(x); }, -1, 1);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return acos(x); },
+                            -1,
+                            1);
 }
-
 
 static void f64_cordic_sin(benchmark::State& state)
 {
-    bench_random_1<fixed64>(state, [](fixed64 x) { return cordic_sine(x); }, -10, 10);
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return cordic_sine(x); },
+                            -10,
+                            10);
 }
 
 #endif

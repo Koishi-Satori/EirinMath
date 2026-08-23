@@ -477,6 +477,38 @@ TEST(Fixed32, Math)
     EXPECT_TRUE(expect_fixed_eq(degrees(numbers::pi), 180_f32));
 }
 
+#ifdef EIRIN_MATH_DOMAIN_SILENT
+TEST(Fixed32, DomainSilentSentinels)
+{
+    // out-of-domain inputs return the documented sentinels instead of throwing.
+    EXPECT_EQ(asin(2_f32), f32_max);
+    EXPECT_EQ(acos(-2_f32), f32_max);
+    EXPECT_EQ(log2(0_f32), f32_min);
+    EXPECT_EQ(log(0_f32), f32_min);
+    EXPECT_EQ(log10(-1_f32), f32_min);
+    EXPECT_EQ(pow(-2_f32, 0.5_f32), f32_max);
+    EXPECT_EQ(pow_fast(-2_f32, 0.5_f32), f32_max);
+    EXPECT_EQ(tan(fixed32::pi() / 2), f32_max);
+    // valid calls are unaffected.
+    EXPECT_EQ(log2(2_f32), 1_f32);
+    EXPECT_EQ(asin(0.5_f32) > 0_f32, true);
+}
+#else
+#    ifndef EIRIN_NO_EXCEPTIONS
+TEST(Fixed32, DomainThrows)
+{
+    EXPECT_THROW((void)asin(2_f32), std::domain_error);
+    EXPECT_THROW((void)acos(-2_f32), std::domain_error);
+    EXPECT_THROW((void)log2(0_f32), std::domain_error);
+    EXPECT_THROW((void)log(0_f32), std::domain_error);
+    EXPECT_THROW((void)log10(-1_f32), std::domain_error);
+    EXPECT_THROW((void)pow(-2_f32, 0.5_f32), std::domain_error);
+    EXPECT_THROW((void)pow_fast(-2_f32, 0.5_f32), std::domain_error);
+    EXPECT_THROW((void)tan(fixed32::pi() / 2), std::domain_error);
+}
+#    endif
+#endif
+
 TEST(FixedNum, Constants)
 {
     GTEST_LOG_(INFO) << "fixed32 max value: " << max_value<fixed32>() << ", min value: " << min_value<fixed32>();

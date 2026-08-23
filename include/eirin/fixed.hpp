@@ -82,7 +82,7 @@ namespace detail
     // forward declaration: now we try to use hexfloat literals to represent some constants.
     template <typename CharT, typename T, typename I, unsigned int f, bool r>
     consteval fixed_num<T, I, f, r> eval_const(const CharT* str);
-}
+} // namespace detail
 
 /**
      * @brief The fixed number.
