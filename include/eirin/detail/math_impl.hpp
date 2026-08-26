@@ -20,6 +20,49 @@ enum class overflow_strategy
 
 namespace detail
 {
+    template <typename T, typename I>
+    EIRIN_ALWAYS_INLINE consteval T __eval_max_value() noexcept
+    {
+        if constexpr(std::numeric_limits<T>::is_specialized)
+        {
+            return std::numeric_limits<T>::max();
+        }
+        else if constexpr(detail::is_signed_v<T>)
+        {
+            constexpr auto digits = sizeof(T) * 8 - 1;
+            return static_cast<T>((static_cast<I>(1) << digits) - 1);
+        }
+        else
+        {
+            constexpr auto digits = sizeof(T) * 8;
+            return static_cast<T>((static_cast<I>(1) << digits) - 1);
+        }
+    }
+
+    template <typename T, typename I>
+    EIRIN_ALWAYS_INLINE consteval T __eval_min_value() noexcept
+    {
+        if constexpr(std::numeric_limits<T>::is_specialized)
+        {
+            return std::numeric_limits<T>::min();
+        }
+        else if constexpr(detail::is_signed_v<T>)
+        {
+            constexpr auto digits = sizeof(T) * 8 - 1;
+            return static_cast<T>(-(static_cast<I>(1) << digits));
+        }
+        else
+        {
+            return static_cast<T>(0);
+        }
+    }
+
+    template <typename T, typename I>
+    inline constexpr T __max_value = __eval_max_value<T, I>();
+
+    template <typename T, typename I>
+    inline constexpr T __min_value = __eval_min_value<T, I>();
+
     // Signed round-half-away right shift; a no-op for sh == 0.
     template <typename V>
     constexpr V pow_rshift(V v, unsigned int sh) noexcept

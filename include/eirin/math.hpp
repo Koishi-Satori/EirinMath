@@ -8,6 +8,8 @@
 #include "numbers.hpp"
 #include "detail/math_impl.hpp"
 
+// TODO: finish overflow version of `pow`, `pow_fast`, `tan`, `degree`, `hypot`, `fmod`, `abs`.
+
 namespace eirin
 {
 // Domain-error policy:
@@ -39,7 +41,7 @@ constexpr inline fixed64 f64_min = fixed64::from_internal_value(0x80000000000000
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 {
-    return std::numeric_limits<T>::max();
+    return T::from_internal_value(detail::__eval_max_value<typename T::value_type, typename T::intermediate_type>());
 }
 
 /**
@@ -51,7 +53,7 @@ EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T min_value() noexcept
 {
-    return std::numeric_limits<T>::min();
+    return T::from_internal_value(detail::__eval_min_value<typename T::value_type, typename T::intermediate_type>());
 }
 
 /**
@@ -195,6 +197,17 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> max(fixed_num<T, I, f, r> a, fix
     auto b_i = b.internal_value();
     return a_i > b_i ? a : b;
 }
+
+template <typename MantissaType, typename ExponentType>
+requires fixed_point<MantissaType> && (fixed_point<ExponentType> || detail::integral<ExponentType>)
+struct frexp_t
+{
+    using mantissa_type = MantissaType;
+    using exponent_type = ExponentType;
+
+    MantissaType mantissa;
+    ExponentType exponent;
+};
 
 /**
  * @brief Break x into a normalized fraction and an exponent, like std::frexp.

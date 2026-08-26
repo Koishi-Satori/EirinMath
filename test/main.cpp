@@ -97,6 +97,96 @@ struct is_signed<test_ud_int> : public std::true_type
 {};
 } // namespace eirin::detail
 
+// user-defined big-int: split into two uint64 words (lo first, little-endian).
+template <eirin::detail::bit_width_word OutType>
+requires std::is_same_v<OutType, std::uint64_t>
+struct eirin::int_sequence_generator<test_ud_int, OutType> : eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>
+{
+    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>;
+    static constexpr bool is_specialized = true;
+
+    struct it
+    {
+        const test_ud_int* p;
+        int idx;
+
+        constexpr typename base_t::word_type operator*() const
+        {
+            return idx == 0 ? static_cast<typename base_t::word_type>(p->lo) : static_cast<typename base_t::word_type>(p->hi);
+        }
+
+        constexpr it& operator++() noexcept
+        {
+            ++idx;
+            return *this;
+        }
+
+        constexpr bool operator!=(const it& o) const noexcept
+        {
+            return idx != o.idx;
+        }
+    };
+
+    static constexpr it begin(const test_ud_int& v) noexcept
+    {
+        return it{&v, 0};
+    }
+
+    static constexpr it end(const test_ud_int& v) noexcept
+    {
+        return it{&v, 2};
+    }
+};
+
+// another user big-int, specialized only for 16-bit words (full specialization
+// inheriting the base keeps `word_type` visible): exercises the word-type
+// probing in `detail::bit_width`.
+struct test_ud_short
+{
+    unsigned short lo;
+    unsigned short hi;
+};
+
+template <>
+struct eirin::int_sequence_generator<test_ud_short, unsigned short>
+    : eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>
+{
+    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>;
+    static constexpr bool is_specialized = true;
+
+    struct it
+    {
+        const test_ud_short* p;
+        int idx;
+
+        constexpr typename base_t::word_type operator*() const
+        {
+            return idx == 0 ? p->lo : p->hi;
+        }
+
+        constexpr it& operator++() noexcept
+        {
+            ++idx;
+            return *this;
+        }
+
+        constexpr bool operator!=(const it& o) const noexcept
+        {
+            return idx != o.idx;
+        }
+    };
+
+    static constexpr it begin(const test_ud_short& v) noexcept
+    {
+        return it{&v, 0};
+    }
+
+    static constexpr it end(const test_ud_short& v) noexcept
+    {
+        return it{&v, 2};
+    }
+};
+
 #ifdef _MSC_VER
 namespace
 {
@@ -244,6 +334,67 @@ TEST(FixedNum, ValidateSigned128)
     }
 }
 #endif // _MSC_VER
+
+TEST(FixedNum, TypeTraits)
+{
+    EXPECT_FALSE(detail::has_make_unsigned_v<test_ud_int>);
+    EXPECT_TRUE(detail::has_make_unsigned_v<int64_t>);
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_TRUE(detail::has_make_unsigned_v<detail::int128_t>);
+#endif
+
+    bool f = std::is_same_v<detail::make_unsigned_t<int64_t>, uint64_t>;
+    EXPECT_TRUE(f);
+#ifdef EIRIN_MATH_HAS_INT128
+    f = std::is_same_v<detail::make_unsigned_t<detail::int128_t>, detail::uint128_t>;
+    EXPECT_TRUE(f);
+#endif
+
+    // int_sequence_generator: placeholder vs. user partial specialization.
+    EXPECT_FALSE((int_sequence_generator<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((int_sequence_generator<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<int_sequence_generator<test_ud_int, uint64_t>::word_type, uint64_t>));
+
+    // int_sequence_generator_traits mirrors the generator contract for consumers.
+    EXPECT_FALSE((int_sequence_generator_traits<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((int_sequence_generator_traits<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<int_sequence_generator_traits<test_ud_int, uint64_t>::word_type, uint64_t>));
+    EXPECT_EQ((int_sequence_generator_traits<test_ud_int, uint64_t>::word_bits), std::size_t{64});
+
+    // placeholder: begin == end (empty range), dereference is well-defined.
+    auto p_it = int_sequence_generator<int, uint64_t>::begin(0);
+    const auto p_end = int_sequence_generator<int, uint64_t>::end(0);
+    EXPECT_TRUE(p_it == p_end);
+    EXPECT_EQ(*p_it, std::uint64_t{0});
+
+    // specialized: little-endian words, bit_width = highest_nonzero_word_index * 64 + bit_width(top_word).
+    constexpr auto make_ud = [](long long lo, long long hi) constexpr
+    {
+        test_ud_int v;
+        v.lo = lo;
+        v.hi = hi;
+        return v;
+    };
+    EXPECT_EQ(detail::bit_width(make_ud(0, 0)), std::size_t{0});
+    EXPECT_EQ(detail::bit_width(make_ud(1, 0)), std::size_t{1});
+    EXPECT_EQ(detail::bit_width(make_ud(0, 1)), std::size_t{65}); // 1 << 64
+    EXPECT_EQ(detail::bit_width(make_ud(1, 1)), std::size_t{65}); // (1 << 64) | 1
+    EXPECT_EQ(detail::bit_width(make_ud(5, 7)), std::size_t{67}); // (7 << 64) | 5
+    EXPECT_EQ(detail::bit_width(make_ud(-1, 1)), std::size_t{65}); // lo = 0xFFFFFFFFFFFFFFFF
+    EXPECT_EQ(detail::bit_width(make_ud(0x7FFFFFFFFFFFFFFF, 0x8000000000000000)), std::size_t{128});
+
+    constexpr auto constexpr_bw = detail::bit_width(make_ud(5, 7));
+    static_assert(constexpr_bw == 67u);
+
+    // 16-bit word specialization: `detail::bit_width` probes the standard
+    // unsigned word types and finds this one.
+    EXPECT_TRUE((int_sequence_generator_traits<test_ud_short, uint16_t>::is_specialized));
+    EXPECT_EQ((int_sequence_generator_traits<test_ud_short, uint16_t>::word_bits), std::size_t{16});
+    test_ud_short us{1, 2}; // (2 << 16) | 1 -> 16 + bit_width(2) = 18
+    EXPECT_EQ(detail::bit_width(us), std::size_t{18});
+    constexpr test_ud_short cus{3, 5}; // (5 << 16) | 3 -> 16 + bit_width(5) = 19
+    static_assert(detail::bit_width(cus) == 19u);
+}
 
 TEST(FixedNum, Construct)
 {

@@ -5,6 +5,7 @@
 
 #include "macro.hpp"
 #include "fixed.hpp"
+#include "numeric.hpp"
 #include "math.hpp"
 #include "io/parse.hpp"
 #include "numbers.hpp"

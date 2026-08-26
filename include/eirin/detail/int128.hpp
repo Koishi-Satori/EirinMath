@@ -28,6 +28,12 @@
 #    define EIRIN_MATH_DETAIL_BUILTIN__INT128
 #endif
 
+#if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
+#    ifndef EIRIN_MATH_HAS_INT128
+#        define EIRIN_MATH_HAS_INT128
+#    endif
+#endif
+
 namespace eirin::detail
 {
 #if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
