@@ -758,8 +758,16 @@ namespace detail
             q = pow_rshift(q * r_work, bf) + e1;
             q = pow_rshift(q * r_work, bf) + e0;
         }
-        // exp(r) at bf scale
-        const J e_r = C > bf ? pow_rshift(q, C - bf) : (C < bf ? q << (bf - C) : q);
+        // exp(r) at bf scale. `if constexpr` instead of a ternary: only the
+        // taken branch is compiled, so the `(bf - C)` shift count is always
+        // valid (the ternary's dead branch tripped MSVC C4293).
+        J e_r;
+        if constexpr(C > bf)
+            e_r = pow_rshift(q, C - bf);
+        else if constexpr(C < bf)
+            e_r = q << (bf - C);
+        else
+            e_r = q;
 
         // result = exp(r) * 2^k, narrowed back to f bits
         const int k_int = static_cast<int>(k);

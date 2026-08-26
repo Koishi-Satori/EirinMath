@@ -895,9 +895,15 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp) EIRIN_M
         using J = typename detail::make_signed<I>::type;
         const J hi = static_cast<J>(ln.hi);
         const J lo = static_cast<J>(ln.lo);
-        // ln(b) at f bits: hi at 2^L, lo at 2^S
-        const J ln_f = (sc.L >= f ? detail::pow_rshift(hi, sc.L - f) : hi << (f - sc.L)) +
-                       detail::pow_rshift(lo, sc.S - f);
+        // ln(b) at f bits: hi at 2^L, lo at 2^S. `if constexpr` instead of a
+        // ternary so the `(f - sc.L)` shift is only compiled when positive
+        // (the ternary's dead branch tripped MSVC C4293).
+        J ln_hi;
+        if constexpr(sc.L >= f)
+            ln_hi = detail::pow_rshift(hi, sc.L - f);
+        else
+            ln_hi = hi << (f - sc.L);
+        const J ln_f = ln_hi + detail::pow_rshift(lo, sc.S - f);
         // log2(b) = ln(b) * log2(e); log2(e), exact 61-bit dyadic
         constexpr J log2e_f = detail::eval_dyadic<J, f>("0x1.71547652b82fep+0");
         const J log2_f = detail::pow_rshift(ln_f * log2e_f, f);
