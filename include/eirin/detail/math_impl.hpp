@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <limits>
+#include "./numeric_traits.hpp"
 #include "../fixed.hpp"
 #include "../numbers.hpp"
 
@@ -20,49 +22,6 @@ enum class overflow_strategy
 
 namespace detail
 {
-    template <typename T, typename I>
-    EIRIN_ALWAYS_INLINE consteval T __eval_max_value() noexcept
-    {
-        if constexpr(std::numeric_limits<T>::is_specialized)
-        {
-            return std::numeric_limits<T>::max();
-        }
-        else if constexpr(detail::is_signed_v<T>)
-        {
-            constexpr auto digits = sizeof(T) * 8 - 1;
-            return static_cast<T>((static_cast<I>(1) << digits) - 1);
-        }
-        else
-        {
-            constexpr auto digits = sizeof(T) * 8;
-            return static_cast<T>((static_cast<I>(1) << digits) - 1);
-        }
-    }
-
-    template <typename T, typename I>
-    EIRIN_ALWAYS_INLINE consteval T __eval_min_value() noexcept
-    {
-        if constexpr(std::numeric_limits<T>::is_specialized)
-        {
-            return std::numeric_limits<T>::min();
-        }
-        else if constexpr(detail::is_signed_v<T>)
-        {
-            constexpr auto digits = sizeof(T) * 8 - 1;
-            return static_cast<T>(-(static_cast<I>(1) << digits));
-        }
-        else
-        {
-            return static_cast<T>(0);
-        }
-    }
-
-    template <typename T, typename I>
-    inline constexpr T __max_value = __eval_max_value<T, I>();
-
-    template <typename T, typename I>
-    inline constexpr T __min_value = __eval_min_value<T, I>();
-
     // Signed round-half-away right shift; a no-op for sh == 0.
     template <typename V>
     constexpr V pow_rshift(V v, unsigned int sh) noexcept
@@ -367,7 +326,7 @@ namespace detail
         if constexpr(os == overflow_strategy::SATURATION)
         {
             if(k > static_cast<I>(fixed::digits_int) + 2)
-                return fixed::from_internal_value(std::numeric_limits<T>::max());
+                return fixed::from_internal_value(__any_int_traits<T>::max);
             if constexpr(detail::is_signed_v<I>)
             {
                 if(k < -static_cast<I>(f) - 3)
@@ -448,8 +407,8 @@ namespace detail
 
         if constexpr(os == overflow_strategy::SATURATION)
         {
-            if(v > static_cast<I>(std::numeric_limits<T>::max()))
-                return fixed::from_internal_value(std::numeric_limits<T>::max());
+            if(v > static_cast<I>(__any_int_traits<T>::max))
+                return fixed::from_internal_value(__any_int_traits<T>::max);
         }
         return fixed::from_internal_value(static_cast<T>(v));
     }
@@ -667,7 +626,7 @@ namespace detail
 
         // saturation for out-of-range exponents
         if(k > static_cast<J>(digits_int) + 2)
-            return fixed::from_internal_value(std::numeric_limits<T>::max());
+            return fixed::from_internal_value(__any_int_traits<T>::max);
         if constexpr(detail::is_signed_v<J>)
         {
             if(k < -static_cast<J>(f) - 3)
@@ -777,8 +736,8 @@ namespace detail
             v = e_r << sh;
         else
             v = (e_r + (static_cast<J>(1) << (-sh - 1))) >> (-sh);
-        if(v > static_cast<J>(std::numeric_limits<T>::max()))
-            v = static_cast<J>(std::numeric_limits<T>::max());
+        if(v > static_cast<J>(__any_int_traits<T>::max))
+            v = static_cast<J>(__any_int_traits<T>::max);
         return fixed::from_internal_value(static_cast<T>(v));
     }
 

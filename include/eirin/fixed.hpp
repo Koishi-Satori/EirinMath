@@ -28,6 +28,7 @@
 #include "macro.hpp"
 #include "detail/type_traits_impl.hpp"
 #include "detail/int128.hpp"
+#include "detail/numeric_traits.hpp"
 #include "error.hpp"
 
 namespace eirin
@@ -114,13 +115,9 @@ private:
     // represent value 1.0, and for UQ0.n, this shoule always be 0.0.
     static constexpr Type raw_value_one = (precision == digits) ? static_cast<Type>(0) : static_cast<Type>(1) << fraction;
 
-    static constexpr Type raw_value_max = std::numeric_limits<Type>::is_specialized ?
-                                              std::numeric_limits<Type>::max() :
-                                              static_cast<Type>((static_cast<IntermediateType>(1) << digits) - 1);
+    static constexpr Type raw_value_max = detail::__any_int_traits<Type>::max;
 
-    static constexpr Type raw_value_min = std::numeric_limits<Type>::is_specialized ?
-                                              std::numeric_limits<Type>::min() :
-                                              static_cast<Type>(detail::is_signed_v<Type> ? -(static_cast<IntermediateType>(1) << digits) : IntermediateType(0));
+    static constexpr Type raw_value_min = detail::__any_int_traits<Type>::min;
 
     constexpr inline fixed_num(Type val, raw_value_construct_tag) noexcept
         : m_value(val) {};
@@ -234,7 +231,8 @@ public:
         // for unsigned type, it should be 0.
         if constexpr(detail::is_unsigned_v<Type>)
             return 0;
-        return static_cast<Type>(1) << digits;
+        else
+            return static_cast<Type>(1) << (sizeof(Type) * 8 - 1);
     }
 
     EIRIN_ALWAYS_INLINE friend constexpr bool signbit(const fixed_num& f) noexcept
@@ -1139,7 +1137,7 @@ namespace detail
         }
 
         // check overflow
-        if(fixed_value > static_cast<I>(std::numeric_limits<T>::max()) || fixed_value < static_cast<I>(std::numeric_limits<T>::min()))
+        if(fixed_value > static_cast<I>(detail::__any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::__any_int_traits<T>::min))
         {
             return false;
         }
@@ -1406,7 +1404,7 @@ constexpr bool fixed_from_cstring(const char* str, size_t len, fixed_num<T, I, f
     }
 
     // check overflow
-    if(fixed_value > static_cast<I>(std::numeric_limits<T>::max()) || fixed_value < static_cast<I>(std::numeric_limits<T>::min()))
+    if(fixed_value > static_cast<I>(detail::__any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::__any_int_traits<T>::min))
     {
         return false;
     }

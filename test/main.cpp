@@ -396,6 +396,250 @@ TEST(FixedNum, TypeTraits)
     static_assert(detail::bit_width(cus) == 19u);
 }
 
+TEST(FixedNum, SaturationArithmetic)
+{
+    // normal additions match plain arithmetic
+    EXPECT_EQ(saturating_add(1.5_f32, 2.25_f32), 3.75_f32);
+    EXPECT_EQ(saturating_add(-1.5_f32, 2.25_f32), 0.75_f32);
+    EXPECT_EQ(saturating_add(-0.5_f32, -0.25_f32), -0.75_f32);
+    EXPECT_EQ(saturating_add(0_f32, 0_f32), 0_f32);
+
+    // positive overflow saturates to max
+    EXPECT_EQ(saturating_add(f32_max, 1_f32), f32_max);
+    EXPECT_EQ(saturating_add(f32_max, f32_max), f32_max);
+    EXPECT_EQ(saturating_add(100_f32, f32_max), f32_max);
+
+    // negative overflow saturates to min
+    EXPECT_EQ(saturating_add(f32_min, -1_f32), f32_min);
+    EXPECT_EQ(saturating_add(f32_min, f32_min), f32_min);
+    EXPECT_EQ(saturating_add(-100_f32, f32_min), f32_min);
+
+    // mixed signs never overflow
+    EXPECT_EQ(saturating_add(f32_max, f32_min), fixed32::from_internal_value(-1)); // internal -1 = -2^-16
+    EXPECT_EQ(saturating_add(f32_max, -1_f32), f32_max - 1_f32);
+    EXPECT_EQ(saturating_add(f32_min, 1_f32), f32_min + 1_f32);
+
+    // constexpr path
+    constexpr auto sat = saturating_add(f32_max, 1_f32);
+    static_assert(sat == f32_max);
+
+    // unsigned storage takes the intermediate-type fallback path
+    using uq32 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    constexpr uq32 uq_max = uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max());
+    EXPECT_EQ(saturating_add(uq_max, uq32(1)), uq_max);
+    EXPECT_EQ(saturating_add(uq_max, uq_max), uq_max);
+    EXPECT_EQ(saturating_add(uq32(100), uq32(200)), uq32(300));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_add(1.5_f64, 2.25_f64), 3.75_f64);
+    EXPECT_EQ(saturating_add(f64_max, 1_f64), f64_max);
+    EXPECT_EQ(saturating_add(f64_min, -1_f64), f64_min);
+    EXPECT_EQ(saturating_add(f64_max, f64_min), fixed64::from_internal_value(-1)); // internal -1 = -2^-32
+#endif
+
+    // normal subtractions match plain arithmetic
+    EXPECT_EQ(saturating_sub(3.75_f32, 2.25_f32), 1.5_f32);
+    EXPECT_EQ(saturating_sub(-1.5_f32, 2.25_f32), -3.75_f32);
+    EXPECT_EQ(saturating_sub(-0.5_f32, -0.25_f32), -0.25_f32);
+    EXPECT_EQ(saturating_sub(0_f32, 0_f32), 0_f32);
+    EXPECT_EQ(saturating_sub(5_f32, -3_f32), 8_f32);
+
+    // positive overflow saturates to max (x >= 0, y < 0)
+    EXPECT_EQ(saturating_sub(f32_max, -1_f32), f32_max);
+    EXPECT_EQ(saturating_sub(f32_max, f32_min), f32_max);
+    // the x == 0 edge: 0 - INT_MIN also overflows positive
+    EXPECT_EQ(saturating_sub(0_f32, f32_min), f32_max);
+
+    // negative overflow saturates to min (x < 0, y >= 0)
+    EXPECT_EQ(saturating_sub(f32_min, 1_f32), f32_min);
+    EXPECT_EQ(saturating_sub(f32_min, f32_max), f32_min);
+
+    // no overflow at the exact boundary
+    EXPECT_EQ(saturating_sub(f32_min, fixed32::from_internal_value(-1)),
+              fixed32::from_internal_value(static_cast<std::int32_t>(0x80000000) + 1));
+
+    // constexpr path
+    constexpr auto cs = saturating_sub(f32_min, 1_f32);
+    static_assert(cs == f32_min);
+
+    // unsigned storage underflows to zero
+    EXPECT_EQ(saturating_sub(uq32(100), uq32(200)), uq32(0));
+    EXPECT_EQ(saturating_sub(uq32(200), uq32(100)), uq32(100));
+    EXPECT_EQ(saturating_sub(uq32(0), uq32(1)), uq32(0));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_sub(3.75_f64, 2.25_f64), 1.5_f64);
+    EXPECT_EQ(saturating_sub(f64_max, -1_f64), f64_max);
+    EXPECT_EQ(saturating_sub(f64_min, 1_f64), f64_min);
+    EXPECT_EQ(saturating_sub(0_f64, f64_min), f64_max);
+#endif
+
+    // --- saturating_mul ---
+    EXPECT_EQ(saturating_mul(1.5_f32, 2.25_f32), 3.375_f32);
+    EXPECT_EQ(saturating_mul(-2_f32, 3_f32), -6_f32);
+    EXPECT_EQ(saturating_mul(0_f32, f32_max), 0_f32);
+    // positive overflow saturates to max (same signs)
+    EXPECT_EQ(saturating_mul(f32_max, 2_f32), f32_max);
+    EXPECT_EQ(saturating_mul(f32_max, f32_max), f32_max);
+    EXPECT_EQ(saturating_mul(f32_min, f32_min), f32_max);
+    // negative overflow saturates to min (opposite signs)
+    EXPECT_EQ(saturating_mul(f32_min, 2_f32), f32_min);
+    EXPECT_EQ(saturating_mul(f32_max, -2_f32), f32_min);
+
+    // constexpr path
+    constexpr auto cm = saturating_mul(2_f32, 3_f32);
+    static_assert(cm == 6_f32);
+
+    // rounded variant rounds half away from zero
+    using rnd32 = fixed_num<std::int32_t, std::int64_t, 16, true>;
+    EXPECT_EQ(saturating_mul(rnd32::from_internal_value(32768), rnd32::from_internal_value(1)).internal_value(), 1);  // 0.5 ulp -> 1
+    EXPECT_EQ(saturating_mul(rnd32::from_internal_value(-32768), rnd32::from_internal_value(1)).internal_value(), -1); // -0.5 ulp -> -1
+
+    // unsigned storage saturates to max
+    EXPECT_EQ(saturating_mul(uq32(100), uq32(200)), uq32(20000));
+    EXPECT_EQ(saturating_mul(uq_max, uq32(2)), uq_max);
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_mul(1.5_f64, 2.25_f64), 3.375_f64);
+    EXPECT_EQ(saturating_mul(f64_max, 2_f64), f64_max);
+    EXPECT_EQ(saturating_mul(f64_min, 2_f64), f64_min);
+#endif
+
+    // --- saturating_div ---
+    EXPECT_EQ(saturating_div(3.75_f32, 1.5_f32), 2.5_f32);
+    EXPECT_EQ(saturating_div(-3.75_f32, 1.5_f32), -2.5_f32);
+    EXPECT_EQ(saturating_div(0_f32, f32_max), 0_f32);
+    // quotient of min/max is -1.0 + epsilon: representable, no overflow
+    EXPECT_EQ(saturating_div(f32_min, f32_max), -1_f32);
+    // dividing by values below 1 amplifies
+    EXPECT_EQ(saturating_div(f32_max, 0.5_f32), f32_max);
+    EXPECT_EQ(saturating_div(f32_min, 0.5_f32), f32_min);
+    EXPECT_EQ(saturating_div(f32_max, -0.5_f32), f32_min);
+    EXPECT_EQ(saturating_div(f32_min, -0.5_f32), f32_max);
+    // note: dividing by zero is undefined behavior (precondition y != 0),
+    // matching std::saturating_div.
+
+    // constexpr path
+    constexpr auto cd = saturating_div(6_f32, 2_f32);
+    static_assert(cd == 3_f32);
+
+    // rounded variant rounds half away from zero
+    EXPECT_EQ(saturating_div(rnd32::from_internal_value(1), rnd32::from_internal_value(131072)).internal_value(), 1); // 0.5 ulp -> 1
+    EXPECT_EQ(saturating_div(rnd32::from_internal_value(-1), rnd32::from_internal_value(131072)).internal_value(), -1);
+
+    // unsigned storage
+    EXPECT_EQ(saturating_div(uq32(200), uq32(100)), uq32(2));
+    EXPECT_EQ(saturating_div(uq_max, uq32::from_internal_value(32768)), uq_max); // /0.5 overflows
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_div(3.75_f64, 1.5_f64), 2.5_f64);
+    EXPECT_EQ(saturating_div(f64_max, 0.5_f64), f64_max);
+    EXPECT_EQ(saturating_div(f64_min, 0.5_f64), f64_min);
+#endif
+
+    // --- saturating_cast ---
+    // same fraction, destination wider: exact pass-through (no clamp needed)
+    using s64w = fixed_num<std::int64_t, detail::int128_t, 16, false>;
+    EXPECT_EQ(saturating_cast<s64w>(f32_max).internal_value(), std::int64_t{0x7FFFFFFF});
+    EXPECT_EQ(saturating_cast<s64w>(-1.5_f32).internal_value(), std::int64_t{-98304});
+    constexpr auto cc = saturating_cast<s64w>(1.5_f32);
+    static_assert(cc.internal_value() == std::int64_t{98304});
+
+    // same fraction, destination narrower: clamp both ends
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(std::int64_t{1} << 40)).internal_value(), f32_max.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(-(std::int64_t{1} << 40))).internal_value(), f32_min.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(123456)).internal_value(), 123456);
+
+    // cross fraction: value-preserving upscale (f16 -> f32) and truncating downscale
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_cast<fixed64>(3.75_f32).internal_value(), std::int64_t{16106127360LL}); // 3.75 * 2^32
+    EXPECT_EQ(saturating_cast<fixed32>(3.75_f64).internal_value(), 245760);                     // 3.75 * 2^16
+    EXPECT_EQ(saturating_cast<fixed32>(-0.1_f64).internal_value(), -6553);                      // trunc toward zero
+    EXPECT_EQ(saturating_cast<fixed32>(40000.0_f64), f32_max);                                  // saturate up
+    EXPECT_EQ(saturating_cast<fixed32>(-40000.0_f64), f32_min);                                 // saturate down
+    // rounding destination (r = true) matches the converting constructor
+    using rnd32 = fixed_num<std::int32_t, std::int64_t, 16, true>;
+    EXPECT_EQ(saturating_cast<rnd32>(0.1_f64).internal_value(), rnd32(0.1_f64).internal_value());
+#endif
+
+    // signed -> unsigned: negative saturates to 0, upper bound preserved
+    EXPECT_EQ(saturating_cast<uq32>(f32_min).internal_value(), 0u);
+    EXPECT_EQ(saturating_cast<uq32>(f32_max).internal_value(), std::uint32_t{0x7FFFFFFF});
+    // unsigned -> signed: upper bound saturates to max
+    EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(0xFFFFFFFFu)).internal_value(), f32_max.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(1000u)).internal_value(), 1000);
+}
+
+TEST(FixedNum, ModwarpArithmetic)
+{
+    // --- modwarp_add ---
+    EXPECT_EQ(modwarp_add(1.5_f32, 2.25_f32), 3.75_f32);
+    EXPECT_EQ(modwarp_add(-1.5_f32, 2.25_f32), 0.75_f32);
+    // positive overflow wraps to the low end
+    EXPECT_EQ(modwarp_add(f32_max, fixed32::from_internal_value(1)), f32_min);
+    EXPECT_EQ(modwarp_add(f32_max, f32_max), fixed32::from_internal_value(-2));
+    // negative overflow wraps to the high end
+    EXPECT_EQ(modwarp_add(f32_min, fixed32::from_internal_value(-1)), f32_max);
+    EXPECT_EQ(modwarp_add(f32_min, f32_min), 0_f32);
+    // mixed signs never overflow
+    EXPECT_EQ(modwarp_add(f32_max, f32_min), fixed32::from_internal_value(-1));
+
+    // constexpr path (wrap is well-defined)
+    constexpr auto cw = modwarp_add(f32_max, fixed32::from_internal_value(1));
+    static_assert(cw == f32_min);
+
+    // --- modwarp_sub ---
+    EXPECT_EQ(modwarp_sub(3.75_f32, 2.25_f32), 1.5_f32);
+    EXPECT_EQ(modwarp_sub(1.5_f32, 2.25_f32), -0.75_f32);
+    // underflow wraps to the high end
+    EXPECT_EQ(modwarp_sub(f32_min, fixed32::from_internal_value(1)), f32_max);
+    // positive overflow wraps to the low end
+    EXPECT_EQ(modwarp_sub(f32_max, fixed32::from_internal_value(-1)), f32_min);
+    constexpr auto csub = modwarp_sub(5_f32, 3_f32);
+    static_assert(csub == 2_f32);
+
+    // --- modwarp_mul ---
+    EXPECT_EQ(modwarp_mul(2_f32, 3_f32), 6_f32);
+    EXPECT_EQ(modwarp_mul(1.5_f32, 2.25_f32), 3.375_f32);
+    EXPECT_EQ(modwarp_mul(-2_f32, 3_f32), -6_f32);
+    // scaled product wraps modulo 2^32: (2^31-1)^2 >> 16 mod 2^32 = 0xFFFF0000
+    EXPECT_EQ(modwarp_mul(f32_max, f32_max), fixed32::from_internal_value(-65536));
+    constexpr auto cmul = modwarp_mul(2_f32, 3_f32);
+    static_assert(cmul == 6_f32);
+
+    // --- modwarp_div ---
+    EXPECT_EQ(modwarp_div(6_f32, 2_f32), 3_f32);
+    EXPECT_EQ(modwarp_div(3.75_f32, 1.5_f32), 2.5_f32);
+    EXPECT_EQ(modwarp_div(-3.75_f32, 1.5_f32), -2.5_f32);
+    // (2^31-1)<<16 mod 2^32 = 0xFFFF0000
+    EXPECT_EQ(modwarp_div(f32_max, fixed32::from_internal_value(1)), fixed32::from_internal_value(-65536));
+    constexpr auto cdiv = modwarp_div(6_f32, 2_f32);
+    static_assert(cdiv == 3_f32);
+    // note: dividing by zero is undefined behavior (precondition y != 0)
+
+    // --- unsigned storage wraps modulo 2^32 ---
+    using uq32 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    constexpr uq32 uq_max = uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max());
+    EXPECT_EQ(modwarp_add(uq_max, uq32::from_internal_value(1)), uq32(0));
+    EXPECT_EQ(modwarp_add(uq_max, uq_max), uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max() - 1));
+    EXPECT_EQ(modwarp_sub(uq32(0), uq32(1)), uq32::from_internal_value(0xFFFF0000u)); // 0 - 1.0 wraps to 0xFFFF0000
+    EXPECT_EQ(modwarp_mul(uq_max, uq_max), uq32::from_internal_value(0xFFFE0000u));
+    EXPECT_EQ(modwarp_div(uq32(200), uq32(100)), uq32(2));
+    EXPECT_EQ(modwarp_div(uq_max, uq32::from_internal_value(1)), uq32::from_internal_value(0xFFFF0000u));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(modwarp_add(1.5_f64, 2.25_f64), 3.75_f64);
+    EXPECT_EQ(modwarp_add(f64_max, fixed64::from_internal_value(1)), f64_min);
+    EXPECT_EQ(modwarp_add(f64_min, fixed64::from_internal_value(-1)), f64_max);
+    EXPECT_EQ(modwarp_sub(3.75_f64, 2.25_f64), 1.5_f64);
+    EXPECT_EQ(modwarp_sub(f64_min, fixed64::from_internal_value(1)), f64_max);
+    EXPECT_EQ(modwarp_mul(2_f64, 3_f64), 6_f64);
+    EXPECT_EQ(modwarp_mul(f64_max, f64_max), fixed64::from_internal_value(-4294967296LL));
+    EXPECT_EQ(modwarp_div(3.75_f64, 1.5_f64), 2.5_f64);
+    EXPECT_EQ(modwarp_div(f64_max, fixed64::from_internal_value(1)), fixed64::from_internal_value(-4294967296LL));
+#endif
+}
+
 TEST(FixedNum, Construct)
 {
     auto fp1 = 0_f32;

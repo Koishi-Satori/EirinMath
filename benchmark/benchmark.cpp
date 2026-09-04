@@ -3,6 +3,7 @@
 #include <utility>
 #include <eirin/fixed.hpp>
 #include <eirin/math.hpp>
+#include <eirin/numeric.hpp>
 #include <benchmark/benchmark.h>
 #include <eirin/ext/cordic.hpp>
 #include <eirin/ext/builtin_ints.hpp>
@@ -93,6 +94,40 @@ static void bench_random_2(benchmark::State& state, MathFunc func, double lo1, d
         benchmark::DoNotOptimize(x);
         benchmark::DoNotOptimize(y);
         auto result = func(x, y);
+        benchmark::DoNotOptimize(result);
+        benchmark::ClobberMemory();
+    }
+}
+
+// Values near ±max, so saturating arithmetic saturates on almost every pair.
+template <typename Fixed>
+static std::vector<Fixed> make_saturating_set(std::size_t n)
+{
+    std::vector<Fixed> vec(n);
+    std::mt19937_64 mt64(0xBEAD);
+    const double m = static_cast<double>(eirin::max_value<Fixed>());
+    std::uniform_real_distribution<double> dist(0.9 * m, m);
+    for(auto& v : vec)
+        v = (mt64() & 1) ? Fixed(dist(mt64)) : Fixed(-dist(mt64));
+    return vec;
+}
+
+template <typename Fixed, typename Op>
+static void bench_sat(benchmark::State& state, bool boundary, Op op)
+{
+    const auto a = boundary ? make_saturating_set<Fixed>(state.range(0))
+                            : make_random_fixed_set<Fixed>(state.range(0), -15000, 15000, 0x114514);
+    const auto b = boundary ? make_saturating_set<Fixed>(state.range(0))
+                            : make_random_fixed_set<Fixed>(state.range(0), -15000, 15000, 0x1919810);
+    std::size_t i = 0;
+    for(auto _ : state)
+    {
+        auto x = a[i % a.size()];
+        auto y = b[i % b.size()];
+        ++i;
+        benchmark::DoNotOptimize(x);
+        benchmark::DoNotOptimize(y);
+        auto result = op(x, y);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -227,6 +262,131 @@ static void f32_minus(benchmark::State& state)
                             -15000,
                             15000);
 }
+
+static void f32_add_sat(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return saturating_add(x, y); });
+}
+
+static void f32_add_sat_boundary(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, true, [](fixed32 x, fixed32 y)
+                       { return saturating_add(x, y); });
+}
+
+static void f32_sub_sat(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return saturating_sub(x, y); });
+}
+
+static void f32_mul_sat(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return saturating_mul(x, y); });
+}
+
+static void f32_mul_sat_boundary(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, true, [](fixed32 x, fixed32 y)
+                       { return saturating_mul(x, y); });
+}
+
+static void f32_div_sat(benchmark::State& state)
+{
+    // divisor range excludes 0 (saturating_div by zero is UB) and spans both
+    // |y| >= 1 (fast path) and |y| < 1 (amplifying path).
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return saturating_div(x, y); },
+                            -30000,
+                            30000,
+                            0.001,
+                            30000);
+}
+
+static void f32_modwarp_add(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return modwarp_add(x, y); });
+}
+
+static void f32_modwarp_sub(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return modwarp_sub(x, y); });
+}
+
+static void f32_modwarp_mul(benchmark::State& state)
+{
+    bench_sat<fixed32>(state, false, [](fixed32 x, fixed32 y)
+                       { return modwarp_mul(x, y); });
+}
+
+static void f32_modwarp_div(benchmark::State& state)
+{
+    // divisor range excludes 0 (modwarp_div by zero is UB).
+    bench_random_2<fixed32>(state, [](fixed32 x, fixed32 y)
+                            { return modwarp_div(x, y); },
+                            -30000,
+                            30000,
+                            0.001,
+                            30000);
+}
+
+static void f32_satcast_s2u(benchmark::State& state)
+{
+    using uq16 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return saturating_cast<uq16>(x); },
+                            -30000,
+                            30000);
+}
+
+static void f32_satcast_u2s(benchmark::State& state)
+{
+    using uq16 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    bench_random_1<uq16>(state, [](uq16 x)
+                         { return saturating_cast<fixed32>(x); },
+                         0,
+                         30000);
+}
+
+#ifdef EIRIN_MATH_HAS_INT128
+static void f32_satcast_wide(benchmark::State& state)
+{
+    using wide16 = fixed_num<std::int64_t, detail::int128_t, 16, false>;
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return saturating_cast<wide16>(x); },
+                            -30000,
+                            30000);
+}
+
+static void f32_satcast_narrow(benchmark::State& state)
+{
+    using wide16 = fixed_num<std::int64_t, detail::int128_t, 16, false>;
+    bench_random_1<wide16>(state, [](wide16 x)
+                           { return saturating_cast<fixed32>(x); },
+                           -30000,
+                           30000);
+}
+
+static void f32_satcast_up(benchmark::State& state)
+{
+    bench_random_1<fixed32>(state, [](fixed32 x)
+                            { return saturating_cast<fixed64>(x); },
+                            -30000,
+                            30000);
+}
+
+static void f32_satcast_down(benchmark::State& state)
+{
+    bench_random_1<fixed64>(state, [](fixed64 x)
+                            { return saturating_cast<fixed32>(x); },
+                            -30000,
+                            30000);
+}
+#endif
 
 static void f32_sqrt(benchmark::State& state)
 {
@@ -404,6 +564,77 @@ static void f64_minus(benchmark::State& state)
                             1000000000.0);
 }
 
+static void f64_add_sat(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return saturating_add(x, y); });
+}
+
+static void f64_add_sat_boundary(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, true, [](fixed64 x, fixed64 y)
+                       { return saturating_add(x, y); });
+}
+
+static void f64_sub_sat(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return saturating_sub(x, y); });
+}
+
+static void f64_mul_sat(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return saturating_mul(x, y); });
+}
+
+static void f64_mul_sat_boundary(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, true, [](fixed64 x, fixed64 y)
+                       { return saturating_mul(x, y); });
+}
+
+static void f64_div_sat(benchmark::State& state)
+{
+    // divisor range excludes 0 (saturating_div by zero is UB) and spans both
+    // |y| >= 1 (fast path) and |y| < 1 (amplifying path).
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return saturating_div(x, y); },
+                            -2000000000.0,
+                            2000000000.0,
+                            0.001,
+                            2000000000.0);
+}
+
+static void f64_modwarp_add(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return modwarp_add(x, y); });
+}
+
+static void f64_modwarp_sub(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return modwarp_sub(x, y); });
+}
+
+static void f64_modwarp_mul(benchmark::State& state)
+{
+    bench_sat<fixed64>(state, false, [](fixed64 x, fixed64 y)
+                       { return modwarp_mul(x, y); });
+}
+
+static void f64_modwarp_div(benchmark::State& state)
+{
+    // divisor range excludes 0 (modwarp_div by zero is UB).
+    bench_random_2<fixed64>(state, [](fixed64 x, fixed64 y)
+                            { return modwarp_div(x, y); },
+                            -2000000000.0,
+                            2000000000.0,
+                            0.001,
+                            2000000000.0);
+}
+
 static void f64_sqrt(benchmark::State& state)
 {
     bench_random_1<fixed64>(state, [](fixed64 x)
@@ -533,6 +764,24 @@ BENCHMARK(f32_create)->Args({4096});
 BENCHMARK(f32_divide)->Args({4096});
 BENCHMARK(f32_multiple)->Args({4096});
 BENCHMARK(f32_add)->Args({4096});
+BENCHMARK(f32_add_sat)->Args({4096});
+BENCHMARK(f32_add_sat_boundary)->Args({4096});
+BENCHMARK(f32_sub_sat)->Args({4096});
+BENCHMARK(f32_mul_sat)->Args({4096});
+BENCHMARK(f32_mul_sat_boundary)->Args({4096});
+BENCHMARK(f32_div_sat)->Args({4096});
+BENCHMARK(f32_modwarp_add)->Args({4096});
+BENCHMARK(f32_modwarp_sub)->Args({4096});
+BENCHMARK(f32_modwarp_mul)->Args({4096});
+BENCHMARK(f32_modwarp_div)->Args({4096});
+BENCHMARK(f32_satcast_s2u)->Args({4096});
+BENCHMARK(f32_satcast_u2s)->Args({4096});
+#ifdef EIRIN_MATH_HAS_INT128
+BENCHMARK(f32_satcast_wide)->Args({4096});
+BENCHMARK(f32_satcast_narrow)->Args({4096});
+BENCHMARK(f32_satcast_up)->Args({4096});
+BENCHMARK(f32_satcast_down)->Args({4096});
+#endif
 BENCHMARK(f32_minus)->Args({4096});
 BENCHMARK(f32_sqrt)->Args({4096});
 BENCHMARK(f32_log2)->Args({4096});
@@ -555,6 +804,16 @@ BENCHMARK(f64_create)->Args({4096});
 BENCHMARK(f64_divide)->Args({4096});
 BENCHMARK(f64_multiple)->Args({4096});
 BENCHMARK(f64_add)->Args({4096});
+BENCHMARK(f64_add_sat)->Args({4096});
+BENCHMARK(f64_add_sat_boundary)->Args({4096});
+BENCHMARK(f64_sub_sat)->Args({4096});
+BENCHMARK(f64_mul_sat)->Args({4096});
+BENCHMARK(f64_mul_sat_boundary)->Args({4096});
+BENCHMARK(f64_div_sat)->Args({4096});
+BENCHMARK(f64_modwarp_add)->Args({4096});
+BENCHMARK(f64_modwarp_sub)->Args({4096});
+BENCHMARK(f64_modwarp_mul)->Args({4096});
+BENCHMARK(f64_modwarp_div)->Args({4096});
 BENCHMARK(f64_minus)->Args({4096});
 BENCHMARK(f64_sqrt)->Args({4096});
 BENCHMARK(f64_log2)->Args({4096});

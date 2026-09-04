@@ -41,7 +41,7 @@ constexpr inline fixed64 f64_min = fixed64::from_internal_value(0x80000000000000
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 {
-    return T::from_internal_value(detail::__eval_max_value<typename T::value_type, typename T::intermediate_type>());
+    return T::from_internal_value(detail::__any_int_traits<typename T::value_type>::max);
 }
 
 /**
@@ -53,7 +53,7 @@ EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T min_value() noexcept
 {
-    return T::from_internal_value(detail::__eval_min_value<typename T::value_type, typename T::intermediate_type>());
+    return T::from_internal_value(detail::__any_int_traits<typename T::value_type>::min);
 }
 
 /**
@@ -472,8 +472,8 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
             using wide = fixed_num<T, I, best_wide_fraction, r>;
             constexpr I scale = static_cast<I>(1) << (best_wide_fraction - f);
             const I scaled = static_cast<I>(fp.internal_value()) * scale;
-            if(scaled >= static_cast<I>(std::numeric_limits<T>::min()) &&
-               scaled <= static_cast<I>(std::numeric_limits<T>::max()))
+            if(scaled >= static_cast<I>(detail::__any_int_traits<T>::min) &&
+               scaled <= static_cast<I>(detail::__any_int_traits<T>::max))
             {
                 const wide wx = wide::from_internal_value(static_cast<T>(scaled));
                 const wide wres = detail::sin_minimax<T, I, f, r, pi>(wx);
@@ -521,13 +521,16 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> cos(fixed_num<T, I, f, r> fp) noexcept
 template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp) EIRIN_MATH_TRY_NOEXCEPT
 {
+#ifdef EIRIN_MATH_DOMAIN_SILENT
+    using fixed = fixed_num<T, I, f, r>;
+#endif
     auto cosx = cos(fp);
     if(abs(cosx).internal_value() > 1)
         return sin(fp) / cosx;
     else
         EIRIN_MATH_DOMAIN_ERROR(
             "tan() domain error",
-            (fixed_num<T, I, f, r>::from_internal_value(std::numeric_limits<T>::max()))
+            (max_value<fixed>())
         );
 }
 
@@ -591,7 +594,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> fp) EIRIN_M
 {
     using fixed = fixed_num<T, I, f, r>;
     if(abs(fp) > fixed(1))
-        EIRIN_MATH_DOMAIN_ERROR("asin() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
+        EIRIN_MATH_DOMAIN_ERROR("asin() domain error", max_value<fixed>());
     if(fp == fixed(1))
         return pi / fixed(2);
     else if(fp == fixed(-1))
@@ -654,7 +657,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> fp) EIRIN_M
 {
     using fixed = fixed_num<T, I, f, r>;
     if(abs(fp) > fixed(1))
-        EIRIN_MATH_DOMAIN_ERROR("acos() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
+        EIRIN_MATH_DOMAIN_ERROR("acos() domain error", max_value<fixed>());
     if(fp == fixed(1))
         return fixed(0);
     else if(fp == fixed(-1))
@@ -884,7 +887,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp) EIRIN_M
 {
     using fixed = fixed_num<T, I, f, r>;
     if(fp <= fixed(0))
-        EIRIN_MATH_DOMAIN_ERROR("log2() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
+        EIRIN_MATH_DOMAIN_ERROR("log2() domain error", min_value<fixed>());
 
     if constexpr(f == static_cast<unsigned int>(fixed::digits))
     {
@@ -980,7 +983,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp) EIRIN_MA
 {
     using fixed = fixed_num<T, I, f, r>;
     if(fp <= fixed(0))
-        EIRIN_MATH_DOMAIN_ERROR("log() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
+        EIRIN_MATH_DOMAIN_ERROR("log() domain error", min_value<fixed>());
     // ln(2), exact 61-bit dyadic
     constexpr fixed ln2 = f < 20 ? fixed::from_internal_value(
                                        static_cast<T>(detail::eval_dyadic<I, f>("0x1.62e42fefa39efp-1"))
@@ -1010,7 +1013,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp) EIRIN_
 {
     using fixed = fixed_num<T, I, f, r>;
     if(fp <= fixed(0))
-        EIRIN_MATH_DOMAIN_ERROR("log10() domain error", fixed::from_internal_value(std::numeric_limits<T>::min()));
+        EIRIN_MATH_DOMAIN_ERROR("log10() domain error", min_value<fixed>());
     // log10(2), exact 61-bit dyadic
     constexpr fixed log10_2 = f < 20 ? fixed::from_internal_value(
                                            static_cast<T>(detail::eval_dyadic<I, f>("0x1.34413509f79fef4p-2"))
@@ -1076,7 +1079,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num
         {
             // a negative base is only defined for integer exponents
             if(e.fractional_part() != 0)
-                EIRIN_MATH_DOMAIN_ERROR("pow() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
+                EIRIN_MATH_DOMAIN_ERROR("pow() domain error", max_value<fixed>());
             sign_neg = ((static_cast<I>(e.internal_value()) >> f) & 1) != 0;
             b = -b;
         }
@@ -1107,7 +1110,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num
     {
         // |e * ln b| is beyond the representable range of the result
         const bool prod_neg = (ln_hi < 0) != (e_j < 0);
-        fixed sat = prod_neg ? fixed(0) : fixed::from_internal_value(std::numeric_limits<T>::max());
+        fixed sat = prod_neg ? fixed(0) : max_value<fixed>();
         return sign_neg ? -sat : sat;
     }
     const UI ehi_raw = e_j * ln_hi; // at f+L bits
@@ -1144,7 +1147,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixe
 {
     using fixed = fixed_num<T, I, f, r>;
     if(b < fixed(0))
-        EIRIN_MATH_DOMAIN_ERROR("pow_fast() domain error", fixed::from_internal_value(std::numeric_limits<T>::max()));
+        EIRIN_MATH_DOMAIN_ERROR("pow_fast() domain error", max_value<fixed>());
     // special cases
     if(b == fixed(0))
         return e == fixed(0) ? fixed(1) : fixed(0);
