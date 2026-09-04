@@ -254,8 +254,9 @@ EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
  * Returns the value of `x` represented in `T`, clamped to the storage range
  * of `T` when it does not fit. Cross-fraction conversion preserves the value:
  * the source internal value is scaled to the destination fraction using the
- * same formulas as `fixed_num::from_fixed_num_value` (arithmetic in the
- * destination intermediate type), before saturation is applied.
+ * same formulas as `fixed_num::from_fixed_num_value` (arithmetic in the wider
+ * of the two intermediate types, so a source storage wider than the
+ * destination intermediate is never truncated), before saturation is applied.
  *
  * @tparam T the destination fixed-point type.
  * @tparam U the source fixed-point type.
@@ -269,7 +270,8 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
 {
     using type = typename U::value_type;
     using res_type = typename T::value_type;
-    using intermediate_type = typename T::intermediate_type;
+    using src_intermediate_type = typename U::intermediate_type;
+    using dst_intermediate_type = typename T::intermediate_type;
     constexpr auto src_fraction = U::precision;
     constexpr auto dst_fraction = T::precision;
     constexpr res_type min_res = detail::__any_int_traits<res_type>::min;
@@ -282,36 +284,66 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
             return T(0);
     }
 
-    intermediate_type scaled;
+    // Work in the wider of the two intermediates so that a source storage
+    // type wider than the destination intermediate is never truncated before
+    // scaling and clamping have happened.
+    using work_type = std::conditional_t<
+        (sizeof(dst_intermediate_type) >= sizeof(src_intermediate_type)),
+        dst_intermediate_type,
+        src_intermediate_type>;
+
+    const work_type xw = static_cast<work_type>(xi);
+
+    work_type scaled;
     if constexpr(dst_fraction >= src_fraction)
     {
-        scaled = static_cast<intermediate_type>(xi) << (dst_fraction - src_fraction);
+        constexpr auto shift = dst_fraction - src_fraction;
+        if constexpr(shift != 0)
+        {
+            // Clamp the source value to the destination range before scaling
+            // up, so the shifted value cannot overflow the work type.
+            constexpr work_type high = static_cast<work_type>(max_res >> shift);
+            if constexpr(detail::is_signed_v<work_type> && detail::is_signed_v<res_type>)
+            {
+                constexpr work_type low = static_cast<work_type>(min_res >> shift);
+                scaled = xw < low ? low : (xw > high ? high : xw);
+            }
+            else
+            {
+                scaled = xw > high ? high : xw;
+            }
+            scaled <<= shift;
+        }
+        else
+        {
+            scaled = xw;
+        }
     }
     else
     {
         constexpr auto shift = src_fraction - dst_fraction;
-        const intermediate_type num = static_cast<intermediate_type>(xi);
         if constexpr(T::is_round_enable)
         {
-            scaled = num / (intermediate_type(1) << shift) +
-                     (num / (intermediate_type(1) << (shift - 1))) % 2;
+            scaled = xw / (work_type(1) << shift) +
+                     (xw / (work_type(1) << (shift - 1))) % 2;
         }
         else
         {
-            scaled = num / (intermediate_type(1) << shift);
+            scaled = xw / (work_type(1) << shift);
         }
     }
 
-    if constexpr(detail::is_signed_v<res_type>)
+    constexpr work_type hi = static_cast<work_type>(max_res);
+    if constexpr(detail::is_signed_v<work_type> && detail::is_signed_v<res_type>)
     {
-        const intermediate_type lo = static_cast<intermediate_type>(min_res);
-        const intermediate_type hi = static_cast<intermediate_type>(max_res);
+        constexpr work_type lo = static_cast<work_type>(min_res);
         scaled = scaled < lo ? lo : (scaled > hi ? hi : scaled);
     }
     else
     {
-        const intermediate_type hi = static_cast<intermediate_type>(max_res);
-        scaled = scaled < intermediate_type(0) ? intermediate_type(0) : (scaled > hi ? hi : scaled);
+        // A negative source has already returned `T(0)` above, and an unsigned
+        // source cannot be negative, so only the upper bound is needed here.
+        scaled = scaled > hi ? hi : scaled;
     }
 
     return T::from_internal_value(static_cast<res_type>(scaled));

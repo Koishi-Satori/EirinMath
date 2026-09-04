@@ -568,6 +568,41 @@ TEST(FixedNum, SaturationArithmetic)
     // unsigned -> signed: upper bound saturates to max
     EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(0xFFFFFFFFu)).internal_value(), f32_max.internal_value());
     EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(1000u)).internal_value(), 1000);
+
+    // source storage wider than the destination intermediate: the value must
+    // be scaled and clamped without first truncating through the narrower
+    // intermediate type.
+    using wide20 = fixed_num<std::int32_t, std::int64_t, 20, false>;
+    using narrow4 = fixed_num<std::int8_t, std::int16_t, 4, false>;
+    using narrow4r = fixed_num<std::int8_t, std::int16_t, 4, true>;
+    using uwide20 = fixed_num<std::uint32_t, std::uint64_t, 20, false>;
+
+    const auto wide_max = wide20::from_internal_value(std::numeric_limits<std::int32_t>::max());
+    const auto wide_min = wide20::from_internal_value(std::numeric_limits<std::int32_t>::min());
+    // value-preserving downscale
+    EXPECT_EQ(saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{1} << 20)).internal_value(), 16);  // 1.0
+    EXPECT_EQ(saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{3} << 19)).internal_value(), 24);  // 1.5
+    EXPECT_EQ(saturating_cast<narrow4r>(wide20::from_internal_value(std::int32_t{1} << 20)).internal_value(), 16); // 1.0
+    // clamp both ends instead of wrapping through int16
+    EXPECT_EQ(saturating_cast<narrow4>(wide_max).internal_value(), 127);
+    EXPECT_EQ(saturating_cast<narrow4>(wide_min).internal_value(), -128);
+    EXPECT_EQ(saturating_cast<narrow4r>(wide_max).internal_value(), 127);
+    // rounding (r = true) matches the converting constructor on in-range values
+    const auto mid = wide20::from_internal_value((std::int32_t{1} << 20) + (std::int32_t{1} << 15)); // 1.03125
+    EXPECT_EQ(saturating_cast<narrow4>(mid).internal_value(), 16);
+    EXPECT_EQ(saturating_cast<narrow4r>(mid).internal_value(), narrow4r(mid).internal_value());
+    EXPECT_EQ(saturating_cast<narrow4r>(mid).internal_value(), 17);
+    const auto neg_mid = wide20::from_internal_value(-((std::int32_t{1} << 20) + (std::int32_t{1} << 15)));
+    EXPECT_EQ(saturating_cast<narrow4r>(neg_mid).internal_value(), narrow4r(neg_mid).internal_value());
+    EXPECT_EQ(saturating_cast<narrow4r>(neg_mid).internal_value(), -17);
+    // unsigned source into a narrow signed destination
+    EXPECT_EQ(saturating_cast<narrow4>(uwide20::from_internal_value(std::numeric_limits<std::uint32_t>::max())).internal_value(), 127);
+    EXPECT_EQ(saturating_cast<narrow4>(uwide20::from_internal_value(std::uint32_t{1} << 20)).internal_value(), 16);
+    // upscale from the narrow type into the wide source layout
+    EXPECT_EQ(saturating_cast<wide20>(narrow4::from_internal_value(127)).internal_value(), 127 << 16);
+    // in-range cross casts stay constexpr-friendly
+    constexpr auto cx = saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{1} << 20));
+    static_assert(cx.internal_value() == 16);
 }
 
 TEST(FixedNum, ModwarpArithmetic)
