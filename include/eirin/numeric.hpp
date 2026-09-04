@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <numeric>
+#include <type_traits>
 #include "detail/numeric_traits.hpp"
 #include "fixed.hpp"
 #include "math.hpp"
