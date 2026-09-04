@@ -95,6 +95,32 @@ public:
     static constexpr T max = __eval_max();
     static constexpr T min = __eval_min();
 };
+
+/**
+ * @brief Customization point for the epsilon used by the nearly_* comparison
+ *        functions of a fixed point type.
+ *
+ * The default epsilon is 5/2^16 (0.0000762939453125). Specialize this struct
+ * for a `fixed_num` instantiation to use a different epsilon; the
+ * specialization must set `is_specialized` to `true` and provide a static
+ * constexpr `value` of the fixed point type.
+ *
+ * @code
+ * template <>
+ * struct nearly_compare_epsilon<eirin::fixed32>
+ * {
+ *     static constexpr bool is_specialized = true;
+ *     static constexpr eirin::fixed32 value = eirin::fixed32::from_internal_value(65536);
+ * };
+ * @endcode
+ *
+ * @tparam T the fixed point type whose comparison epsilon is customized.
+ */
+template <typename T>
+struct nearly_compare_epsilon
+{
+    static constexpr bool is_specialized = false;
+};
 } // namespace eirin::detail
 
 #endif

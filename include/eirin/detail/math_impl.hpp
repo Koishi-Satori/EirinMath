@@ -92,9 +92,12 @@ namespace detail
         if(abs(fp) < small_reg_threshold)
             return fp;
 
+        constexpr auto fp_double_pi = 2 * pi;
+        constexpr auto fp_pi_2 = pi / 2;
+
         auto x = fixed(fp);
-        x %= fixed::double_pi();
-        x /= fixed::pi_2();
+        x %= fp_double_pi;
+        x /= fp_pi_2;
         constexpr auto fp1 = fixed(1);
         constexpr auto fp2 = fixed(2);
 

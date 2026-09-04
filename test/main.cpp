@@ -335,6 +335,18 @@ TEST(FixedNum, ValidateSigned128)
 }
 #endif // _MSC_VER
 
+// Customize the nearly_* comparison epsilon for one dedicated test type.
+namespace eirin::detail
+{
+    using custom_nearly_fixed = eirin::fixed_num<std::int16_t, std::int32_t, 8, true>;
+    template <>
+    struct nearly_compare_epsilon<custom_nearly_fixed>
+    {
+        static constexpr bool is_specialized = true;
+        static constexpr custom_nearly_fixed value = custom_nearly_fixed::from_internal_value(4096);
+    };
+} // namespace eirin::detail
+
 TEST(FixedNum, TypeTraits)
 {
     EXPECT_FALSE(detail::has_make_unsigned_v<test_ud_int>);
@@ -394,6 +406,22 @@ TEST(FixedNum, TypeTraits)
     EXPECT_EQ(detail::bit_width(us), std::size_t{18});
     constexpr test_ud_short cus{3, 5}; // (5 << 16) | 3 -> 16 + bit_width(5) = 19
     static_assert(detail::bit_width(cus) == 19u);
+}
+
+TEST(FixedNum, CustomNearlyCompareEpsilon)
+{
+    using custom = eirin::detail::custom_nearly_fixed;
+    EXPECT_EQ(custom::nearly_compare_epsilon().internal_value(), 4096);
+    // Library typedefs keep the built-in epsilon 5/2^16.
+    EXPECT_EQ(fixed32::nearly_compare_epsilon().internal_value(), 5);
+
+    const custom zero = custom::from_internal_value(0);
+    EXPECT_TRUE(zero.nearly_eq(custom::from_internal_value(4096)));
+    EXPECT_TRUE(zero.nearly_eq(custom::from_internal_value(-4096)));
+    EXPECT_FALSE(zero.nearly_eq(custom::from_internal_value(4097)));
+    EXPECT_FALSE(zero.nearly_ne(custom::from_internal_value(4096)));
+    EXPECT_TRUE(zero.nearly_lt(custom::from_internal_value(5000)));
+    EXPECT_TRUE(zero.nearly_gt(custom::from_internal_value(-5000)));
 }
 
 TEST(FixedNum, SaturationArithmetic)

@@ -142,6 +142,14 @@ namespace detail
     }
 } // namespace detail
 
+/**
+ * @brief Add two fixed-point numbers, with saturation in case of overflow.
+ * 
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
+ * @return requires min/max if x + y may overflow, otherwise returns x + y
+ */
 template <typename T>
 requires fixed_point<T>
 EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
@@ -159,6 +167,14 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
         return T::from_internal_value(detail::__any_int_traits<type>::max);
 }
 
+/**
+ * @brief Subtract one fixed-point number from another, with saturation in case of overflow.
+ * 
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
+ * @return requires min/max if x - y may overflow, otherwise returns x - y
+ */
 template <typename T>
 requires fixed_point<T>
 EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
@@ -176,6 +192,14 @@ EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
         return T::from_internal_value(detail::__any_int_traits<type>::max);
 }
 
+/**
+ * @brief Multiply two fixed-point numbers, with saturation in case of overflow.
+ * 
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
+ * @return requires min/max if x * y may overflow, otherwise returns x * y
+ */
 template <typename T>
 requires fixed_point<T>
 EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
@@ -203,6 +227,14 @@ EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
     }
 }
 
+/**
+ * @brief Divide one fixed-point number from another, with saturation in case of overflow.
+ * 
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
+ * @return requires min/max if x / y may overflow, otherwise returns x / y
+ */
 template <typename T>
 requires fixed_point<T>
 EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
@@ -258,7 +290,7 @@ EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
  * of the two intermediate types, so a source storage wider than the
  * destination intermediate is never truncated), before saturation is applied.
  *
- * @tparam T the destination fixed-point type.
+ * @tparam T fixed point type, @see fixed_num
  * @tparam U the source fixed-point type.
  * @param x the source value.
  * @return `x` saturated to the representable range of `T`.
@@ -356,9 +388,9 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
  * computed through the wider intermediate type so no undefined behavior is
  * invoked (unlike plain `operator+`, which overflows the storage type).
  *
- * @tparam T @see fixed_num
- * @param x the first addend.
- * @param y the second addend.
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
  * @return `(x + y) mod 2^N`, where `N` is the bit width of the storage type.
  */
 template <typename T>
@@ -375,9 +407,9 @@ EIRIN_MATH_FUNC_API T modwarp_add(T x, T y) noexcept
 /**
  * @brief Subtract two fixed-point numbers with defined modulo-2^N wrapping.
  *
- * @tparam T @see fixed_num
- * @param x the minuend.
- * @param y the subtrahend.
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
  * @return `(x - y) mod 2^N`, where `N` is the bit width of the storage type.
  */
 template <typename T>
@@ -394,9 +426,9 @@ EIRIN_MATH_FUNC_API T modwarp_sub(T x, T y) noexcept
 /**
  * @brief Multiply two fixed-point numbers with defined modulo-2^N wrapping.
  *
- * @tparam T @see fixed_num
- * @param x the first factor.
- * @param y the second factor.
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
  * @return `(x * y) mod 2^N`, where `N` is the bit width of the storage type.
  */
 template <typename T>
@@ -418,9 +450,9 @@ EIRIN_MATH_FUNC_API T modwarp_mul(T x, T y) noexcept
  * The divisor must not be zero (division by zero stays undefined behavior,
  * as with `operator/`).
  *
- * @tparam T @see fixed_num
- * @param x the dividend.
- * @param y the divisor, must not be zero.
+ * @tparam T fixed point type, @see fixed_num
+ * @param x operand 1
+ * @param y operand 2
  * @return `(x / y) mod 2^N`, where `N` is the bit width of the storage type.
  */
 template <typename T>

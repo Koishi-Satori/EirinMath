@@ -200,27 +200,36 @@ public:
 
     static constexpr fixed_num pi_2()
     {
-        // pi / 2 just need shift the inner value right 1 bit.
-        // so here just set the fraction to 1 less.
-        return from_fixed_num_value<62>(0x6487ED5110B4611All);
+        // exact 61-bit dyadic approximation of pi / 2
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.921fb54442d18468p+0");
     }
 
     static constexpr fixed_num pi_4()
     {
-        // pi / 2 just need shift the inner value right 2 bit.
-        // so here just set the fraction to 2 less.
-        return from_fixed_num_value<63>(0x6487ED5110B4611All);
+        // exact 61-bit dyadic approximation of pi / 4
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.921fb54442d18468p-1");
     }
 
     static constexpr fixed_num double_pi()
     {
-        // pi / 2 just need shift the inner value left 1 bit.
-        // so here just set the fraction to 1 more.
-        return from_fixed_num_value<60>(0x6487ED5110B4611All);
+        // exact 61-bit dyadic approximation of 2 * pi
+        return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.921fb54442d18468p+2");
     }
 
+    /**
+     * @brief Get the epsilon used by the nearly_* comparison functions.
+     *
+     * Defaults to 5/2^16 = 0.0000762939453125. Specialize
+     * `eirin::detail::nearly_compare_epsilon<fixed_num>` to customize the
+     * epsilon for a fixed point type.
+     *
+     * @return the comparison epsilon of this fixed point type.
+     */
     static constexpr fixed_num nearly_compare_epsilon()
     {
+        using custom_epsilon = detail::nearly_compare_epsilon<fixed_num>;
+        if constexpr(custom_epsilon::is_specialized)
+            return custom_epsilon::value;
         // 5/2^16 = 0.0000762939453125
         return detail::eval_const<char, Type, IntermediateType, fraction, rounding>("0x1.4p-14");
     }
@@ -269,6 +278,18 @@ public:
         return m_value % (static_cast<Type>(1) << fraction);
     }
 
+    /**
+     * @brief Evaluate the bit width of the fixed number, similar to std::bit_width, but support any fixed-point number.
+     * 
+     * @tparam IgnoreSignBit should ignore the sign bit, default true. If false, the bit width will be the minimum bit width for two's complement representation.
+     * @return lzcnt of the fixed-point number.
+     * @note For a custom fixed-point storage type, provide a specialization of
+     *       `eirin::int_sequence_generator_traits`: it should produce a
+     *       begin/end iterator that yields every integral "word" of the
+     *       storage type, so the bit width can be computed faster by applying
+     *       `std::bit_width` to each word. Without such a specialization, the
+     *       algorithm falls back to a slower method.
+     */
     template <bool IgnoreSignBit = true>
     EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
     {
@@ -933,7 +954,13 @@ namespace detail
     // parse a C99-style hexfloat literal "0x<hex>[.<hex>][p<exp>]" (no leading
     // sign) into the raw fixed-point value.
     template <typename I>
-    constexpr bool parse_hexfloat(const char* str, size_t len, unsigned int fraction, I& raw) noexcept
+    constexpr bool parse_hexfloat(
+        const char* str,
+        size_t len,
+        unsigned int fraction,
+        I& raw,
+        bool round_half_away = true
+    ) noexcept
     {
         size_t pos = 0;
         if(pos + 1 >= len || str[pos] != '0' || (str[pos + 1] != 'x' && str[pos + 1] != 'X'))
@@ -1043,7 +1070,7 @@ namespace detail
             const unsigned int rsh = static_cast<unsigned int>(-sh);
             if(rsh > I_bits)
                 return false;
-            raw = hexfloat_rshift_round(mant, rsh);
+            raw = round_half_away ? hexfloat_rshift_round(mant, rsh) : static_cast<I>(mant >> rsh);
         }
         (void)truncated;
         return pos == len;
@@ -1096,7 +1123,7 @@ namespace detail
         if(pos + 1 < len && str[pos] == '0' && (str[pos + 1] == 'x' || str[pos + 1] == 'X'))
         {
             // we guess this is hexfloat literals format string.
-            if(!parse_hexfloat(str + pos, len - pos, fixed::precision, fixed_value))
+            if(!parse_hexfloat(str + pos, len - pos, fixed::precision, fixed_value, fixed::is_round_enable))
                 return false;
         }
         else

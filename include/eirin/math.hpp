@@ -35,7 +35,7 @@ constexpr inline fixed64 f64_min = fixed64::from_internal_value(0x80000000000000
 /**
  * @brief Return the maximum representable value of the fixed-point type.
  *
- * @tparam T @see fixed_num
+ * @tparam T fixed point type, @see fixed_num
  * @return the maximum representable value.
  */
 template <fixed_point T>
@@ -47,7 +47,7 @@ EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 /**
  * @brief Return the minimum representable value of the fixed-point type.
  *
- * @tparam T @see fixed_num
+ * @tparam T fixed point type, @see fixed_num
  * @return the minimum representable value.
  */
 template <fixed_point T>
@@ -59,11 +59,11 @@ EIRIN_MATH_SMALL_FUNC_API T min_value() noexcept
 /**
  * @brief Ceiling function of fixed-point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @param fp the input x.
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @param fp the input operand.
  * @return ceil(x) in a fixed-point approximation.
  */
 template <typename T, typename I, unsigned int f, bool r>
@@ -83,10 +83,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> ceil(fixed_num<T, I, f, r> fp) n
 /**
  * @brief Floor function of fixed-point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return floor(x) in a fixed-point approximation.
  */
@@ -108,10 +108,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> floor(fixed_num<T, I, f, r> fp) 
 /**
  * @brief Truncation function of fixed-point number (round toward zero).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return trunc(x) in a fixed-point approximation.
  */
@@ -126,10 +126,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> trunc(fixed_num<T, I, f, r> fp) 
 /**
  * @brief Rounding function of fixed-point number (round half away from zero).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return round(x) in a fixed-point approximation.
  */
@@ -145,10 +145,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> round(fixed_num<T, I, f, r> fp) 
 /**
  * @brief Absolute value function of fixed-point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return |x|.
  */
@@ -163,10 +163,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> abs(fixed_num<T, I, f, r> fp) no
 /**
  * @brief Minimum function of two fixed-point numbers.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param a the first input.
  * @param b the second input.
  * @return the smaller of `a` and `b`.
@@ -182,10 +182,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> min(fixed_num<T, I, f, r> a, fix
 /**
  * @brief Maximum function of two fixed-point numbers.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param a the first input.
  * @param b the second input.
  * @return the larger of `a` and `b`.
@@ -215,10 +215,10 @@ struct frexp_t
  * Returns m with |m| in [0.5, 1) and writes e with x = m * 2^e. When x == 0,
  * m == 0 and e == 0.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the input.
  * @param exponent the output exponent, stored as a fixed-point value.
  * @return the normalized fraction m.
@@ -252,10 +252,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, f
  * m == 0 and e == 0. A null exponent pointer is ignored and the function only
  * returns the normalized fraction.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the input.
  * @param exponent the output exponent, stored as a fixed-point value.
  * @return the normalized fraction m.
@@ -291,10 +291,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, f
  * Same as the fixed-point exponent overload, but writes the exponent to a
  * native integral type.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the input.
  * @param exponent the output exponent, stored as an integral value.
  * @return the normalized fraction m.
@@ -328,10 +328,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, d
  * native integral type. A null exponent pointer is ignored and the function
  * only returns the normalized fraction.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the input.
  * @param exponent the output exponent, stored as an integral value.
  * @return the normalized fraction m.
@@ -366,10 +366,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, d
  *
  * Negative inputs do not throw; they return fixed(-1) as an invalid result.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x, must be non-negative.
  * @return sqrt(x) in a fixed-point approximation.
  */
@@ -447,10 +447,11 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sqrt(fixed_num<T, I, f, r> fp) noexcep
  * cannot provide that many fraction bits (wide_fraction larger than the
  * type's feasible fraction), this function falls back to the Taylor sin().
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
  * @param fp the input angle x.
  * @return sin(fp) in a fixed-point approximation.
  */
@@ -487,11 +488,11 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
 /**
  * @brief cosine function for fixed point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
  * @param fp the input angle x.
  * @return cos(x) in a fixed-point approximation.
  */
@@ -507,10 +508,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> cos(fixed_num<T, I, f, r> fp) noexcept
 /**
  * @brief Tangent function of fixed-point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input angle x.
  * @return tan(x) in a fixed-point approximation.
  * @note When cos(x) is within 1 ulp of zero the function throws
@@ -545,10 +546,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> tan(fixed_num<T, I, f, r> fp) EIRIN_MA
  * 15 <= f <= 20 -> deg7/9;
  * f >= 21 -> deg/7/9/11;
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return atan(x) in a fixed-point approximation.
  * @note To be noticed that, if `decltype(fp)` has no enough precision to store integral part, this function
@@ -578,10 +579,11 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> atan(fixed_num<T, I, f, r> fp) noexcep
  * @brief Arcsin function of fixed-point number.
  * We use different simulation function in different range, similar to `atan`
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
  * @param fp the input x.
  * @return asin(x) in a fixed-point approximation.
  * @note To be noticed that, if `fp` is out of the domain (of arcsin), this
@@ -641,10 +643,11 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> fp) EIRIN_M
  * @brief Arccos function of fixed-point number.
  * We use different simulation function in different range, similar to `atan`
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
  * @param fp the input x.
  * @return acos(x) in a fixed-point approximation.
  * @note To be noticed that, if `fp` is out of the domain (of arccos), this
@@ -670,10 +673,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> acos(fixed_num<T, I, f, r> fp) EIRIN_M
 /**
  * @brief Cube root for fixed point number.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @return cbrt(x) in a fixed-point approximation.
  */
@@ -744,10 +747,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> cbrt(fixed_num<T, I, f, r> fp) noexcep
  * so `b` must not overflow the type's intermediate storage. 0^0 is defined as
  * 1, matching the IEEE convention.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @tparam E integral type, must fit concept `detail::integral`.
  * @param b the pow base.
  * @param e the pow exponent.
@@ -791,10 +794,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, E e) noex
  * the storage type, so the raw-intermediate detail::exp_inline of pow is used
  * (with saturation semantics on overflow).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input exponent.
  * @return exp(x) in a fixed-point approximation.
  * @note This function will perform a default behavior when overflow, means UB.
@@ -816,10 +819,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp(fixed_num<T, I, f, r> fp) noexcept
  * the storage type, so the raw-intermediate detail::exp_inline of pow is used
  * (with saturation semantics on overflow).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input exponent.
  * @return exp(x) in a fixed-point approximation.
  * @note This function will perform a saturation behavior when overflow.
@@ -841,10 +844,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp_sat(fixed_num<T, I, f, r> fp) noex
  * the storage type, so the raw-intermediate detail::exp_inline of pow is used
  * (with saturation semantics on overflow).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input exponent.
  * @return exp(x) in a fixed-point approximation.
  * @note This function will perform a mod-warp behavior when overflow.
@@ -871,10 +874,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> exp_modwarp(fixed_num<T, I, f, r> fp) 
  * would exceed the storage range, so log2 falls back to the raw-intermediate
  * ln machinery used by pow (detail::log_inline).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x, must be positive.
  * @return log2(x) in a fixed-point approximation.
  * @note If `fp` is out of the domain (<= 0), this function will throw
@@ -967,10 +970,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp) EIRIN_M
  * integer part is empty, e.g. Q127), and the constant is a raw 61-bit dyadic
  * so no parse limit applies.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x, must be positive.
  * @return log(fp) in a fixed-point approximation.
  * @note If `fp` is out of the domain (<= 0), this function will throw
@@ -997,10 +1000,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log(fixed_num<T, I, f, r> fp) EIRIN_MA
  *
  * Computed as log2(fp) * log10(2), see log for the motivation.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x, must be positive.
  * @return log10(fp) in a fixed-point approximation.
  * @note If `fp` is out of the domain (<= 0), this function will throw
@@ -1048,10 +1051,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log10(fixed_num<T, I, f, r> fp) EIRIN_
  * Works for any fixed_num<T, I, f, r>, including user-defined and unsigned
  * types; for unsigned types the base must be >= 1 (same restriction as exp).
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param b the base.
  * @param e the exponent.
  * @return b^e as a fixed-point approximation.
@@ -1130,10 +1133,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num
  * @brief Fast pow, use a^b = e^(b * log2(a) * ln2).
  * This function is faster than `pow`, but has accuracy loss.
  * 
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param b the pow base
  * @param e the pow exponent
  * @return b^e as a fixed-point approximation.
@@ -1169,10 +1172,10 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow_fast(fixed_num<T, I, f, r> b, fixe
 /**
  * @brief Remainder of the division of two fixed-point numbers, like std::fmod.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param a the dividend.
  * @param b the divisor.
  * @return a mod b with the sign of `a`.
@@ -1186,10 +1189,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> fmod(fixed_num<T, I, f, r> a, fi
 /**
  * @brief Split a fixed-point number into its integer and fractional parts.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param fp the input x.
  * @param int_part the output integer part (floor(x)).
  * @return the fractional part (x - floor(x)).
@@ -1204,12 +1207,12 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> modf(fixed_num<T, I, f, r> fp, f
 /**
  * @brief convert radian to degree.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param rad
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
+ * @param rad the input angle in radians.
  * @return deg(rad)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -1224,12 +1227,12 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> degrees(fixed_num<T, I, f, r> ra
 /**
  * @brief convert degree to radian.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
- * @tparam pi the pi value, default is pi_v<fixed_num<T, I, f, r>>(). if you want more precision for fixed types like fixed128, you can pass the value you want.
- * @param deg
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
+ * @tparam pi the pi constant, defaults to numbers::pi_v<fixed_num<T, I, f, r>>(); override it for fixed types that need higher pi precision.
+ * @param deg the input angle in degrees.
  * @return rad(deg)
  */
 template <typename T, typename I, unsigned int f, bool r, fixed_num<T, I, f, r> pi = eirin::numbers::pi_v<fixed_num<T, I, f, r>>()>
@@ -1244,10 +1247,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> radians(fixed_num<T, I, f, r> de
 /**
  * @brief Euclidean norm (length) of a 2D vector, like std::hypot.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the x component.
  * @param y the y component.
  * @return sqrt(x^2 + y^2) in a fixed-point approximation.
@@ -1261,10 +1264,10 @@ EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> hypot(fixed_num<T, I, f, r> x, f
 /**
  * @brief Euclidean norm (length) of a 3D vector, like std::hypot.
  *
- * @tparam T @see fixed_num
- * @tparam I @see fixed_num
- * @tparam f @see fixed_num
- * @tparam r @see fixed_num
+ * @tparam T fixed point storage type, @see fixed_num
+ * @tparam I intermediate type, @see fixed_num
+ * @tparam f fraction bits, @see fixed_num
+ * @tparam r if rounding, @see fixed_num
  * @param x the x component.
  * @param y the y component.
  * @param z the z component.
