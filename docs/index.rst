@@ -32,6 +32,7 @@ Contents:
 
    basic
    operators
+   numeric
    io
 
 .. toctree::
