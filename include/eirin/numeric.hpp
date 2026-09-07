@@ -3,145 +3,20 @@
 
 #pragma once
 
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER >= 1937 && (defined(_M_IX86) || defined(_M_X64))
+#    include "intrin.h"
+#endif
+
 #include <type_traits>
+#include <memory>
 #include "detail/numeric_traits.hpp"
+#include "detail/sat_arith.hpp"
 #include "fixed.hpp"
 #include "math.hpp"
 #include "numbers.hpp"
 
 namespace eirin
 {
-namespace detail
-{
-    template <typename T, typename I>
-    concept __has_enough_bits_imul = sizeof(I) >= sizeof(T) * 2;
-
-    /**
-     * @brief Detect overflow of `x + y` in the storage type `T`.
-     *
-     * @tparam T the storage type.
-     * @tparam I the wider intermediate type.
-     * @param x the first addend.
-     * @param y the second addend.
-     * @param z receives the sum truncated back to `T`. This is the exact sum
-     *          when there is no overflow and the mod-2^N wrapped sum when
-     *          there is, so `z` is always usable.
-     * @return `true` iff `x + y` overflows `T`.
-     */
-    template <typename T, typename I>
-    EIRIN_MATH_SMALL_FUNC_API bool __add_overflow(T x, T y, T* z) noexcept
-    {
-        if constexpr(detail::is_signed_v<T> && has_make_unsigned_v<T>)
-        {
-            // use unsigned version to check.
-            using u_type = detail::make_unsigned_t<T>;
-            u_type res = static_cast<u_type>(x) + static_cast<u_type>(y);
-            *z = static_cast<T>(res);
-            constexpr u_type sign_bit = static_cast<u_type>(1) << (std::numeric_limits<u_type>::is_specialized ? std::numeric_limits<u_type>::digits - 1 : sizeof(T) * 8 - 1);
-            const bool pos_overflow = (x > 0 && y > 0 && (res & sign_bit));
-            const bool neg_overflow = (x < 0 && y < 0 && !(res & sign_bit));
-            return pos_overflow || neg_overflow;
-        }
-        I res = static_cast<I>(x) + static_cast<I>(y);
-        *z = static_cast<T>(res);
-        return res > static_cast<I>(detail::__any_int_traits<T>::max) ||
-               res < static_cast<I>(detail::__any_int_traits<T>::min);
-    }
-
-    template <typename T, typename I>
-    EIRIN_MATH_SMALL_FUNC_API bool __sub_overflow(T x, T y, T* z) noexcept
-    {
-        if constexpr(detail::is_signed_v<T> && has_make_unsigned_v<T>)
-        {
-            // use unsigned version to check.
-            // neg - pos can neg overflow, pos - neg can pos overflow
-            using u_type = detail::make_unsigned_t<T>;
-            u_type res = static_cast<u_type>(x) - static_cast<u_type>(y);
-            *z = static_cast<T>(res);
-            constexpr u_type sign_bit = static_cast<u_type>(1) << (std::numeric_limits<u_type>::is_specialized ? std::numeric_limits<u_type>::digits - 1 : sizeof(T) * 8 - 1);
-            const bool pos_overflow = (x >= 0 && y < 0 && (res & sign_bit));
-            const bool neg_overflow = (x < 0 && y >= 0 && !(res & sign_bit));
-            return pos_overflow || neg_overflow;
-        }
-        I res = static_cast<I>(x) - static_cast<I>(y);
-        *z = static_cast<T>(res);
-        return res > static_cast<I>(detail::__any_int_traits<T>::max) ||
-               res < static_cast<I>(detail::__any_int_traits<T>::min);
-    }
-
-    template <typename T, typename I, bool r, unsigned int f>
-    requires __has_enough_bits_imul<T, I>
-    EIRIN_MATH_SMALL_FUNC_API I __mul_scaled(T x, T y) noexcept
-    {
-        const I p = static_cast<I>(x) * static_cast<I>(y);
-        if constexpr(r)
-        {
-            constexpr I fraction_multiplier = I(1) << f;
-            I v = p / (fraction_multiplier / 2);
-            return (v + (v % 2)) >> 1;
-        }
-        else
-        {
-            return p >> f;
-        }
-    }
-
-    template <typename T, typename I, bool r, unsigned int f>
-    requires __has_enough_bits_imul<T, I>
-    EIRIN_MATH_SMALL_FUNC_API bool __mul_overflow(T x, T y, T* z) noexcept
-    {
-        const I res = __mul_scaled<T, I, r, f>(x, y);
-        *z = static_cast<T>(res);
-        return res > static_cast<I>(detail::__any_int_traits<T>::max) ||
-               res < static_cast<I>(detail::__any_int_traits<T>::min);
-    }
-
-    template <typename T, typename I, bool r, unsigned int f>
-    requires __has_enough_bits_imul<T, I>
-    EIRIN_MATH_SMALL_FUNC_API I __div_scaled(T x, T y) noexcept
-    {
-        const I num = static_cast<I>(x) << f; // x * 2^f
-        if constexpr(r)
-        {
-            const I v = (num * 2) / y;
-            return (v + (v % 2)) >> 1;
-        }
-        else
-        {
-            return num / y;
-        }
-    }
-
-    template <typename T, typename I, bool r, unsigned int f, bool modwarp = true>
-    requires __has_enough_bits_imul<T, I>
-    EIRIN_MATH_SMALL_FUNC_API bool __div_overflow(T x, T y, T* z) noexcept
-    {
-        // division by zero has no fixed-point value, so always report overflow.
-        if(y == 0)
-        {
-            *z = T(0);
-            return true;
-        }
-
-        const I res = __div_scaled<T, I, r, f>(x, y);
-
-        const bool overflow = res > static_cast<I>(detail::__any_int_traits<T>::max) ||
-                              res < static_cast<I>(detail::__any_int_traits<T>::min);
-        if(overflow)
-        {
-            if constexpr(modwarp)
-                *z = static_cast<T>(res); // mod-2^N wrapped quotient
-            else
-                *z = T(0); // caller saturates and ignores z
-        }
-        else
-        {
-            *z = static_cast<T>(res);
-        }
-        return overflow;
-    }
-} // namespace detail
-
 /**
  * @brief Add two fixed-point numbers, with saturation in case of overflow.
  * 
@@ -379,6 +254,100 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
     }
 
     return T::from_internal_value(static_cast<res_type>(scaled));
+}
+
+/// Add two integers, with saturation in case of overflow.
+template <typename T>
+requires detail::__saturating_arithmetic_type<T>
+EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
+{
+#if defined(_MSC_VER) || defined(__clang__)
+    // according to the discussion with contributors of MSVC-STL,
+    // to keep the same style of potential implementation style,
+    // we use this kind of code.
+    // it will produce 2 `add` + 1 `cmovno` to prevent branches on both MSVC and Clang.
+    // branchless will perform one extra `add` but not depend on data.
+    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    {
+        constexpr auto shifts = detail::__any_int_traits<T>::digits;
+        T saturated = (static_cast<detail::make_unsigned_t<T>>(y) >> shifts) + detail::__any_int_traits<T>::max;
+        T z;
+        bool overflowed = detail::__integral_add_overflow(x, y, std::addressof(z));
+        return !overflowed ? z : saturated;
+    }
+#endif
+    T z;
+    if(!detail::__integral_add_overflow(x, y, std::addressof(z)))
+        return z;
+    if constexpr(detail::is_unsigned_v<T>)
+        return detail::__any_int_traits<T>::max;
+    else if(x < 0)
+        return detail::__any_int_traits<T>::min;
+    else
+        return detail::__any_int_traits<T>::max;
+}
+
+/// Subtract one integer from another, with saturation in case of overflow.
+template <typename T>
+requires detail::__saturating_arithmetic_type<T>
+EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
+{
+#if defined(_MSC_VER) || defined(__clang__)
+    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    {
+        T saturated = x >= y ? detail::__any_int_traits<T>::max : detail::__any_int_traits<T>::min;
+        T z;
+        bool overflowed = detail::__integral_sub_overflow(x, y, std::addressof(z));
+        return !overflowed ? z : saturated;
+    }
+#endif
+    T z;
+    if(!detail::__integral_sub_overflow(x, y, std::addressof(z)))
+        return z;
+    if constexpr(detail::is_unsigned_v<T>)
+        return detail::__any_int_traits<T>::min;
+    else if(x < 0)
+        return detail::__any_int_traits<T>::min;
+    else
+        return detail::__any_int_traits<T>::max;
+}
+
+/// Multiply two integers, with saturation in case of overflow.
+template <typename T>
+requires detail::__saturating_arithmetic_type<T>
+EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
+{
+#if defined(_MSC_VER) || defined(__clang__)
+    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    {
+        T saturated = (x < 0) ^ (y < 0) ? detail::__any_int_traits<T>::min : detail::__any_int_traits<T>::max;
+        T z;
+        bool overflowed = detail::__integral_mul_overflow(x, y, std::addressof(z));
+        return !overflowed ? z : saturated;
+    }
+#endif
+    T z;
+    if(!detail::__integral_mul_overflow(x, y, std::addressof(z)))
+        return z;
+    if constexpr(detail::is_unsigned_v<T>)
+        return detail::__any_int_traits<T>::max;
+    else if((x < 0) ^ (y < 0))
+        return detail::__any_int_traits<T>::min;
+    else
+        return detail::__any_int_traits<T>::max;
+}
+
+/// Divide one integer from another, with saturation in case of overflow.
+template <typename T>
+requires detail::__saturating_arithmetic_type<T>
+EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
+{
+    if(detail::is_unsigned_v<T>)
+        return x / y;
+    else if(x == detail::__any_int_traits<T>::min && y == -1)
+        return detail::__any_int_traits<T>::max;
+    else
+        return x / y;
 }
 
 /**

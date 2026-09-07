@@ -26,6 +26,13 @@
 #    define EIRIN_ALWAYS_INLINE inline
 #endif
 
+#if defined(__cplusplus) && __cplusplus >= 202302L && defined(__cpp_consteval) && __cpp_consteval >= 202211L
+#    define EIRIN_IF_CONSTEVAL if consteval
+#else
+#    include <type_traits>
+#    define EIRIN_IF_CONSTEVAL if(std::is_constant_evaluated())
+#endif
+
 #if defined(__EXCEPTIONS) && __EXCEPTIONS != EIRIN_ENABLE
 #    define EIRIN_NO_EXCEPTIONS
 #endif
