@@ -36,6 +36,21 @@ target("eirin_fixed.tvec.benchmark")
     --     os.cp("$(scriptdir)/*.in", target:targetdir() .. "/benchmark_input/")
     -- end)
 
+target("eirin_fixed.sat_arith.benchmark")
+    set_kind("binary")
+    if is_plat("wasm") then
+        set_extension(".js")
+    end
+    add_includedirs(".", {public = true})
+    add_files("./bench_sat_arith.cpp", "./bench.cpp")
+    add_deps("eirin_fixed")
+    add_packages("benchmark")
+    -- add -Wmaybe-uninitialized on linux to catch uninitialized variable usage
+    -- to be noticed that in windows/msvc this flag is not available
+    if is_os("linux") then
+        add_cxxflags("-Wmaybe-uninitialized", {force = true})
+    end
+
 if has_config("eirin_build_advanced_benchmark") and get_config("eirin_build_advanced_benchmark") == true then
     target("eirin_fixed.perf")
         set_kind("binary")

@@ -754,7 +754,8 @@ public:
             if(value < 0)
             {
                 put_char('-');
-                value = -value;
+                // fixed: C4146 on MSVC.
+                value = static_cast<Type>(0) - value;
             }
             int_part = value >> fraction;
         }
