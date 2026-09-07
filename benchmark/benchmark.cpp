@@ -832,6 +832,8 @@ BENCHMARK(f64_cordic_sin)->Args({4096});
 BENCHMARK(f64_cbrt)->Args({4096});
 #endif
 
+BENCHMARK_MAIN();
+
 // on windows/msvc, -Wmaybe-uninitialized is not available
 // so we can use #pragma to ignore the warning there
 #ifdef _MSC_VER

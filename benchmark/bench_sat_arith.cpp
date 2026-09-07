@@ -195,3 +195,5 @@ BENCHMARK(i64_div_sat)->Args({4096});
 BENCHMARK(sat_cast_i64_to_i32)->Args({4096});
 BENCHMARK(sat_cast_i64_to_u32)->Args({4096});
 BENCHMARK(sat_cast_u64_to_u32)->Args({4096});
+
+BENCHMARK_MAIN();
