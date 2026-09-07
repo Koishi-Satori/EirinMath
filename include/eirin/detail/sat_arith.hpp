@@ -235,9 +235,11 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __integral_add_overflow(_Tp x, _Tp y, _Tp* z) noexcept
     {
-#if defined(__has_builtin) && __has_builtin(__builtin_add_overflow)
+#if defined(__has_builtin)
+#    if __has_builtin(__builtin_add_overflow)
         if constexpr(std::is_integral_v<_Tp>)
             return __builtin_add_overflow(x, y, z);
+#    endif
 #endif
         // we have _add_overflow_i8/16/32 on MSVC, and i64 ver is only defined for _M_X64
 #if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER >= 1937 && (defined(_M_IX86) || defined(_M_X64))
@@ -270,8 +272,10 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __integral_sub_overflow(_Tp x, _Tp y, _Tp* z) noexcept
     {
-#if defined(__has_builtin) && __has_builtin(__builtin_sub_overflow)
+#if defined(__has_builtin)
+#    if __has_builtin(__builtin_sub_overflow)
         return __builtin_sub_overflow(x, y, z);
+#    endif
 #endif
         // we have _sub_overflow_i8/16/32 on MSVC, and i64 ver is only defined for _M_X64
 #if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER >= 1937 && (defined(_M_IX86) || defined(_M_X64))
@@ -304,8 +308,10 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __integral_mul_overflow(_Tp x, _Tp y, _Tp* z) noexcept
     {
-#if defined(__has_builtin) && __has_builtin(__builtin_mul_overflow)
+#if defined(__has_builtin)
+#    if __has_builtin(__builtin_mul_overflow)
         return __builtin_mul_overflow(x, y, z);
+#    endif
 #endif
         // we have _mul[_full]_overflow_xxx on MSVC, and i64/u64 ver is only defined for _M_X64
 #if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER >= 1937 && (defined(_M_IX86) || defined(_M_X64))
