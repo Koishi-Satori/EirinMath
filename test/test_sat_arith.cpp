@@ -49,33 +49,22 @@ namespace
         using L = std::numeric_limits<T>;
         constexpr T min = L::min();
         constexpr T max = L::max();
-        constexpr auto mask = sizeof(T) >= 8
-                                  ? ~std::uint64_t(0)
-                                  : (std::uint64_t(1) << (sizeof(T) * 8)) - 1;
 
         for(int i = 0; i < 4000; ++i)
         {
-            const T x = static_cast<T>(rng() & mask);
-            T y = static_cast<T>(rng() & mask);
-            if constexpr(!is_signed_v<T>)
-            {
-                // keep the divisor non-zero
-                if(y == 0)
-                    y = T(1);
-            }
-            else
-            {
-                if(y == 0)
-                    y = T(1);
-            }
+            // casting a uniform 64-bit draw to T keeps the low N bits uniform
+            const T x = static_cast<T>(rng());
+            T y = static_cast<T>(rng());
+            if(y == 0) // keep the divisor non-zero
+                y = T(1);
 
             if constexpr(is_signed_v<T>)
             {
                 const std::int64_t xl = x;
                 const std::int64_t yl = y;
-                const std::int64_t lo = min;
-                const std::int64_t hi = max;
-                auto clamp = [lo, hi](std::int64_t v)
+                constexpr std::int64_t lo = static_cast<std::int64_t>(min);
+                constexpr std::int64_t hi = static_cast<std::int64_t>(max);
+                auto clamp = [](std::int64_t v)
                 {
                     return v > hi ? static_cast<T>(hi) : (v < lo ? static_cast<T>(lo) : static_cast<T>(v));
                 };
@@ -90,8 +79,8 @@ namespace
             {
                 const std::uint64_t xl = x;
                 const std::uint64_t yl = y;
-                const std::uint64_t hi = max;
-                auto clamp = [hi](std::uint64_t v)
+                constexpr std::uint64_t hi = static_cast<std::uint64_t>(max);
+                auto clamp = [](std::uint64_t v)
                 {
                     return v > hi ? static_cast<T>(hi) : static_cast<T>(v);
                 };
@@ -124,7 +113,7 @@ namespace
 
             if constexpr(sign)
             {
-                auto clamp = [lo, hi](__int128 v)
+                auto clamp = [](__int128 v)
                 {
                     return v > hi ? static_cast<T>(hi) : (v < lo ? static_cast<T>(lo) : static_cast<T>(v));
                 };
@@ -137,8 +126,8 @@ namespace
             {
                 const auto raw_u = static_cast<unsigned __int128>(x);
                 const auto raw_v = static_cast<unsigned __int128>(y);
-                const auto raw_mx = static_cast<unsigned __int128>(L::max());
-                auto clamp = [raw_mx](unsigned __int128 v)
+                constexpr auto raw_mx = static_cast<unsigned __int128>(L::max());
+                auto clamp = [](unsigned __int128 v)
                 {
                     return v > raw_mx ? static_cast<T>(raw_mx) : static_cast<T>(v);
                 };
@@ -194,12 +183,9 @@ namespace
     template <typename From, typename To>
     void check_cast_random(std::mt19937_64& rng)
     {
-        constexpr auto mask = sizeof(From) >= 8
-                                  ? ~std::uint64_t(0)
-                                  : (std::uint64_t(1) << (sizeof(From) * 8)) - 1;
         for(int i = 0; i < 4000; ++i)
         {
-            const From v = static_cast<From>(rng() & mask);
+            const From v = static_cast<From>(rng());
             EXPECT_EQ((saturating_cast<To>(v)), (cast_ref<From, To>(v)));
         }
     }
