@@ -342,12 +342,48 @@ template <typename T>
 requires detail::__saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
 {
-    if(detail::is_unsigned_v<T>)
+    if constexpr(detail::is_unsigned_v<T>)
         return x / y;
     else if(x == detail::__any_int_traits<T>::min && y == -1)
         return detail::__any_int_traits<T>::max;
     else
         return x / y;
+}
+
+/// Type casting, with saturation in case of overflow.
+template <typename Res, typename T>
+requires detail::__saturating_arithmetic_type<T> && detail::__saturating_arithmetic_type<Res>
+EIRIN_MATH_FUNC_API Res saturating_cast(T x) noexcept
+{
+    constexpr auto digits_res = detail::__any_int_traits<Res>::digits;
+    constexpr auto digits_in = detail::__any_int_traits<T>::digits;
+    constexpr Res max_res = detail::__any_int_traits<Res>::max;
+
+    if constexpr(detail::is_signed_v<Res> && detail::is_signed_v<T>)
+    {
+        if constexpr(digits_res < digits_in)
+        {
+            constexpr Res min_res = detail::__any_int_traits<Res>::min;
+
+            if(x < static_cast<T>(min_res))
+                return min_res;
+            else if(x > static_cast<T>(max_res))
+                return max_res;
+        }
+    }
+    else if constexpr(detail::is_signed_v<T>)
+    {
+        if(x < 0)
+            return 0;
+        else if(detail::make_unsigned_t<T>(x) > max_res)
+            return max_res;
+    }
+    else
+    {
+        if(x > detail::make_unsigned_t<Res>(max_res))
+            return max_res;
+    }
+    return static_cast<Res>(x);
 }
 
 /**
