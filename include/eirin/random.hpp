@@ -16,7 +16,7 @@ namespace eirin
 namespace detail
 {
     template <typename T, T state, T multiplier, T increment, T mix_multiplier, T xor_multiplier>
-    concept pcg_params_check = std::is_unsigned_v<T>;
+    concept pcg_params_check = is_unsigned_v<T>;
 
     template <typename FixedType, typename _RandomNumberEngine>
     concept fixed_random_engine_type_check = requires {
@@ -32,13 +32,13 @@ namespace detail
  * PCG is a family of simple fast space-efficient statistically good algorithms for random number generation.
  * Unlike many general-purpose RNGs, they are also hard to predict.
  * And in this instance, we use a state counter.
- * 
+ *
  * @tparam UIntType unsigned int type, use for parameters and return type.
  * @tparam state initial state.
- * @tparam multiplier 
- * @tparam increment 
- * @tparam mix_multiplier 
- * @tparam xor_multiplier 
+ * @tparam multiplier
+ * @tparam increment
+ * @tparam mix_multiplier
+ * @tparam xor_multiplier
  */
 template <typename UIntType, UIntType state, UIntType multiplier, UIntType increment, UIntType mix_multiplier, UIntType xor_multiplier>
 requires detail::pcg_params_check<UIntType, state, multiplier, increment, mix_multiplier, xor_multiplier>
@@ -165,7 +165,7 @@ inline std::basic_ostream<charT, charTraits>& operator<<(std::basic_ostream<char
 
 /**
  * @brief A adapter for standard random engines to support fixed point types, which fits RandomNumberEngine requirements.
- * 
+ *
  * @tparam FixedType Fixed point type, must satisfy concept `is_fixed_point_v`.
  * @tparam _RandomNumberEngine The underlying random number engine type.
  */
@@ -255,7 +255,7 @@ typedef permuted_congruential_engine<uint64_t, 0x0, 0x5851F42D4C957F2D, 0x9E3779
 
 // /**
 //  * @brief Temporary test function for random number generator, remove it in the future.
-//  * 
+//  *
 //  */
 // inline void test()
 // {

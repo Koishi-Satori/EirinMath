@@ -3,18 +3,21 @@
 
 // IWYU pragma: begin_exports
 
+#include "macro.hpp"
+#include "ext/config.hpp"
 #include "fixed.hpp"
+#include "numeric.hpp"
 #include "math.hpp"
 #include "io/parse.hpp"
-#include "macro.hpp"
 #include "numbers.hpp"
 #include "random.hpp"
+#include "vec.hpp"
 
 // IWYU pragma: end_exports
 
 #define EIRIN_MATH_MAJOR_VERSION 1
-#define EIRIN_MATH_MINOR_VERSION 2
-#define EIRIN_MATH_PATCH_VERSION 0
+#define EIRIN_MATH_MINOR_VERSION 5
+#define EIRIN_MATH_PATCH_VERSION 2
 
 #include <tuple>
 

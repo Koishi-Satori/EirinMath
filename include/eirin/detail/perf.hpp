@@ -5,8 +5,8 @@
 
 #include <cmath>
 #include <cstdio>
-#include "int128.hpp"
 #include "../eirin.hpp"
+#include "int128.hpp"
 
 namespace eirin
 {
@@ -26,7 +26,7 @@ namespace perf
     };
 
     template <typename T, typename Func, typename StdFunc>
-    esp_ret<T> measure_esp(T start, T end, T step, Func func, StdFunc std_func, T (initializer)(int64_t))
+    esp_ret<T> measure_esp(T start, T end, T step, Func func, StdFunc std_func, T(initializer)(int64_t))
     {
         T max_esp = initializer(0), min_esp = initializer(0XFF), max_input = initializer(0), min_input = initializer(0);
         for(T x = start; x <= end; x += step)

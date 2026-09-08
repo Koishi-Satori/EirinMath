@@ -1,22 +1,31 @@
-# EirinFixed
+# EirinMath
 
 - Other language: [中文](README.zh-CN.md)
 
-A flexible and high-performance C++ fixed point number library, provides fixed point template class, high precision mathematical operations and basic input and output functions. You can run the benchmarks ```fixed.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double. Also the benchmark results have been provided in the benchmark directory, running in AMD laptop CPU R7-7735H, with [-O3](benchmark/fixed_benchmark_O3.txt) and [-O2](benchmark/fixed_benchmark_O2.txt) optimization.
+A flexible, high-performance and header-only C++ fixed point number mathematics library, provides fixed point template class, high precision mathematical operations and basic input and output functions. You can run the benchmarks ```fixed.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double. 
 
-It also provides a pre-defined 32bit-width fixed point, with 16bit precision(```fixed32```), and 64bit-width fixed point, with 32bit precision(```fixed64```).
+*EirinMath* also provides a pre-defined 32bit-width fixed point, with 16bit precision(```fixed32```), and 64bit-width fixed point, with 32bit precision(```fixed64```).
 The fixed points require same calculation result in different platforms, devices, operator systems and compilers, and this library fulfills this requirement.
 Notice that the fixed64 uses some int128 compiler extension as its IntermediateType, and some compiler might not support it. The ```__msvc_int128.hpp``` in MSVC provides ```std::_Signed128``` and ```std::_Unsigned128```, Clang and GCC in Linux provide ```__int128```.
 
+As an extra function, *EirinMath* provides the vector class `tvec<T, N>`, and its partial specialization versions in `vec.hpp`. *EirinMath* allows you to use swizzle operators like GLSL, but with function call `()`, e.g.
+
+``` c++
+eirin::f64vec4 v{495, 514_f64, 19, 0};
+eirin::ivec4 vi{114, 514.0, 0, 0};
+v.xyz() += 1_f32;
+vi.xyzw() = eirin::ivec4{1, 2, 3, 4} + v.xyxy();
+```
+
+## Fixed point library
 
 ### Create Fixed Point
 
 You can create a fixed point number with integral or floating types using constructor and literals.
 
 - The literals now only provides for fixed32 and fixed64.
-- The way of constructing from floating type is not that recommended.
-    - Reason: Floating point error in different platforms, devices, operator systems and compilers.
-    - The fixed point needs to make sure same result in different situations.
+- Constructing from floating‑point types is not recommended in cross‑platform code, because the binary representation of floating‑point constants may differ across platforms/compilers, leading to inconsistent results. Use string‑based literals instead.
+
 ```c++
 #include <eirin/fixed.hpp>
 
@@ -43,7 +52,7 @@ You can also create a fixed point from std::basic_istream or strings.
 - ```f32_from_cstring``` and ```fixed_from_cstring``` will return true on success.
 - the ```parse``` functions needs to pass the end of the string.
     - it will stops when meeting the **first char** of the end string.
-    - for example, 114a.514a will only parse "114" part.
+    - for example, 114a.514a will parse only "114".
 
 ```c++
 #include <eirin/fixed.hpp>
@@ -159,12 +168,220 @@ Supported functions:
 - log2/log/log10
 - pow/exp
 
-### Supported Compilers
+## Vector Library
 
-Requires at least C++20.
+*EirinMath* provides a vector library with a GLSL swizzle support.
 
-- xmake >= v2.2.2
-- Any C++ compiler that supports C++20
+### Create Vector
+
+Vectors are provided by the `tvec<N, T>` template, with aliases for common types:
+- `vec2<T>`, `vec3<T>`, `vec4<T>` (using `tvec<N, T>`)
+- Pre‑defined aliases: `vec2i`, `vec3i`, `vec4fixed64`, `vec4fixed32`, etc. (see `vec.hpp`)
+- The aliases naming is `vec[dimensions][type][width,optional]`, e.g. `vec2i32`, `vec3f128`, `vec3fixed64`, etc.
+
+| Vec Type |  int  | float |  fixed-int   | fixed-float  |  fixed point number   |
+| -------- | ----- | ----- | ------------ | ------------ | --------------------- |
+| vec2     | vec2i | vec2f | vec2i[width] | vec2f[width] | vec2fixed<T, I, f, r> |
+| vec3     | vec2i | vec2f | vec2i[width] | vec2f[width] | vec3fixed<T, I, f, r> |
+| vec4     | vec2i | vec2f | vec2i[width] | vec2f[width] | vec4fixed<T, I, f, r> |
+
+Constructors:
+
+```c++
+#include <eirin/vec.hpp>
+
+using namespace eirin;
+
+int main()
+{
+    // Default construction (uninitialised)
+    vec2<int> v1;
+
+    // Scalar – all components set to same value
+    vec3<float> v2(1.0f);
+
+    // Explicit component‑wise
+    vec4<int> v3(1, 2, 3, 4);
+
+    // From another vector (implicit conversion)
+    vec2<float> v4(v3);   // converts components to float
+
+    // From a smaller vector plus extra components
+    vec3<double> v5(vec2<double>(1.0, 2.0), 3.0);
+
+    // Uniform initialisation with braces
+    vec4<int> v6{1, 2, 3, 4};
+    return 0;
+}
+```
+
+### Access Elements
+
+Elements are accessed via named members `.x`, `.y`, `.z`, `.w` and also via `operator[]`.
+
+```c++
+vec4<int> v{1, 2, 3, 4};
+v.x = 10;
+int a = v[2];   // a = 3
+```
+
+### Swizzle Operations
+
+*EirinMath* supports swizzle masks using function‑call syntax `.xy()`, `.xyz()`, `.yxw()`, etc. The mask length can be 2, 3, or 4 components, and components may be repeated (e.g. `.xx()`, `.xyx()`).
+
+- Read from a swizzle returns a new vector of the mask length.
+- Write to a swizzle (via assignment) is allowed if the mask length matches the right‑hand side vector dimension.
+- Compound assignments (`+=`, `-=`, `*=`, `/=`, etc.) are supported for swizzle expressions, provided the mask length matches the vector dimension.
+
+```c++
+vec4<int> v{1, 2, 3, 4};
+
+// Read
+auto v2 = v.xy();               // v2 = (1, 2)
+auto v3 = v.zyx();              // v3 = (3, 2, 1)
+
+// Write
+v.xy() = vec2<int>{5, 6};       // v = (5, 6, 3, 4)
+v.xz() += vec2<int>{1, 1};      // v = (6, 6, 4, 4)
+
+// Repeated indices are allowed for reads
+auto xx = v.xx();               // (6, 6) – reading twice
+
+// For writes, repeated indices as lvalue are disallowed:
+v.xx() = vec2<int>{7, 8};       // compile failed.
+```
+
+> Note: Just Like GLSL/GLM, *EirinMath* also does not permit repeated indices in modifying swizzle expressions (e.g. `v.xx() += 1`).
+
+### Vector Operators and Functions
+
+Vectors support the usual arithmetic operators (`+`, `-`, `*`, `/`, `%`, bitwise `&`, `|`, `^`, shifts) both with scalars and vectors of compatible dimensions.
+
+```c++
+vec2<int> a{1, 2}, b{3, 4};
+auto c = a + b;               // (4, 6)
+auto d = a * 2;               // (2, 4)
+auto e = 3 * a;               // (3, 6)
+a += b;                       // a becomes (4, 6)
+```
+
+`tvec` provides a rich set of utility functions:
+- `dot` – dot product
+- `cross` – cross product (only for 2/3‑component vectors, because vector cross products are only defines on 3 or 7 dim.)
+
+### Saturating Arithmetic
+
+Since before C++26, the saturating arithmetic is not provided by the C++ Standard Library, *EirinMath* provides an implementation that is accurate, data-independent, as high-performance as possible, and as branch-free as possible.
+
+The saturating arithmetic functions are declared in `numeric.hpp`, and available for both fixed point number and integral types (can be custom type).
+
+```c++
+int32_t a = INT32_MAX, b = INT32_MIN;
+int32_t res = eirin::saturating_add(a, a); // INT32_MAX
+res = eirin::saturating_add(b, b);         // INT32_MIN
+res = eirin::saturating_sub(a, b);         // INT32_MAX
+res = eirin::saturating_mul(a, a);         // INT32_MAX
+res = eirin::saturating_mul(a, b);         // INT32_MIN
+res = eirin::saturating_div(b, -1);        // INT32_MAX
+res = eirin::saturating_cast(INT64_MAX);   // INT32_MAX
+```
+
+### Custom Integral Type
+
+The saturating helpers in `numeric.hpp` work on any integer-like storage type,
+but a user-defined integer is not recognized automatically: it must opt in
+through the traits below. `include/eirin/ext/builtin_ints.hpp` (the
+`eirin::ext::int128` / `uint128` specializations) is a complete reference
+implementation you can copy from.
+
+To use a custom type `my_int` with the `saturating_*` functions, specialize:
+
+- `eirin::detail::is_integral<my_int>` — the opt-in switch that enables the
+  saturating overloads;
+- `eirin::detail::is_signed<my_int>` or `eirin::detail::is_unsigned<my_int>` —
+  exactly one of them must report `true` so overflow direction is known;
+- `std::numeric_limits<my_int>` — provides `digits` and `min()`/`max()`/
+  `lowest()`, which are the saturation bounds.
+
+```c++
+namespace eirin::detail
+{
+template <>
+struct is_integral<my_int> : public std::true_type
+{};
+
+template <>
+struct is_signed<my_int> : public std::true_type
+{};
+} // namespace eirin::detail
+
+namespace std
+{
+template <>
+class numeric_limits<my_int>
+{
+public:
+    static constexpr bool is_specialized = true;
+    static constexpr bool is_signed = true;
+    static constexpr bool is_integer = true;
+    static constexpr int digits = 127;
+    static constexpr int radix = 2;
+
+    static constexpr my_int(min)() noexcept { /* INT128_MIN */ }
+    static constexpr my_int(max)() noexcept { /* INT128_MAX */ }
+    static constexpr my_int lowest() noexcept { return (min)(); }
+};
+} // namespace std
+```
+
+The type itself must also provide the plain integer operations the algorithms
+rely on (`+ - * / %`, shifts, unary minus, comparisons and conversions), all
+`constexpr`.
+
+Two more traits are optional:
+
+- `eirin::detail::make_unsigned<my_int>` (and `make_signed` for the unsigned
+  counterpart) enables the branchless overflow path in `saturating_*`, and is
+  required when the type is used as `fixed_num` storage. When no unsigned
+  counterpart exists, the saturating helpers detect that and fall back to the
+  generic path.
+
+```c++
+namespace eirin::detail
+{
+template <>
+struct make_unsigned<my_int>
+{
+    using type = my_uint;
+};
+
+template <>
+struct make_signed<my_uint, true>
+{
+    using type = my_int;
+};
+} // namespace eirin::detail
+```
+
+- `eirin::int_sequence_generator<my_int, Word>` lets `detail::bit_width` (and
+  therefore `fixed_num::bit_width()`) split a big integer into words instead of
+  using the slower generic loop. Inherit
+  `eirin::detail::__int_sequence_generator_base`, set
+  `is_specialized = true`, and provide `constexpr` `begin()`/`end()` returning
+  an iterator with `operator*`, `operator++` and `operator!=`. Words are
+  yielded least significant first; `test/main.cpp` contains working examples
+  for both 64-bit and 16-bit word types.
+
+## Supported Compilers
+
+Requires at least **C++20**.
+
+- Build System: xmake >= v2.2.2
+- Compilers:
+    - Any C++ compiler that supports **C++20**.
+    - Clang >= 10
+    - GCC >= 10
+    - MSVC >= 19.22 (VS 2019 16.2)
 
 ## License
 [MIT](LICENSE) License

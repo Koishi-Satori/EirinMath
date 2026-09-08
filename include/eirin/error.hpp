@@ -29,9 +29,25 @@ namespace detail
 } // namespace detail
 
 #define EIRIN_THROW_EXCEPTION(Exception, ...)                     \
-    do {                                                          \
+    do                                                            \
+    {                                                             \
         ::eirin::detail::throw_exception<Exception>(__VA_ARGS__); \
     } while(0)
 } // namespace eirin
+
+// math function domain-error behavior. By default the functions throw
+// std::domain_error when the input is out of the function domain (or call
+// std::terminate() when EIRIN_NO_EXCEPTIONS is defined, see macros before).
+// Define EIRIN_MATH_DOMAIN_SILENT to make them return a sentinel value
+// instead; the sentinel is documented per function in math.hpp.
+// Also, this will cause some function which not marked as `noexcept` before
+// marked as `noexcept`.
+#ifdef EIRIN_MATH_DOMAIN_SILENT
+#    define EIRIN_MATH_DOMAIN_ERROR(msg, ret) return (ret)
+#    define EIRIN_MATH_TRY_NOEXCEPT noexcept
+#else
+#    define EIRIN_MATH_DOMAIN_ERROR(msg, ret) EIRIN_THROW_EXCEPTION(std::domain_error, msg)
+#    define EIRIN_MATH_TRY_NOEXCEPT
+#endif
 
 #endif

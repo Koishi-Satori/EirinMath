@@ -36,6 +36,12 @@ jobs:
 
           - name: Benchmark
             run: xmake run --verbose eirin_fixed.benchmark
+
+          - name: Benchmark (Vec Library)
+            run: xmake run --verbose eirin_fixed.tvec.benchmark
+
+          - name: Benchmark (Saturating Arithmetic)
+            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
           
           - name: Benchmark (For Compare)
             run: xmake run --verbose double.benchmark
@@ -80,6 +86,12 @@ jobs:
 
           - name: Benchmark
             run: xmake run --verbose eirin_fixed.benchmark
+
+          - name: Benchmark (Vec Library)
+            run: xmake run --verbose eirin_fixed.tvec.benchmark
+
+          - name: Benchmark (Saturating Arithmetic)
+            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
           
           - name: Benchmark (For Compare)
             run: xmake run --verbose double.benchmark
@@ -123,6 +135,12 @@ jobs:
 
           - name: Benchmark
             run: xmake run --verbose eirin_fixed.benchmark
+
+          - name: Benchmark (Vec Library)
+            run: xmake run --verbose eirin_fixed.tvec.benchmark
+
+          - name: Benchmark (Saturating Arithmetic)
+            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
           
           - name: Benchmark (For Compare)
             run: xmake run --verbose double.benchmark
@@ -167,6 +185,12 @@ jobs:
 
           - name: Benchmark
             run: node build/wasm/wasm32/release/eirin_fixed.benchmark.js
+
+          - name: Benchmark (Vec Library)
+            run: node build/wasm/wasm32/release/eirin_fixed.tvec.benchmark.js
+
+          - name: Benchmark (Saturating Arithmetic)
+            run: node build/wasm/wasm32/release/eirin_fixed.sat_arith.benchmark.js
           
           - name: Benchmark (For Compare)
             run: node build/wasm/wasm32/release/double.benchmark.js

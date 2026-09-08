@@ -1,15 +1,708 @@
+#include "test_config.hpp"
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <random>
 #include <eirin/eirin.hpp>
 #include <eirin/io/format.hpp>
 #include <eirin/ext/cordic.hpp>
+#include <eirin/ext/builtin_ints.hpp>
 #include <eirin/detail/util.hpp>
 #include <eirin/detail/perf.hpp>
 
+#ifdef _MSC_VER
+#    include <__msvc_int128.hpp>
+#endif
+
 #ifdef EIRIN_DEV_TEST_MODE
-#include <eirin/ext/simd_math.hpp>
+#    include <eirin/ext/simd_math.hpp>
 #endif
 
 using namespace eirin;
+
+// user defined int128 test
+struct test_ud_int
+{
+    long long lo;
+    long long hi;
+
+    constexpr test_ud_int() = default;
+
+    explicit constexpr test_ud_int(long long v)
+        : lo(v), hi(v < 0 ? -1 : 0)
+    {}
+
+    constexpr test_ud_int operator<<(unsigned int s) const
+    {
+        return test_ud_int(lo << s);
+    }
+
+    // MSVC will check the unused static members, so we need to provide minus operator
+    // in case of preventing compile failed.
+    friend constexpr test_ud_int operator-(test_ud_int a) noexcept
+    {
+        const auto lo_ = 0ull - static_cast<unsigned long long>(a.lo);
+        const auto hi_ = 0ull - static_cast<unsigned long long>(a.hi) - (a.lo != 0 ? 1ull : 0ull);
+        test_ud_int r;
+        r.lo = static_cast<long long>(lo_);
+        r.hi = static_cast<long long>(hi_);
+        return r;
+    }
+
+    friend constexpr test_ud_int operator-(test_ud_int a, test_ud_int b) noexcept
+    {
+        const auto alo = static_cast<unsigned long long>(a.lo);
+        const auto blo = static_cast<unsigned long long>(b.lo);
+        const auto lo_ = alo - blo;
+        const auto hi_ = static_cast<unsigned long long>(a.hi) - static_cast<unsigned long long>(b.hi) -
+                         (alo < blo ? 1ull : 0ull);
+        test_ud_int r;
+        r.lo = static_cast<long long>(lo_);
+        r.hi = static_cast<long long>(hi_);
+        return r;
+    }
+
+    friend constexpr test_ud_int operator-(test_ud_int a, long long b) noexcept
+    {
+        return a - test_ud_int(b);
+    }
+
+    explicit constexpr operator long long() const noexcept
+    {
+        return lo;
+    }
+
+    explicit constexpr operator unsigned long long() const noexcept
+    {
+        return static_cast<unsigned long long>(lo);
+    }
+
+    explicit constexpr operator long() const noexcept
+    {
+        return static_cast<long>(lo);
+    }
+};
+
+static_assert(sizeof(test_ud_int) > sizeof(std::int64_t));
+
+namespace eirin::detail
+{
+template <>
+struct is_integral<test_ud_int> : public std::true_type
+{};
+
+template <>
+struct is_signed<test_ud_int> : public std::true_type
+{};
+} // namespace eirin::detail
+
+// user-defined big-int: split into two uint64 words (lo first, little-endian).
+template <eirin::detail::bit_width_word OutType>
+requires std::is_same_v<OutType, std::uint64_t>
+struct eirin::int_sequence_generator<test_ud_int, OutType> : eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>
+{
+    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>;
+    static constexpr bool is_specialized = true;
+
+    struct it
+    {
+        const test_ud_int* p;
+        int idx;
+
+        constexpr typename base_t::word_type operator*() const
+        {
+            return idx == 0 ? static_cast<typename base_t::word_type>(p->lo) : static_cast<typename base_t::word_type>(p->hi);
+        }
+
+        constexpr it& operator++() noexcept
+        {
+            ++idx;
+            return *this;
+        }
+
+        constexpr bool operator!=(const it& o) const noexcept
+        {
+            return idx != o.idx;
+        }
+    };
+
+    static constexpr it begin(const test_ud_int& v) noexcept
+    {
+        return it{&v, 0};
+    }
+
+    static constexpr it end(const test_ud_int& v) noexcept
+    {
+        return it{&v, 2};
+    }
+};
+
+// another user big-int, specialized only for 16-bit words (full specialization
+// inheriting the base keeps `word_type` visible): exercises the word-type
+// probing in `detail::bit_width`.
+struct test_ud_short
+{
+    unsigned short lo;
+    unsigned short hi;
+};
+
+template <>
+struct eirin::int_sequence_generator<test_ud_short, unsigned short>
+    : eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>
+{
+    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>;
+    static constexpr bool is_specialized = true;
+
+    struct it
+    {
+        const test_ud_short* p;
+        int idx;
+
+        constexpr typename base_t::word_type operator*() const
+        {
+            return idx == 0 ? p->lo : p->hi;
+        }
+
+        constexpr it& operator++() noexcept
+        {
+            ++idx;
+            return *this;
+        }
+
+        constexpr bool operator!=(const it& o) const noexcept
+        {
+            return idx != o.idx;
+        }
+    };
+
+    static constexpr it begin(const test_ud_short& v) noexcept
+    {
+        return it{&v, 0};
+    }
+
+    static constexpr it end(const test_ud_short& v) noexcept
+    {
+        return it{&v, 2};
+    }
+};
+
+#ifdef _MSC_VER
+namespace
+{
+using msvc_int128 = std::_Signed128;
+using eirin_int128 = eirin::ext::int128;
+
+// build a 128-bit value from hi+lo words.
+template <typename Int>
+Int create_int128(std::uint64_t lo, std::uint64_t hi);
+
+template <>
+inline msvc_int128 create_int128<msvc_int128>(std::uint64_t lo, std::uint64_t hi)
+{
+    msvc_int128 m;
+    m._Word[0] = lo;
+    m._Word[1] = hi;
+    return m;
+}
+
+template <>
+inline eirin_int128 create_int128<eirin_int128>(std::uint64_t lo, std::uint64_t hi)
+{
+    return eirin_int128{static_cast<std::int64_t>(hi), static_cast<std::int64_t>(lo)};
+}
+
+std::uint64_t low_word(const msvc_int128& x) noexcept
+{
+    return x._Word[0];
+}
+
+std::uint64_t high_word(const msvc_int128& x) noexcept
+{
+    return x._Word[1];
+}
+
+std::uint64_t low_word(const eirin_int128& x) noexcept
+{
+    return static_cast<std::uint64_t>(x.low_bits());
+}
+
+std::uint64_t high_word(const eirin_int128& x) noexcept
+{
+    return static_cast<std::uint64_t>(x.high_bits());
+}
+
+void expect_same_int128(const char* what, const msvc_int128& m, const eirin_int128& e)
+{
+    EXPECT_EQ(low_word(m), low_word(e)) << what;
+    EXPECT_EQ(high_word(m), high_word(e)) << what;
+}
+} // namespace
+
+TEST(FixedNum, ValidateSigned128)
+{
+    // eirin::ext::int128 must be a drop-in replacement for the MSVC STL's
+    // std::_Signed128: the same two's-complement (low, high) word layout and
+    // identical modulo-2^128 semantics for every operator both classes share.
+    const auto check_pair = [](std::uint64_t lo_lhs, std::uint64_t hi_lhs, std::uint64_t lo_rhs, std::uint64_t hi_rhs)
+    {
+        const msvc_int128 ma = create_int128<msvc_int128>(lo_lhs, hi_lhs);
+        const msvc_int128 mb = create_int128<msvc_int128>(lo_rhs, hi_rhs);
+        const eirin_int128 ea = create_int128<eirin_int128>(lo_lhs, hi_lhs);
+        const eirin_int128 eb = create_int128<eirin_int128>(lo_rhs, hi_rhs);
+
+        expect_same_int128("a + b", ma + mb, ea + eb);
+        expect_same_int128("a - b", ma - mb, ea - eb);
+        expect_same_int128("-a", -ma, -ea);
+        expect_same_int128("a * b", ma * mb, ea * eb);
+
+        // INT128_MIN / -1 overflows the signed range (the quotient does not
+        // fit), so it is not part of the equivalence contract; a zero divisor
+        // is undefined as well.
+        const bool is_min = lo_lhs == 0 && hi_lhs == 0x8000000000000000ull;
+        const bool is_neg_one = lo_rhs == 0xFFFFFFFFFFFFFFFFull && hi_rhs == 0xFFFFFFFFFFFFFFFFull;
+        if((lo_rhs != 0 || hi_rhs != 0) && !(is_min && is_neg_one))
+        {
+            expect_same_int128("a / b", ma / mb, ea / eb);
+            expect_same_int128("a % b", ma % mb, ea % eb);
+        }
+
+        expect_same_int128("~a", ~ma, ~ea);
+
+        // The STL class narrows the shift count to unsigned char, so the two
+        // classes are only required to agree for counts 0..127.
+        for(const std::uint32_t s : {0u, 1u, 7u, 63u, 64u, 65u, 127u})
+        {
+            expect_same_int128("a << s", ma << create_int128<msvc_int128>(s, 0), ea << s);
+            expect_same_int128("a >> s", ma >> create_int128<msvc_int128>(s, 0), ea >> s);
+        }
+
+        EXPECT_EQ(ma == mb, ea == eb);
+        EXPECT_EQ(ma != mb, ea != eb);
+        EXPECT_EQ(ma < mb, ea < eb);
+        EXPECT_EQ(ma <= mb, ea <= eb);
+        EXPECT_EQ(ma > mb, ea > eb);
+        EXPECT_EQ(ma >= mb, ea >= eb);
+
+        auto m2 = ma;
+        auto e2 = ea;
+        m2 += mb;
+        e2 += eb;
+        expect_same_int128("a += b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        m2 -= mb;
+        e2 -= eb;
+        expect_same_int128("a -= b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        m2 *= mb;
+        e2 *= eb;
+        expect_same_int128("a *= b", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        ++m2;
+        ++e2;
+        expect_same_int128("++a", m2, e2);
+        m2 = ma;
+        e2 = ea;
+        --m2;
+        --e2;
+        expect_same_int128("--a", m2, e2);
+    };
+
+    constexpr std::uint64_t lo_edges[] = {0, 1, 0x7FFFFFFFFFFFFFFFull, 0x8000000000000000ull, 0xFFFFFFFFFFFFFFFFull};
+    constexpr std::uint64_t hi_edges[] = {0, 1, 0x7FFFFFFFFFFFFFFFull, 0x8000000000000000ull, 0xFFFFFFFFFFFFFFFFull};
+    for(const auto hi_lhs : hi_edges)
+    {
+        for(const auto lo_lhs : lo_edges)
+        {
+            for(const auto hi_rhs : hi_edges)
+            {
+                for(const auto lo_rhs : lo_edges)
+                {
+                    check_pair(hi_lhs, lo_lhs, hi_rhs, lo_rhs);
+                }
+            }
+        }
+    }
+
+    std::mt19937_64 rng(0x1919810);
+    for(int i = 0; i < 114514; ++i)
+    {
+        check_pair(rng(), rng(), rng(), rng());
+    }
+}
+#endif // _MSC_VER
+
+// Customize the nearly_* comparison epsilon for one dedicated test type.
+namespace eirin::detail
+{
+    using custom_nearly_fixed = eirin::fixed_num<std::int16_t, std::int32_t, 8, true>;
+    template <>
+    struct nearly_compare_epsilon<custom_nearly_fixed>
+    {
+        static constexpr bool is_specialized = true;
+        static constexpr custom_nearly_fixed value = custom_nearly_fixed::from_internal_value(4096);
+    };
+} // namespace eirin::detail
+
+TEST(FixedNum, TypeTraits)
+{
+    EXPECT_FALSE(detail::has_make_unsigned_v<test_ud_int>);
+    EXPECT_TRUE(detail::has_make_unsigned_v<int64_t>);
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_TRUE(detail::has_make_unsigned_v<detail::int128_t>);
+#endif
+
+    bool f = std::is_same_v<detail::make_unsigned_t<int64_t>, uint64_t>;
+    EXPECT_TRUE(f);
+#ifdef EIRIN_MATH_HAS_INT128
+    f = std::is_same_v<detail::make_unsigned_t<detail::int128_t>, detail::uint128_t>;
+    EXPECT_TRUE(f);
+#endif
+
+    // int_sequence_generator: placeholder vs. user partial specialization.
+    EXPECT_FALSE((int_sequence_generator<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((int_sequence_generator<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<int_sequence_generator<test_ud_int, uint64_t>::word_type, uint64_t>));
+
+    // int_sequence_generator_traits mirrors the generator contract for consumers.
+    EXPECT_FALSE((int_sequence_generator_traits<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((int_sequence_generator_traits<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<int_sequence_generator_traits<test_ud_int, uint64_t>::word_type, uint64_t>));
+    EXPECT_EQ((int_sequence_generator_traits<test_ud_int, uint64_t>::word_bits), std::size_t{64});
+
+    // placeholder: begin == end (empty range), dereference is well-defined.
+    auto p_it = int_sequence_generator<int, uint64_t>::begin(0);
+    const auto p_end = int_sequence_generator<int, uint64_t>::end(0);
+    EXPECT_TRUE(p_it == p_end);
+    EXPECT_EQ(*p_it, std::uint64_t{0});
+
+    // specialized: little-endian words, bit_width = highest_nonzero_word_index * 64 + bit_width(top_word).
+    constexpr auto make_ud = [](long long lo, long long hi) constexpr
+    {
+        test_ud_int v;
+        v.lo = lo;
+        v.hi = hi;
+        return v;
+    };
+    EXPECT_EQ(detail::bit_width(make_ud(0, 0)), std::size_t{0});
+    EXPECT_EQ(detail::bit_width(make_ud(1, 0)), std::size_t{1});
+    EXPECT_EQ(detail::bit_width(make_ud(0, 1)), std::size_t{65}); // 1 << 64
+    EXPECT_EQ(detail::bit_width(make_ud(1, 1)), std::size_t{65}); // (1 << 64) | 1
+    EXPECT_EQ(detail::bit_width(make_ud(5, 7)), std::size_t{67}); // (7 << 64) | 5
+    EXPECT_EQ(detail::bit_width(make_ud(-1, 1)), std::size_t{65}); // lo = 0xFFFFFFFFFFFFFFFF
+    EXPECT_EQ(detail::bit_width(make_ud(0x7FFFFFFFFFFFFFFF, 0x8000000000000000)), std::size_t{128});
+
+    constexpr auto constexpr_bw = detail::bit_width(make_ud(5, 7));
+    static_assert(constexpr_bw == 67u);
+
+    // 16-bit word specialization: `detail::bit_width` probes the standard
+    // unsigned word types and finds this one.
+    EXPECT_TRUE((int_sequence_generator_traits<test_ud_short, uint16_t>::is_specialized));
+    EXPECT_EQ((int_sequence_generator_traits<test_ud_short, uint16_t>::word_bits), std::size_t{16});
+    test_ud_short us{1, 2}; // (2 << 16) | 1 -> 16 + bit_width(2) = 18
+    EXPECT_EQ(detail::bit_width(us), std::size_t{18});
+    constexpr test_ud_short cus{3, 5}; // (5 << 16) | 3 -> 16 + bit_width(5) = 19
+    static_assert(detail::bit_width(cus) == 19u);
+}
+
+TEST(FixedNum, CustomNearlyCompareEpsilon)
+{
+    using custom = eirin::detail::custom_nearly_fixed;
+    EXPECT_EQ(custom::nearly_compare_epsilon().internal_value(), 4096);
+    // Library typedefs keep the built-in epsilon 5/2^16.
+    EXPECT_EQ(fixed32::nearly_compare_epsilon().internal_value(), 5);
+
+    const custom zero = custom::from_internal_value(0);
+    EXPECT_TRUE(zero.nearly_eq(custom::from_internal_value(4096)));
+    EXPECT_TRUE(zero.nearly_eq(custom::from_internal_value(-4096)));
+    EXPECT_FALSE(zero.nearly_eq(custom::from_internal_value(4097)));
+    EXPECT_FALSE(zero.nearly_ne(custom::from_internal_value(4096)));
+    EXPECT_TRUE(zero.nearly_lt(custom::from_internal_value(5000)));
+    EXPECT_TRUE(zero.nearly_gt(custom::from_internal_value(-5000)));
+}
+
+TEST(FixedNum, SaturationArithmetic)
+{
+    // normal additions match plain arithmetic
+    EXPECT_EQ(saturating_add(1.5_f32, 2.25_f32), 3.75_f32);
+    EXPECT_EQ(saturating_add(-1.5_f32, 2.25_f32), 0.75_f32);
+    EXPECT_EQ(saturating_add(-0.5_f32, -0.25_f32), -0.75_f32);
+    EXPECT_EQ(saturating_add(0_f32, 0_f32), 0_f32);
+
+    // positive overflow saturates to max
+    EXPECT_EQ(saturating_add(f32_max, 1_f32), f32_max);
+    EXPECT_EQ(saturating_add(f32_max, f32_max), f32_max);
+    EXPECT_EQ(saturating_add(100_f32, f32_max), f32_max);
+
+    // negative overflow saturates to min
+    EXPECT_EQ(saturating_add(f32_min, -1_f32), f32_min);
+    EXPECT_EQ(saturating_add(f32_min, f32_min), f32_min);
+    EXPECT_EQ(saturating_add(-100_f32, f32_min), f32_min);
+
+    // mixed signs never overflow
+    EXPECT_EQ(saturating_add(f32_max, f32_min), fixed32::from_internal_value(-1)); // internal -1 = -2^-16
+    EXPECT_EQ(saturating_add(f32_max, -1_f32), f32_max - 1_f32);
+    EXPECT_EQ(saturating_add(f32_min, 1_f32), f32_min + 1_f32);
+
+    // constexpr path
+    constexpr auto sat = saturating_add(f32_max, 1_f32);
+    static_assert(sat == f32_max);
+
+    // unsigned storage takes the intermediate-type fallback path
+    using uq32 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    constexpr uq32 uq_max = uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max());
+    EXPECT_EQ(saturating_add(uq_max, uq32(1)), uq_max);
+    EXPECT_EQ(saturating_add(uq_max, uq_max), uq_max);
+    EXPECT_EQ(saturating_add(uq32(100), uq32(200)), uq32(300));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_add(1.5_f64, 2.25_f64), 3.75_f64);
+    EXPECT_EQ(saturating_add(f64_max, 1_f64), f64_max);
+    EXPECT_EQ(saturating_add(f64_min, -1_f64), f64_min);
+    EXPECT_EQ(saturating_add(f64_max, f64_min), fixed64::from_internal_value(-1)); // internal -1 = -2^-32
+#endif
+
+    // normal subtractions match plain arithmetic
+    EXPECT_EQ(saturating_sub(3.75_f32, 2.25_f32), 1.5_f32);
+    EXPECT_EQ(saturating_sub(-1.5_f32, 2.25_f32), -3.75_f32);
+    EXPECT_EQ(saturating_sub(-0.5_f32, -0.25_f32), -0.25_f32);
+    EXPECT_EQ(saturating_sub(0_f32, 0_f32), 0_f32);
+    EXPECT_EQ(saturating_sub(5_f32, -3_f32), 8_f32);
+
+    // positive overflow saturates to max (x >= 0, y < 0)
+    EXPECT_EQ(saturating_sub(f32_max, -1_f32), f32_max);
+    EXPECT_EQ(saturating_sub(f32_max, f32_min), f32_max);
+    // the x == 0 edge: 0 - INT_MIN also overflows positive
+    EXPECT_EQ(saturating_sub(0_f32, f32_min), f32_max);
+
+    // negative overflow saturates to min (x < 0, y >= 0)
+    EXPECT_EQ(saturating_sub(f32_min, 1_f32), f32_min);
+    EXPECT_EQ(saturating_sub(f32_min, f32_max), f32_min);
+
+    // no overflow at the exact boundary
+    EXPECT_EQ(saturating_sub(f32_min, fixed32::from_internal_value(-1)),
+              fixed32::from_internal_value(static_cast<std::int32_t>(0x80000000) + 1));
+
+    // constexpr path
+    constexpr auto cs = saturating_sub(f32_min, 1_f32);
+    static_assert(cs == f32_min);
+
+    // unsigned storage underflows to zero
+    EXPECT_EQ(saturating_sub(uq32(100), uq32(200)), uq32(0));
+    EXPECT_EQ(saturating_sub(uq32(200), uq32(100)), uq32(100));
+    EXPECT_EQ(saturating_sub(uq32(0), uq32(1)), uq32(0));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_sub(3.75_f64, 2.25_f64), 1.5_f64);
+    EXPECT_EQ(saturating_sub(f64_max, -1_f64), f64_max);
+    EXPECT_EQ(saturating_sub(f64_min, 1_f64), f64_min);
+    EXPECT_EQ(saturating_sub(0_f64, f64_min), f64_max);
+#endif
+
+    // --- saturating_mul ---
+    EXPECT_EQ(saturating_mul(1.5_f32, 2.25_f32), 3.375_f32);
+    EXPECT_EQ(saturating_mul(-2_f32, 3_f32), -6_f32);
+    EXPECT_EQ(saturating_mul(0_f32, f32_max), 0_f32);
+    // positive overflow saturates to max (same signs)
+    EXPECT_EQ(saturating_mul(f32_max, 2_f32), f32_max);
+    EXPECT_EQ(saturating_mul(f32_max, f32_max), f32_max);
+    EXPECT_EQ(saturating_mul(f32_min, f32_min), f32_max);
+    // negative overflow saturates to min (opposite signs)
+    EXPECT_EQ(saturating_mul(f32_min, 2_f32), f32_min);
+    EXPECT_EQ(saturating_mul(f32_max, -2_f32), f32_min);
+
+    // constexpr path
+    constexpr auto cm = saturating_mul(2_f32, 3_f32);
+    static_assert(cm == 6_f32);
+
+    // rounded variant rounds half away from zero
+    using rnd32 = fixed_num<std::int32_t, std::int64_t, 16, true>;
+    EXPECT_EQ(saturating_mul(rnd32::from_internal_value(32768), rnd32::from_internal_value(1)).internal_value(), 1);  // 0.5 ulp -> 1
+    EXPECT_EQ(saturating_mul(rnd32::from_internal_value(-32768), rnd32::from_internal_value(1)).internal_value(), -1); // -0.5 ulp -> -1
+
+    // unsigned storage saturates to max
+    EXPECT_EQ(saturating_mul(uq32(100), uq32(200)), uq32(20000));
+    EXPECT_EQ(saturating_mul(uq_max, uq32(2)), uq_max);
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_mul(1.5_f64, 2.25_f64), 3.375_f64);
+    EXPECT_EQ(saturating_mul(f64_max, 2_f64), f64_max);
+    EXPECT_EQ(saturating_mul(f64_min, 2_f64), f64_min);
+#endif
+
+    // --- saturating_div ---
+    EXPECT_EQ(saturating_div(3.75_f32, 1.5_f32), 2.5_f32);
+    EXPECT_EQ(saturating_div(-3.75_f32, 1.5_f32), -2.5_f32);
+    EXPECT_EQ(saturating_div(0_f32, f32_max), 0_f32);
+    // quotient of min/max is -1.0 + epsilon: representable, no overflow
+    EXPECT_EQ(saturating_div(f32_min, f32_max), -1_f32);
+    // dividing by values below 1 amplifies
+    EXPECT_EQ(saturating_div(f32_max, 0.5_f32), f32_max);
+    EXPECT_EQ(saturating_div(f32_min, 0.5_f32), f32_min);
+    EXPECT_EQ(saturating_div(f32_max, -0.5_f32), f32_min);
+    EXPECT_EQ(saturating_div(f32_min, -0.5_f32), f32_max);
+    // note: dividing by zero is undefined behavior (precondition y != 0),
+    // matching std::saturating_div.
+
+    // constexpr path
+    constexpr auto cd = saturating_div(6_f32, 2_f32);
+    static_assert(cd == 3_f32);
+
+    // rounded variant rounds half away from zero
+    EXPECT_EQ(saturating_div(rnd32::from_internal_value(1), rnd32::from_internal_value(131072)).internal_value(), 1); // 0.5 ulp -> 1
+    EXPECT_EQ(saturating_div(rnd32::from_internal_value(-1), rnd32::from_internal_value(131072)).internal_value(), -1);
+
+    // unsigned storage
+    EXPECT_EQ(saturating_div(uq32(200), uq32(100)), uq32(2));
+    EXPECT_EQ(saturating_div(uq_max, uq32::from_internal_value(32768)), uq_max); // /0.5 overflows
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_div(3.75_f64, 1.5_f64), 2.5_f64);
+    EXPECT_EQ(saturating_div(f64_max, 0.5_f64), f64_max);
+    EXPECT_EQ(saturating_div(f64_min, 0.5_f64), f64_min);
+#endif
+
+    // --- saturating_cast ---
+    // same fraction, destination wider: exact pass-through (no clamp needed)
+    using s64w = fixed_num<std::int64_t, detail::int128_t, 16, false>;
+    EXPECT_EQ(saturating_cast<s64w>(f32_max).internal_value(), std::int64_t{0x7FFFFFFF});
+    EXPECT_EQ(saturating_cast<s64w>(-1.5_f32).internal_value(), std::int64_t{-98304});
+    constexpr auto cc = saturating_cast<s64w>(1.5_f32);
+    static_assert(cc.internal_value() == std::int64_t{98304});
+
+    // same fraction, destination narrower: clamp both ends
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(std::int64_t{1} << 40)).internal_value(), f32_max.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(-(std::int64_t{1} << 40))).internal_value(), f32_min.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(s64w::from_internal_value(123456)).internal_value(), 123456);
+
+    // cross fraction: value-preserving upscale (f16 -> f32) and truncating downscale
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(saturating_cast<fixed64>(3.75_f32).internal_value(), std::int64_t{16106127360LL}); // 3.75 * 2^32
+    EXPECT_EQ(saturating_cast<fixed32>(3.75_f64).internal_value(), 245760);                     // 3.75 * 2^16
+    EXPECT_EQ(saturating_cast<fixed32>(-0.1_f64).internal_value(), -6553);                      // trunc toward zero
+    EXPECT_EQ(saturating_cast<fixed32>(40000.0_f64), f32_max);                                  // saturate up
+    EXPECT_EQ(saturating_cast<fixed32>(-40000.0_f64), f32_min);                                 // saturate down
+    // rounding destination (r = true) matches the converting constructor
+    using rnd32 = fixed_num<std::int32_t, std::int64_t, 16, true>;
+    EXPECT_EQ(saturating_cast<rnd32>(0.1_f64).internal_value(), rnd32(0.1_f64).internal_value());
+#endif
+
+    // signed -> unsigned: negative saturates to 0, upper bound preserved
+    EXPECT_EQ(saturating_cast<uq32>(f32_min).internal_value(), 0u);
+    EXPECT_EQ(saturating_cast<uq32>(f32_max).internal_value(), std::uint32_t{0x7FFFFFFF});
+    // unsigned -> signed: upper bound saturates to max
+    EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(0xFFFFFFFFu)).internal_value(), f32_max.internal_value());
+    EXPECT_EQ(saturating_cast<fixed32>(uq32::from_internal_value(1000u)).internal_value(), 1000);
+
+    // source storage wider than the destination intermediate: the value must
+    // be scaled and clamped without first truncating through the narrower
+    // intermediate type.
+    using wide20 = fixed_num<std::int32_t, std::int64_t, 20, false>;
+    using narrow4 = fixed_num<std::int8_t, std::int16_t, 4, false>;
+    using narrow4r = fixed_num<std::int8_t, std::int16_t, 4, true>;
+    using uwide20 = fixed_num<std::uint32_t, std::uint64_t, 20, false>;
+
+    const auto wide_max = wide20::from_internal_value(std::numeric_limits<std::int32_t>::max());
+    const auto wide_min = wide20::from_internal_value(std::numeric_limits<std::int32_t>::min());
+    // value-preserving downscale
+    EXPECT_EQ(saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{1} << 20)).internal_value(), 16);  // 1.0
+    EXPECT_EQ(saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{3} << 19)).internal_value(), 24);  // 1.5
+    EXPECT_EQ(saturating_cast<narrow4r>(wide20::from_internal_value(std::int32_t{1} << 20)).internal_value(), 16); // 1.0
+    // clamp both ends instead of wrapping through int16
+    EXPECT_EQ(saturating_cast<narrow4>(wide_max).internal_value(), 127);
+    EXPECT_EQ(saturating_cast<narrow4>(wide_min).internal_value(), -128);
+    EXPECT_EQ(saturating_cast<narrow4r>(wide_max).internal_value(), 127);
+    // rounding (r = true) matches the converting constructor on in-range values
+    const auto mid = wide20::from_internal_value((std::int32_t{1} << 20) + (std::int32_t{1} << 15)); // 1.03125
+    EXPECT_EQ(saturating_cast<narrow4>(mid).internal_value(), 16);
+    EXPECT_EQ(saturating_cast<narrow4r>(mid).internal_value(), narrow4r(mid).internal_value());
+    EXPECT_EQ(saturating_cast<narrow4r>(mid).internal_value(), 17);
+    const auto neg_mid = wide20::from_internal_value(-((std::int32_t{1} << 20) + (std::int32_t{1} << 15)));
+    EXPECT_EQ(saturating_cast<narrow4r>(neg_mid).internal_value(), narrow4r(neg_mid).internal_value());
+    EXPECT_EQ(saturating_cast<narrow4r>(neg_mid).internal_value(), -17);
+    // unsigned source into a narrow signed destination
+    EXPECT_EQ(saturating_cast<narrow4>(uwide20::from_internal_value(std::numeric_limits<std::uint32_t>::max())).internal_value(), 127);
+    EXPECT_EQ(saturating_cast<narrow4>(uwide20::from_internal_value(std::uint32_t{1} << 20)).internal_value(), 16);
+    // upscale from the narrow type into the wide source layout
+    EXPECT_EQ(saturating_cast<wide20>(narrow4::from_internal_value(127)).internal_value(), 127 << 16);
+    // in-range cross casts stay constexpr-friendly
+    constexpr auto cx = saturating_cast<narrow4>(wide20::from_internal_value(std::int32_t{1} << 20));
+    static_assert(cx.internal_value() == 16);
+}
+
+TEST(FixedNum, ModwarpArithmetic)
+{
+    // --- modwarp_add ---
+    EXPECT_EQ(modwarp_add(1.5_f32, 2.25_f32), 3.75_f32);
+    EXPECT_EQ(modwarp_add(-1.5_f32, 2.25_f32), 0.75_f32);
+    // positive overflow wraps to the low end
+    EXPECT_EQ(modwarp_add(f32_max, fixed32::from_internal_value(1)), f32_min);
+    EXPECT_EQ(modwarp_add(f32_max, f32_max), fixed32::from_internal_value(-2));
+    // negative overflow wraps to the high end
+    EXPECT_EQ(modwarp_add(f32_min, fixed32::from_internal_value(-1)), f32_max);
+    EXPECT_EQ(modwarp_add(f32_min, f32_min), 0_f32);
+    // mixed signs never overflow
+    EXPECT_EQ(modwarp_add(f32_max, f32_min), fixed32::from_internal_value(-1));
+
+    // constexpr path (wrap is well-defined)
+    constexpr auto cw = modwarp_add(f32_max, fixed32::from_internal_value(1));
+    static_assert(cw == f32_min);
+
+    // --- modwarp_sub ---
+    EXPECT_EQ(modwarp_sub(3.75_f32, 2.25_f32), 1.5_f32);
+    EXPECT_EQ(modwarp_sub(1.5_f32, 2.25_f32), -0.75_f32);
+    // underflow wraps to the high end
+    EXPECT_EQ(modwarp_sub(f32_min, fixed32::from_internal_value(1)), f32_max);
+    // positive overflow wraps to the low end
+    EXPECT_EQ(modwarp_sub(f32_max, fixed32::from_internal_value(-1)), f32_min);
+    constexpr auto csub = modwarp_sub(5_f32, 3_f32);
+    static_assert(csub == 2_f32);
+
+    // --- modwarp_mul ---
+    EXPECT_EQ(modwarp_mul(2_f32, 3_f32), 6_f32);
+    EXPECT_EQ(modwarp_mul(1.5_f32, 2.25_f32), 3.375_f32);
+    EXPECT_EQ(modwarp_mul(-2_f32, 3_f32), -6_f32);
+    // scaled product wraps modulo 2^32: (2^31-1)^2 >> 16 mod 2^32 = 0xFFFF0000
+    EXPECT_EQ(modwarp_mul(f32_max, f32_max), fixed32::from_internal_value(-65536));
+    constexpr auto cmul = modwarp_mul(2_f32, 3_f32);
+    static_assert(cmul == 6_f32);
+
+    // --- modwarp_div ---
+    EXPECT_EQ(modwarp_div(6_f32, 2_f32), 3_f32);
+    EXPECT_EQ(modwarp_div(3.75_f32, 1.5_f32), 2.5_f32);
+    EXPECT_EQ(modwarp_div(-3.75_f32, 1.5_f32), -2.5_f32);
+    // (2^31-1)<<16 mod 2^32 = 0xFFFF0000
+    EXPECT_EQ(modwarp_div(f32_max, fixed32::from_internal_value(1)), fixed32::from_internal_value(-65536));
+    constexpr auto cdiv = modwarp_div(6_f32, 2_f32);
+    static_assert(cdiv == 3_f32);
+    // note: dividing by zero is undefined behavior (precondition y != 0)
+
+    // --- unsigned storage wraps modulo 2^32 ---
+    using uq32 = fixed_num<std::uint32_t, std::uint64_t, 16, false>;
+    constexpr uq32 uq_max = uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max());
+    EXPECT_EQ(modwarp_add(uq_max, uq32::from_internal_value(1)), uq32(0));
+    EXPECT_EQ(modwarp_add(uq_max, uq_max), uq32::from_internal_value(std::numeric_limits<std::uint32_t>::max() - 1));
+    EXPECT_EQ(modwarp_sub(uq32(0), uq32(1)), uq32::from_internal_value(0xFFFF0000u)); // 0 - 1.0 wraps to 0xFFFF0000
+    EXPECT_EQ(modwarp_mul(uq_max, uq_max), uq32::from_internal_value(0xFFFE0000u));
+    EXPECT_EQ(modwarp_div(uq32(200), uq32(100)), uq32(2));
+    EXPECT_EQ(modwarp_div(uq_max, uq32::from_internal_value(1)), uq32::from_internal_value(0xFFFF0000u));
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(modwarp_add(1.5_f64, 2.25_f64), 3.75_f64);
+    EXPECT_EQ(modwarp_add(f64_max, fixed64::from_internal_value(1)), f64_min);
+    EXPECT_EQ(modwarp_add(f64_min, fixed64::from_internal_value(-1)), f64_max);
+    EXPECT_EQ(modwarp_sub(3.75_f64, 2.25_f64), 1.5_f64);
+    EXPECT_EQ(modwarp_sub(f64_min, fixed64::from_internal_value(1)), f64_max);
+    EXPECT_EQ(modwarp_mul(2_f64, 3_f64), 6_f64);
+    EXPECT_EQ(modwarp_mul(f64_max, f64_max), fixed64::from_internal_value(-4294967296LL));
+    EXPECT_EQ(modwarp_div(3.75_f64, 1.5_f64), 2.5_f64);
+    EXPECT_EQ(modwarp_div(f64_max, fixed64::from_internal_value(1)), fixed64::from_internal_value(-4294967296LL));
+#endif
+}
 
 TEST(FixedNum, Construct)
 {
@@ -25,6 +718,66 @@ TEST(FixedNum, Construct)
 #endif
 }
 
+TEST(FixedNum, UserDefinedTypes)
+{
+    // user defined
+    using ud_fixed = fixed_num<std::int64_t, test_ud_int, 32, false>;
+    using ud_fixed_round = fixed_num<std::int64_t, test_ud_int, 32, true>;
+
+    const ud_fixed a(0.5);
+    EXPECT_EQ(a.internal_value(), fixed64(0.5).internal_value());
+
+    const ud_fixed b(114.514);
+    EXPECT_EQ(b.internal_value(), fixed64(114.514).internal_value());
+
+    const ud_fixed c(-114.514);
+    EXPECT_EQ(c.internal_value(), fixed64(-114.514).internal_value());
+
+    // rounding flavour: round-half-away on the scaled value; 0.1*2^16 has a
+    // fractional part of 0.6, so rounding adds exactly 1 raw unit.
+    const ud_fixed_round d(0.1);
+    const ud_fixed_round e(-0.1);
+    const ud_fixed plain(0.1);
+    EXPECT_EQ(d.internal_value(), plain.internal_value() + 1);
+    EXPECT_EQ(e.internal_value(), -plain.internal_value() - 1);
+}
+
+TEST(FixedNum, RoundingConstructor)
+{
+    // Regression: the builtin-intermediate rounding branch used to multiply the
+    // scaled value by 0.5 (val * 2^f * 0.5) instead of adding 0.5, so
+    // fixed_num<..., true>(0.1) produced 0.1*2^(f-1). Both flavours must now
+    // round half-away from zero on the scaled value.
+    using fixed32r = fixed_num<int32_t, int64_t, 16, true>;
+    using fixed64r = fixed_num<int64_t, detail::int128_t, 32, true>;
+
+    EXPECT_EQ(fixed32r(0.1).internal_value(), static_cast<int32_t>(0.1 * 65536.0) + 1);
+    EXPECT_EQ(fixed32r(-0.1).internal_value(), -static_cast<int32_t>(0.1 * 65536.0) - 1);
+    EXPECT_EQ(fixed32r(0.5).internal_value(), fixed32(0.5).internal_value());
+    EXPECT_EQ(fixed32r(1.5).internal_value(), fixed32(1.5).internal_value());
+    EXPECT_EQ(fixed32r(-0.5).internal_value(), fixed32(-0.5).internal_value());
+
+#ifdef EIRIN_MATH_HAS_INT128
+    EXPECT_EQ(fixed64r(0.1).internal_value(), static_cast<int64_t>(0.1 * 4294967296.0) + 1);
+    EXPECT_EQ(fixed64r(-0.1).internal_value(), -static_cast<int64_t>(0.1 * 4294967296.0) - 1);
+#endif
+}
+
+TEST(FixedNum, HexfloatParse)
+{
+    // hexfloat literals parse exactly through detail::parse / eval_const
+    EXPECT_EQ("0x1.8p1"_f32, 3_f32);
+    EXPECT_EQ("-0x1.4p-2"_f32, -0.3125_f32);
+    EXPECT_EQ("0x1.921fb54442d18468p+1"_f64, fixed64::pi());
+
+    // runtime parsing goes through the same detail::parse
+    fixed32 a;
+    EXPECT_TRUE(f32_from_cstring("0x1.62e42fefa39efp-1", sizeof("0x1.62e42fefa39efp-1") - 1, a));
+    EXPECT_EQ(a.internal_value(), 45426); // ln(2) at 16 fraction bits
+    EXPECT_TRUE(f32_from_cstring("0x1.8", sizeof("0x1.8") - 1, a)); // exponent part is optional
+    EXPECT_FALSE(f32_from_cstring("0x1.8q", sizeof("0x1.8q") - 1, a)); // trailing garbage rejected
+}
+
 TEST(Fixed32, Operator)
 {
     auto fp1 = 0_f32;
@@ -37,6 +790,16 @@ TEST(Fixed32, Operator)
     EXPECT_EQ(fp2.divide(2), 257_f32);
     EXPECT_EQ(515_f32 % 2_f32, 1_f32);
     EXPECT_EQ(--fp1, 0.14_f32);
+    fp2 = fp2 + 1;
+    EXPECT_EQ(fp2, 515_f32);
+    fp2 = 515_f32 / fp2;
+    EXPECT_EQ(fp2, 1_f32);
+    fp2 = fp2 * 2;
+    EXPECT_EQ(fp2, 2_f32);
+    fp2 = 6 / fp2;
+    EXPECT_EQ(fp2, 3_f32);
+    fp2 = 120_f32 / fp2;
+    EXPECT_EQ(fp2, 40_f32);
 
 #ifndef EIRIN_NO_EXCEPTIONS
 
@@ -120,10 +883,21 @@ TEST(Fixed32, Math)
 {
     using test_math::expect_fixed_eq;
 
+    // 1 bit for 1, 16 bits for fraction.
+    EXPECT_EQ((1_f32).bit_width(), 17);
+    EXPECT_EQ((2_f32).bit_width(), 18);
+    EXPECT_EQ((4_f32).bit_width(), 19);
+    // 1 bit for 1, 16 bits for fraction.
+    EXPECT_EQ((-1_f32).bit_width(), 17);
+    EXPECT_EQ((-2_f32).bit_width(), 18);
+    EXPECT_EQ((-4_f32).bit_width(), 19);
+
     EXPECT_EQ(abs(-114.514_f32), 114.514_f32);
     EXPECT_EQ(sin(0_f32), 0_f32);
     EXPECT_TRUE(expect_fixed_eq(sin(1_f32), 0.841471_f32));
     EXPECT_TRUE(expect_fixed_eq(sin(fixed32::pi() / 6), 0.5_f32));
+    EXPECT_EQ(detail::eval_integral_part_max_digits10<fixed32>(), 5); // max value of fixed32 is 32767.
+    EXPECT_EQ(detail::eval_integral_part_max_digits10<fixed64>(), 10); // max value of fixed64 is 0X7FFFFFFF.
     EXPECT_EQ(cos(0_f32), 1_f32);
     EXPECT_TRUE(expect_fixed_eq(cos(fixed32::pi() / 3), 0.5_f32));
     EXPECT_TRUE(expect_fixed_eq(cos(1_f32), 0.540302_f32));
@@ -134,8 +908,15 @@ TEST(Fixed32, Math)
     EXPECT_TRUE(expect_fixed_eq(atan(1_f32), 0.785398_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(asin(0_f32), 0_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(asin(0.5_f32), 0.523598_f32, test_math::arc_triangle_max_error));
+    EXPECT_EQ(asin(1_f32), numbers::pi / 2);
+    EXPECT_EQ(asin(-1_f32), -numbers::pi / 2);
     EXPECT_TRUE(expect_fixed_eq(acos(0_f32), 1.570796_f32, test_math::arc_triangle_max_error));
     EXPECT_TRUE(expect_fixed_eq(acos(0.5_f32), 1.047197_f32, test_math::arc_triangle_max_error));
+    EXPECT_EQ(acos(1_f32), 0_f32);
+    EXPECT_EQ(acos(-1_f32), numbers::pi);
+    // glibc e_asin.c style near-1 branch (z = (1-x)/2, asin(x) = pi/2 - 2*asin(sqrt(z))).
+    EXPECT_TRUE(expect_fixed_eq(asin(1_f32 - 1_f32 / (1 << 16)), 1.5652721_f32));
+    EXPECT_TRUE(expect_fixed_eq(acos(1_f32 - 1_f32 / (1 << 16)), 0.00552427_f32));
     EXPECT_EQ(sqrt(0_f32), 0_f32);
     EXPECT_EQ(sqrt(4_f32), 2_f32);
     EXPECT_EQ(sqrt(114.514_f32), 10.701121_f32);
@@ -144,15 +925,48 @@ TEST(Fixed32, Math)
     EXPECT_EQ(cbrt(8_f32), 2_f32);
     EXPECT_EQ(cbrt(27_f32), 3_f32);
     EXPECT_EQ(log2(2_f32), 1_f32);
-    EXPECT_EQ(log2(10_f32), 3.321928_f32);
+    EXPECT_TRUE(expect_fixed_eq(log2(10_f32), 3.321928_f32));
     EXPECT_TRUE(expect_fixed_eq(log(fixed32::e()), 1_f32));
     EXPECT_TRUE(expect_fixed_eq(log(114.514_f32), 4.740697_f32));
     EXPECT_TRUE(expect_fixed_eq(log10(10_f32), 1_f32));
-    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f32), 2.058859_f32));
+    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f32), 2.05885858494_f32));
+    EXPECT_TRUE(expect_fixed_eq(log10(114.514_f64), 2.05885858494_f64));
     EXPECT_TRUE(expect_fixed_eq(exp(1_f32), fixed32::e()));
     EXPECT_TRUE(expect_fixed_eq(radians(180_f32), numbers::pi));
     EXPECT_TRUE(expect_fixed_eq(degrees(numbers::pi), 180_f32));
 }
+
+#ifdef EIRIN_MATH_DOMAIN_SILENT
+TEST(Fixed32, DomainSilentSentinels)
+{
+    // out-of-domain inputs return the documented sentinels instead of throwing.
+    EXPECT_EQ(asin(2_f32), f32_max);
+    EXPECT_EQ(acos(-2_f32), f32_max);
+    EXPECT_EQ(log2(0_f32), f32_min);
+    EXPECT_EQ(log(0_f32), f32_min);
+    EXPECT_EQ(log10(-1_f32), f32_min);
+    EXPECT_EQ(pow(-2_f32, 0.5_f32), f32_max);
+    EXPECT_EQ(pow_fast(-2_f32, 0.5_f32), f32_max);
+    EXPECT_EQ(tan(fixed32::pi() / 2), f32_max);
+    // valid calls are unaffected.
+    EXPECT_EQ(log2(2_f32), 1_f32);
+    EXPECT_EQ(asin(0.5_f32) > 0_f32, true);
+}
+#else
+#    ifndef EIRIN_NO_EXCEPTIONS
+TEST(Fixed32, DomainThrows)
+{
+    EXPECT_THROW((void)asin(2_f32), std::domain_error);
+    EXPECT_THROW((void)acos(-2_f32), std::domain_error);
+    EXPECT_THROW((void)log2(0_f32), std::domain_error);
+    EXPECT_THROW((void)log(0_f32), std::domain_error);
+    EXPECT_THROW((void)log10(-1_f32), std::domain_error);
+    EXPECT_THROW((void)pow(-2_f32, 0.5_f32), std::domain_error);
+    EXPECT_THROW((void)pow_fast(-2_f32, 0.5_f32), std::domain_error);
+    EXPECT_THROW((void)tan(fixed32::pi() / 2), std::domain_error);
+}
+#    endif
+#endif
 
 TEST(FixedNum, Constants)
 {
@@ -195,12 +1009,13 @@ TEST(FixedNum, Random)
     eirin::mt19937 mt_32(rd());
     auto tmp_mt_int = std::uniform_int_distribution<>()(mt_32);
     // avoid C4834 on MSVC and unused variable.
-    (void) tmp_mt_int;
+    (void)tmp_mt_int;
     eirin::fixed_int_distribution_adapter<fixed32, std::uniform_int_distribution<>> dist_32;
     std::array<fixed32, 10> values_32;
     auto test_random = [&](auto& engine, auto& dist, auto& values, const char* label)
     {
-        std::generate(values.begin(), values.end(), [&]() { return dist(engine); });
+        std::generate(values.begin(), values.end(), [&]()
+                      { return dist(engine); });
         GTEST_LOG_(INFO) << label << " Random distribution in [" << dist.min() << ", " << dist.max() << "]: ";
         std::cout << "  { ";
         for(size_t i = 0; i < values.size() - 1; ++i)
@@ -297,8 +1112,15 @@ TEST(Fixed64, Math)
     EXPECT_TRUE(expect_fixed_eq(atan(1_f64), 0.785398_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(asin(0_f64), 0_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(asin(0.5_f64), 0.523598_f64, test_math::arc_triangle_max_error_64));
+    EXPECT_EQ(asin(1_f64), numbers::pi_f64 / 2);
+    EXPECT_EQ(asin(-1_f64), -numbers::pi_f64 / 2);
     EXPECT_TRUE(expect_fixed_eq(acos(0_f64), 1.570796_f64, test_math::arc_triangle_max_error_64));
     EXPECT_TRUE(expect_fixed_eq(acos(0.5_f64), 1.047197_f64, test_math::arc_triangle_max_error_64));
+    EXPECT_EQ(acos(1_f64), 0_f64);
+    EXPECT_EQ(acos(-1_f64), numbers::pi_f64);
+    // glibc e_asin.c style near-1 branch (z = (1-x)/2, asin(x) = pi/2 - 2*asin(sqrt(z))).
+    EXPECT_TRUE(expect_fixed_eq(asin(1_f64 - 1_f64 / (1LL << 32)), 1.57077475_f64));
+    EXPECT_TRUE(expect_fixed_eq(acos(1_f64 - 1_f64 / (1LL << 32)), 0.000021579_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(0_f64), 0_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(4_f64), 2_f64));
     EXPECT_TRUE(expect_fixed_eq(sqrt(114.514_f64), 10.701121_f64));

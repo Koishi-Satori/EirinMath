@@ -9,6 +9,10 @@
 #endif
 
 #include <version>
+#include "../macro.hpp"
+#if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
+#    include "eirin/ext/builtin_ints.hpp"
+#endif
 
 #ifdef _MSC_VER
 #    define EIRIN_MATH_HAS_INT128
@@ -24,20 +28,31 @@
 #    define EIRIN_MATH_DETAIL_BUILTIN__INT128
 #endif
 
+#if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
+#    ifndef EIRIN_MATH_HAS_INT128
+#        define EIRIN_MATH_HAS_INT128
+#    endif
+#endif
+
 namespace eirin::detail
 {
-#ifdef EIRIN_MATH_DETAIL_INT128_MSVC_STL
+#if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
+using int128_t = ::eirin::ext::int128;
+using uint128_t = ::eirin::ext::uint128;
+#else
+#    ifdef EIRIN_MATH_DETAIL_INT128_MSVC_STL
 
 using int128_t = std::_Signed128;
 using uint128_t = std::_Unsigned128;
 
-#endif
+#    endif
 
-#ifdef EIRIN_MATH_DETAIL_BUILTIN__INT128
+#    ifdef EIRIN_MATH_DETAIL_BUILTIN__INT128
 
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
 
+#    endif
 #endif
 } // namespace eirin::detail
 

@@ -14,91 +14,100 @@ using enable_if_fixed = std::enable_if_t<is_fixed_point_v<T>, T>;
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> e_v()
 {
-    return T::template from_fixed_num_value<61>(0x56FC2A2C515DA54Dll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("2.718281828459045235360287471352662498");
 }
 
 // pi
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> pi_v()
 {
-    return T::template from_fixed_num_value<61>(0x6487ED5110B4611All);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("3.141592653589793238462643383279502884");
 }
 
 // log2e
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> log2e_v()
 {
-    return T::template from_fixed_num_value<61>(0x2e2a8eca5705fc00ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("1.442695040888963407359924681001892137");
 }
 
 // log10e
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> log10e_v()
 {
-    return T::template from_fixed_num_value<61>(0xde5bd8a93728700ll);
+    // return T::template from_fixed_num_value<61>(0xde5bd8a93728700ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.434294481903251827651128918916605082");
 }
 
 // inv_pi
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> inv_pi_v()
 {
-    return T::template from_fixed_num_value<61>(0xa2f9836e4e44180ll);
+    // return T::template from_fixed_num_value<61>(0xa2f9836e4e44180ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.318309886183790671537767526745028");
 }
 
 // inv_sqrtpi
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> inv_sqrtpi_v()
 {
-    return T::template from_fixed_num_value<61>(0x120dd750429b6d00ll);
+    // return T::template from_fixed_num_value<61>(0x120dd750429b6d00ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.564189583547756286948079451560772");
 }
 
 // ln2
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> ln2_v()
 {
-    return T::template from_fixed_num_value<61>(0x162e42fefa39ef00ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.693147180559945309417232121458176568");
 }
 
 // ln10
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> ln10_v()
 {
-    return T::template from_fixed_num_value<61>(0x49aec6eed5545800ll);
+    // return T::template from_fixed_num_value<61>(0x49aec6eed5545800ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("2.302585092994045684017991454684364208");
 }
 
 // sqrt2
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> sqrt2_v()
 {
-    return T::template from_fixed_num_value<61>(0x2d413cccfe779a00ll);
+    // return T::template from_fixed_num_value<61>(0x2d413cccfe779a00ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("1.414213562373095048801688724209698");
 }
 
 // sqrt3
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> sqrt3_v()
 {
-    return T::template from_fixed_num_value<61>(0x376cf5d0b0995400ll);
+    // return T::template from_fixed_num_value<61>(0x376cf5d0b0995400ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("1.732050807568877293527446341505872");
 }
 
 // inv_sqrt3
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> inv_sqrt3_v()
 {
-    return T::template from_fixed_num_value<61>(0x1279a74590331c00ll);
+    // return T::template from_fixed_num_value<61>(0x1279a74590331c00ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.577350269189625764509148780501957");
 }
 
 // egamma
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> egamma_v()
 {
-    return T::template from_fixed_num_value<61>(0x12788cfc6fb61900ll);
+    // return T::template from_fixed_num_value<61>(0x12788cfc6fb61900ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("0.577215664901532860606512090082402");
 }
 
 // phi
 template <typename T>
 EIRIN_ALWAYS_INLINE constexpr enable_if_fixed<T> phi_v()
 {
-    return T::template from_fixed_num_value<61>(0x33c6ef372fe95000ll);
+    // return T::template from_fixed_num_value<61>(0x33c6ef372fe95000ll);
+    return detail::eval_const<char, typename T::value_type, typename T::intermediate_type, T::precision, T::is_round_enable>("1.618033988749894848204586834365638");
 }
 
 inline constexpr auto pi = pi_v<fixed32>();
