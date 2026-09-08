@@ -3,6 +3,13 @@
 
 #pragma once
 
+// EIRIN_ENABLE/EIRIN_DISABLE and the EIRIN_VEC_SWIZZLE_* knobs must be
+// available before the feature guard below is evaluated: this header can be
+// included on its own with EIRIN_VEC_SWIZZLE_ENABLE == 0, in which case an
+// undefined EIRIN_ENABLE used to make the guard compare 0 == 0 and compile
+// the whole swizzle block anyway.
+#include <eirin/macro.hpp>
+
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
 
 #    include <array>
@@ -124,7 +131,7 @@ public:
 
 #    define EIRIN_SWIZZLE_PROXY_COMPONENT_ACCESS(letter, position) \
         template <typename Dummy = void>                           \
-        requires(!IsConst && k_size >= (position + 1))             \
+        requires(!IsConst && k_distinct && k_size >= (position + 1)) \
         constexpr T& letter() noexcept                             \
         {                                                          \
             return (*m_data)[mapped<position>()];                  \
@@ -174,18 +181,34 @@ protected:
     constexpr void assign_vec(const tvec<RN, U>& vec) noexcept
     {
         static_assert(RN == k_size);
+        // feat: create a snapshot of source vector to keep same behavior as GLSL/GLM.
+        const auto snapshot = [&]
+        {
+            std::array<T, k_size> values{};
+            for(std::size_t i = 0; i < k_size; ++i)
+                values[i] = static_cast<T>(vec[i]);
+            return values;
+        }();
         [&]<std::size_t... Ps>(std::index_sequence<Ps...>)
         {
-            (static_cast<void>((*m_data)[index_table()[Ps]] = static_cast<T>(vec[Ps])), ...);
+            (static_cast<void>((*m_data)[index_table()[Ps]] = snapshot[Ps]), ...);
         }(std::make_index_sequence<k_size>{});
     }
 
     template <typename Proxy>
     constexpr void assign_proxy(const Proxy& that) noexcept
     {
+        // feat: create a snapshot of source vector to keep same behavior as GLSL/GLM.
+        const auto snapshot = [&]
+        {
+            std::array<T, k_size> values{};
+            for(std::size_t i = 0; i < k_size; ++i)
+                values[i] = static_cast<T>(that[i]);
+            return values;
+        }();
         [&]<std::size_t... Ps>(std::index_sequence<Ps...>)
         {
-            (static_cast<void>((*m_data)[index_table()[Ps]] = static_cast<T>(that[Ps])), ...);
+            (static_cast<void>((*m_data)[index_table()[Ps]] = snapshot[Ps]), ...);
         }(std::make_index_sequence<k_size>{});
     }
 
@@ -206,9 +229,16 @@ public:
         requires(!IsConst && k_distinct && RN == k_size)                                                                   \
         constexpr swizzle_proxy_base& operator op##=(const tvec<RN, U>& vec) noexcept                                      \
         {                                                                                                                  \
+            const auto snapshot = [&]                                                                                      \
+            {                                                                                                              \
+                std::array<T, k_size> values{};                                                                            \
+                for(std::size_t i = 0; i < k_size; ++i)                                                                    \
+                    values[i] = static_cast<T>(vec[i]);                                                                    \
+                return values;                                                                                             \
+            }();                                                                                                           \
             [&]<std::size_t... Ps>(std::index_sequence<Ps...>)                                                             \
             {                                                                                                              \
-                (static_cast<void>((*m_data)[index_table()[Ps]] op## = static_cast<T>(vec[Ps])), ...);                     \
+                (static_cast<void>((*m_data)[index_table()[Ps]] op## = snapshot[Ps]), ...);                                \
             }(std::make_index_sequence<k_size>{});                                                                         \
             return *this;                                                                                                  \
         }                                                                                                                  \
@@ -216,9 +246,16 @@ public:
         requires(!IsConst && k_distinct && detail::is_swizzle_proxy<Proxy> && detail::proxy_traits<Proxy>::size == k_size) \
         constexpr swizzle_proxy_base& operator op##=(const Proxy & that) noexcept                                          \
         {                                                                                                                  \
+            const auto snapshot = [&]                                                                                      \
+            {                                                                                                              \
+                std::array<T, k_size> values{};                                                                            \
+                for(std::size_t i = 0; i < k_size; ++i)                                                                    \
+                    values[i] = static_cast<T>(that[i]);                                                                   \
+                return values;                                                                                             \
+            }();                                                                                                           \
             [&]<std::size_t... Ps>(std::index_sequence<Ps...>)                                                             \
             {                                                                                                              \
-                (static_cast<void>((*m_data)[index_table()[Ps]] op## = static_cast<T>(that[Ps])), ...);                    \
+                (static_cast<void>((*m_data)[index_table()[Ps]] op## = snapshot[Ps]), ...);                                \
             }(std::make_index_sequence<k_size>{});                                                                         \
             return *this;                                                                                                  \
         }
@@ -300,43 +337,58 @@ public:
         {                                                                                                                        \
             this->assign_proxy(that);                                                                                            \
             return *this;                                                                                                        \
+        }                                                                                                                        \
+        constexpr swizzle_proxy& operator=(const swizzle_proxy& that) noexcept                                                   \
+            requires(!C && base::k_distinct)                                                                                     \
+        {                                                                                                                        \
+            this->assign_proxy(that);                                                                                            \
+            return *this;                                                                                                        \
         }
 
 #    include <eirin/detail/vec_swizzle_decl.hpp>
 
+// IsConst flag of a chain selector's result.  The first hop from a vector
+// always yields a writable proxy; every deeper hop returns a read-only view
+// unless EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE is enabled.
+#    if EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE == EIRIN_ENABLE
+#        define EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST C
+#    else
+#        define EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST true
+#    endif
+
 // selectors that produce 2 components out of a 2-component view
-#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                       \
-        constexpr auto NAME() noexcept                                                                         \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value>    \
-        {                                                                                                      \
-            return {this->m_data};                                                                             \
-        }                                                                                                      \
-        constexpr auto NAME() const noexcept                                                                   \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value> \
-        {                                                                                                      \
-            return {this->m_data};                                                                             \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                                                    \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                             \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value> \
+        {                                                                                                                                   \
+            return {this->m_data};                                                                                                          \
+        }                                                                                                                                   \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                       \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value>                              \
+        {                                                                                                                                   \
+            return {this->m_data};                                                                                                          \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                      \
-        constexpr auto NAME() noexcept                                                                                                            \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value>    \
-        {                                                                                                                                         \
-            return {this->m_data};                                                                                                                \
-        }                                                                                                                                         \
-        constexpr auto NAME() const noexcept                                                                                                      \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value> \
-        {                                                                                                                                         \
-            return {this->m_data};                                                                                                                \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                                                   \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value> \
+        {                                                                                                                                                                      \
+            return {this->m_data};                                                                                                                                             \
+        }                                                                                                                                                                      \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                          \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value>                              \
+        {                                                                                                                                                                      \
+            return {this->m_data};                                                                                                                                             \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                     \
-        constexpr auto NAME() noexcept                                                                                                                                               \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value, detail::idx_at<P3, I0, I1>::value>    \
-        {                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                   \
-        }                                                                                                                                                                            \
-        constexpr auto NAME() const noexcept                                                                                                                                         \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value, detail::idx_at<P3, I0, I1>::value> \
-        {                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                   \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                                                  \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                                                   \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value, detail::idx_at<P3, I0, I1>::value> \
+        {                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                \
+        }                                                                                                                                                                                                         \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                                                             \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1>::value, detail::idx_at<P1, I0, I1>::value, detail::idx_at<P2, I0, I1>::value, detail::idx_at<P3, I0, I1>::value>                              \
+        {                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                \
         }
 
 template <std::size_t N, typename T, bool C, std::size_t I0, std::size_t I1>
@@ -347,9 +399,11 @@ class swizzle_proxy<N, T, C, I0, I1> : public swizzle_proxy_base<N, T, C, I0, I1
 public:
     using base::base;
     EIRIN_SWIZZLE_PROXY_ASSIGN_DECLS
+#    if EIRIN_VEC_SWIZZLE_CHAIN == EIRIN_ENABLE
     EIRIN_TVEC_SWIZZLE2_4_MEMBERS_DECL(T, x, y)
     EIRIN_TVEC_SWIZZLE2_3_MEMBERS_DECL(T, x, y)
     EIRIN_TVEC_SWIZZLE2_2_MEMBERS_DECL(T, x, y)
+#    endif
 };
 
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_2
@@ -357,38 +411,38 @@ public:
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_4
 
 // selectors for a 3-component view
-#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                               \
-        constexpr auto NAME() noexcept                                                                                 \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value>    \
-        {                                                                                                              \
-            return {this->m_data};                                                                                     \
-        }                                                                                                              \
-        constexpr auto NAME() const noexcept                                                                           \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value> \
-        {                                                                                                              \
-            return {this->m_data};                                                                                     \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                                                            \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                     \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value> \
+        {                                                                                                                                           \
+            return {this->m_data};                                                                                                                  \
+        }                                                                                                                                           \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                               \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value>                              \
+        {                                                                                                                                           \
+            return {this->m_data};                                                                                                                  \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                                  \
-        constexpr auto NAME() noexcept                                                                                                                        \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value>    \
-        {                                                                                                                                                     \
-            return {this->m_data};                                                                                                                            \
-        }                                                                                                                                                     \
-        constexpr auto NAME() const noexcept                                                                                                                  \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value> \
-        {                                                                                                                                                     \
-            return {this->m_data};                                                                                                                            \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                                                               \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                            \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value> \
+        {                                                                                                                                                                                  \
+            return {this->m_data};                                                                                                                                                         \
+        }                                                                                                                                                                                  \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                                      \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value>                              \
+        {                                                                                                                                                                                  \
+            return {this->m_data};                                                                                                                                                         \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                                     \
-        constexpr auto NAME() noexcept                                                                                                                                                               \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value, detail::idx_at<P3, I0, I1, I2>::value>    \
-        {                                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                                   \
-        }                                                                                                                                                                                            \
-        constexpr auto NAME() const noexcept                                                                                                                                                         \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value, detail::idx_at<P3, I0, I1, I2>::value> \
-        {                                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                                   \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                                                                  \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                                                                   \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value, detail::idx_at<P3, I0, I1, I2>::value> \
+        {                                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                                \
+        }                                                                                                                                                                                                                         \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                                                                             \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2>::value, detail::idx_at<P1, I0, I1, I2>::value, detail::idx_at<P2, I0, I1, I2>::value, detail::idx_at<P3, I0, I1, I2>::value>                              \
+        {                                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                                \
         }
 
 template <std::size_t N, typename T, bool C, std::size_t I0, std::size_t I1, std::size_t I2>
@@ -399,9 +453,11 @@ class swizzle_proxy<N, T, C, I0, I1, I2> : public swizzle_proxy_base<N, T, C, I0
 public:
     using base::base;
     EIRIN_SWIZZLE_PROXY_ASSIGN_DECLS
+#    if EIRIN_VEC_SWIZZLE_CHAIN == EIRIN_ENABLE
     EIRIN_TVEC_SWIZZLE3_4_MEMBERS_DECL(T, x, y, z)
     EIRIN_TVEC_SWIZZLE3_3_MEMBERS_DECL(T, x, y, z)
     EIRIN_TVEC_SWIZZLE3_2_MEMBERS_DECL(T, x, y, z)
+#    endif
 };
 
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_2
@@ -409,38 +465,38 @@ public:
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_4
 
 // selectors for a 4-component view
-#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                                       \
-        constexpr auto NAME() noexcept                                                                                         \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value>    \
-        {                                                                                                                      \
-            return {this->m_data};                                                                                             \
-        }                                                                                                                      \
-        constexpr auto NAME() const noexcept                                                                                   \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value> \
-        {                                                                                                                      \
-            return {this->m_data};                                                                                             \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)                                                                                                    \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                             \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value> \
+        {                                                                                                                                                   \
+            return {this->m_data};                                                                                                                          \
+        }                                                                                                                                                   \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                       \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value>                              \
+        {                                                                                                                                                   \
+            return {this->m_data};                                                                                                                          \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                                              \
-        constexpr auto NAME() noexcept                                                                                                                                    \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value>    \
-        {                                                                                                                                                                 \
-            return {this->m_data};                                                                                                                                        \
-        }                                                                                                                                                                 \
-        constexpr auto NAME() const noexcept                                                                                                                              \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value> \
-        {                                                                                                                                                                 \
-            return {this->m_data};                                                                                                                                        \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)                                                                                                                                           \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                                        \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value> \
+        {                                                                                                                                                                                              \
+            return {this->m_data};                                                                                                                                                                     \
+        }                                                                                                                                                                                              \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                                                  \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value>                              \
+        {                                                                                                                                                                                              \
+            return {this->m_data};                                                                                                                                                                     \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                                                     \
-        constexpr auto NAME() noexcept                                                                                                                                                                               \
-            -> swizzle_proxy<N, T, C, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value, detail::idx_at<P3, I0, I1, I2, I3>::value>    \
-        {                                                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                                                   \
-        }                                                                                                                                                                                                            \
-        constexpr auto NAME() const noexcept                                                                                                                                                                         \
-            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value, detail::idx_at<P3, I0, I1, I2, I3>::value> \
-        {                                                                                                                                                                                                            \
-            return {this->m_data};                                                                                                                                                                                   \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)                                                                                                                                                                                  \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept                                                                                                                                                                                   \
+            -> swizzle_proxy<N, T, EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value, detail::idx_at<P3, I0, I1, I2, I3>::value> \
+        {                                                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                                                \
+        }                                                                                                                                                                                                                                         \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept                                                                                                                                                                             \
+            -> swizzle_proxy<N, T, true, detail::idx_at<P0, I0, I1, I2, I3>::value, detail::idx_at<P1, I0, I1, I2, I3>::value, detail::idx_at<P2, I0, I1, I2, I3>::value, detail::idx_at<P3, I0, I1, I2, I3>::value>                              \
+        {                                                                                                                                                                                                                                         \
+            return {this->m_data};                                                                                                                                                                                                                \
         }
 
 template <std::size_t N, typename T, bool C, std::size_t I0, std::size_t I1, std::size_t I2, std::size_t I3>
@@ -451,49 +507,52 @@ class swizzle_proxy<N, T, C, I0, I1, I2, I3> : public swizzle_proxy_base<N, T, C
 public:
     using base::base;
     EIRIN_SWIZZLE_PROXY_ASSIGN_DECLS
+#    if EIRIN_VEC_SWIZZLE_CHAIN == EIRIN_ENABLE
     EIRIN_TVEC_SWIZZLE4_4_MEMBERS_DECL(T, x, y, z, w)
     EIRIN_TVEC_SWIZZLE4_3_MEMBERS_DECL(T, x, y, z, w)
     EIRIN_TVEC_SWIZZLE4_2_MEMBERS_DECL(T, x, y, z, w)
+#    endif
 };
 
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_2
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_3
 #    undef EIRIN_TVEC_SWIZZLE_IMPL_4
+#    undef EIRIN_TVEC_SWIZZLE_CHAIN_IS_CONST
 #    undef EIRIN_SWIZZLE_PROXY_ASSIGN_DECLS
 
 // ---- vector member function context: indices are literal component indices --
-#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)         \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() noexcept       \
-            -> swizzle_proxy<SRC, T, false, P0, P1>              \
-        {                                                        \
-            return {this};                                       \
-        }                                                        \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() const noexcept \
-            -> swizzle_proxy<SRC, T, true, P0, P1>               \
-        {                                                        \
-            return {this};                                       \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_2(SRC, NAME, P0, P1)              \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept       \
+            -> swizzle_proxy<SRC, T, false, P0, P1>                   \
+        {                                                             \
+            return {this};                                            \
+        }                                                             \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept \
+            -> swizzle_proxy<SRC, T, true, P0, P1>                    \
+        {                                                             \
+            return {this};                                            \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)     \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() noexcept       \
-            -> swizzle_proxy<SRC, T, false, P0, P1, P2>          \
-        {                                                        \
-            return {this};                                       \
-        }                                                        \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() const noexcept \
-            -> swizzle_proxy<SRC, T, true, P0, P1, P2>           \
-        {                                                        \
-            return {this};                                       \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_3(SRC, NAME, P0, P1, P2)          \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept       \
+            -> swizzle_proxy<SRC, T, false, P0, P1, P2>               \
+        {                                                             \
+            return {this};                                            \
+        }                                                             \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept \
+            -> swizzle_proxy<SRC, T, true, P0, P1, P2>                \
+        {                                                             \
+            return {this};                                            \
         }
-#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3) \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() noexcept       \
-            -> swizzle_proxy<SRC, T, false, P0, P1, P2, P3>      \
-        {                                                        \
-            return {this};                                       \
-        }                                                        \
-        EIRIN_ALWAYS_INLINE constexpr auto NAME() const noexcept \
-            -> swizzle_proxy<SRC, T, true, P0, P1, P2, P3>       \
-        {                                                        \
-            return {this};                                       \
+#    define EIRIN_TVEC_SWIZZLE_IMPL_4(SRC, NAME, P0, P1, P2, P3)      \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() noexcept       \
+            -> swizzle_proxy<SRC, T, false, P0, P1, P2, P3>           \
+        {                                                             \
+            return {this};                                            \
+        }                                                             \
+        EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL auto NAME() const noexcept \
+            -> swizzle_proxy<SRC, T, true, P0, P1, P2, P3>            \
+        {                                                             \
+            return {this};                                            \
         }
 
 // ---- free binary operators (materialize both sides) -----------------------

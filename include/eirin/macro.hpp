@@ -82,20 +82,6 @@
 #    define EIRIN_MATH_NO_SIMD
 #endif
 
-#ifndef EIRIN_VEC_SWIZZLE_ENABLE
-#    define EIRIN_VEC_SWIZZLE_ENABLE EIRIN_ENABLE
-#endif
-
-#ifndef EIRIN_VEC_SWIZZLE_FORCE_INLINE
-#    define EIRIN_VEC_SWIZZLE_FORCE_INLINE EIRIN_DISABLE
-#endif
-
-#if EIRIN_VEC_SWIZZLE_FORCE_INLINE == EIRIN_DISABLE
-#    define EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL constexpr inline
-#else
-#    define EIRIN_TVEC_SWIZZLE_PROXY_FUNC_DECL constexpr EIRIN_ALWAYS_INLINE
-#endif
-
 #if defined(__cpp_lib_unreachable) && __cpp_lib_unreachable >= 202202L
 #    define EIRIN_UNREACHABLE std::unreachable()
 #elif defined(_MSC_VER) && !defined(__clang__)
@@ -104,49 +90,11 @@
 #    define EIRIN_UNREACHABLE __builtin_unreachable()
 #endif
 
-// if the ++/-- operator should mod-warp or sat the value when meet UQ(N) or Q(N-1).
-// for best performance, default option is no-op.
+// must include this, as config header.
+#include "ext/config.hpp"
 
-#ifdef EIRIN_MODWRAP_FIXED_INC_DEC
-#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_MODWRAP
-#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_MODWRAP
+#ifdef EIRIN_MATH_HAS_INCLUDE_CONFIG
+// do nothing here, just for silence code analysis warning.
 #endif
-#ifdef EIRIN_SAT_FIXED_INC_DEC
-#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_SAT
-#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_SAT
-#endif
-
-#ifndef EIRIN_FIXED_NUM_SELF_INC_OVERFLOW
-#    define EIRIN_FIXED_NUM_SELF_INC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
-#endif
-#ifndef EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW
-#    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
-#endif
-
-// use which type of int128, builtin or extention
-// in MSVC, the default is builtin int128 due to performance issue of _Signed128
-
-#ifndef EIRIN_USE_EXT_BUILTIN_INT128
-#    ifdef _MSC_VER
-#        define EIRIN_FORCE_EXT_BUILTIN_INT128
-#    endif
-#endif
-
-#ifdef EIRIN_FORCE_EXT_BUILTIN_INT128
-#    define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_ENABLE
-#endif
-
-#ifndef EIRIN_USE_EXT_BUILTIN_INT128
-#    define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_DISABLE
-#endif
-
-// exposed math functions
-#ifdef EIRIN_MATH_FUNC_FORCE_INLINE
-#    define EIRIN_MATH_FUNC_API EIRIN_ALWAYS_INLINE constexpr
-#else
-#    define EIRIN_MATH_FUNC_API inline constexpr
-#endif
-// small func can force inline.
-#define EIRIN_MATH_SMALL_FUNC_API EIRIN_ALWAYS_INLINE constexpr
 
 #endif // EIRIN_MATH_MARCO_HPP
