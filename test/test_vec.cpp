@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+#include <type_traits>
+#include <utility>
 #include <eirin/eirin.hpp>
 #include <eirin/io/format.hpp>
+#include "compile_check.hpp"
 
 using namespace eirin;
 using namespace eirin::literals;
@@ -381,6 +384,7 @@ TEST(Vec, SwizzleWriteValid)
     vi.wxyz()[0] = 1;
     EXPECT_EQ(vi.w, 1);
     // vii.xxxx()[0] = 1; // This should compile failed.
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(vii.xxxx()[0], 1));
 
     tvec<4, int> v(1, 2, 3, 4);
 
@@ -417,17 +421,26 @@ TEST(Vec, SwizzleWriteValid)
     EXPECT_EQ(old.y, 85);
     EXPECT_EQ(v.x, 204);
     EXPECT_EQ(v.y, 86);
+
+    // overlapping selections must snapshot the right-hand side first
+    tvec<2, int> ov(1, 2);
+    ov.xy() = ov.yx(); // swap
+    EXPECT_EQ(ov.x, 2);
+    EXPECT_EQ(ov.y, 1);
+
+    tvec<2, int> cv2(1, 2);
+    cv2.xy() += cv2.yx(); // (1+2, 2+1)
+    EXPECT_EQ(cv2.x, 3);
+    EXPECT_EQ(cv2.y, 3);
 }
 
 TEST(Vec, SwizzleWriteDuplicateCompileCheck)
 {
+    tvec<2, int> v(1, 2);
     // These should compile failed.
-    /*
-    tvec<2, int> v(1,2);
-    v.xx() = tvec<2, int>(3,4);
-    v.xx() += 1;
-    ++v.xx();
-    */
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xx(), (tvec<2, int>(3, 4)))); // v.xx() = tvec<2, int>(3,4)
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD_ASSIGN(v.xx(), 1)); // v.xx() += 1
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_PRE_INCR(v.xx())); // ++v.xx()
     SUCCEED();
 }
 
@@ -490,6 +503,121 @@ TEST(Vec, SwizzleProxyChain)
     static_assert(constexpr_chain());
 }
 
+// ==================== 11.5 Chained Swizzle as Lvalue ====================
+TEST(Vec, SwizzleChainLvaluePolicy)
+{
+    tvec<4, int> v(1, 2, 3, 4);
+
+    // The first hop from a vector is always a writable proxy.
+    static_assert(std::is_same_v<decltype(v.xy()), swizzle_proxy<4, int, false, 0, 1>>);
+
+    // A chained hop is a read-only view by default, and a writable proxy only
+    // when EIRIN_VEC_ENABLE_SWIZZLE_CHAIN_AS_LVALUE is defined.
+#if EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE == EIRIN_ENABLE
+    static_assert(std::is_same_v<decltype(v.xy().yx()), swizzle_proxy<4, int, false, 1, 0>>);
+#else
+    static_assert(std::is_same_v<decltype(v.xy().yx()), swizzle_proxy<4, int, true, 1, 0>>);
+    // these should compile failed.
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xy().yx(), (tvec<2, int>(9, 9)))); // v.xy().yx() = tvec<2, int>(9, 9)
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD_ASSIGN(v.xy().yx(), (tvec<2, int>(1, 1)))); // v.xy().yx() += tvec<2, int>(1, 1)
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xy().yx(), v.yx())); // v.xy().yx() = v.yx()
+#endif
+
+    // reads through chained selectors keep working in both configurations
+    EXPECT_EQ(v.xy().yx()[0], 2);
+    EXPECT_EQ(v.xy().yx()[1], 1);
+    v.xy() = tvec<2, int>(10, 20);
+    EXPECT_EQ(v.x, 10);
+    EXPECT_EQ(v.y, 20);
+}
+
+#if EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE == EIRIN_ENABLE
+TEST(Vec, SwizzleChainWrite)
+{
+    tvec<4, int> v(1, 2, 3, 4);
+    v.xy().yx() = tvec<2, int>(7, 8); // y = 7, x = 8
+    EXPECT_EQ(v.x, 8);
+    EXPECT_EQ(v.y, 7);
+    EXPECT_EQ(v.z, 3);
+    EXPECT_EQ(v.w, 4);
+
+    // overlapping selections keep GLSL/GLM snapshot semantics through chains
+    tvec<2, int> ov(1, 2);
+    ov.xy().xy() = ov.yx(); // swap
+    EXPECT_EQ(ov.x, 2);
+    EXPECT_EQ(ov.y, 1);
+
+    tvec<2, int> cv2(1, 2);
+    cv2.xy().xy() += cv2.yx(); // (1+2, 2+1)
+    EXPECT_EQ(cv2.x, 3);
+    EXPECT_EQ(cv2.y, 3);
+
+    // deeper chains stay writable: wzyx -> (4,3,2,1); yx -> (3,4) = (z, w)
+    tvec<4, int> deep(1, 2, 3, 4);
+    deep.xyzw().wzyx().yx() = tvec<2, int>(30, 40);
+    EXPECT_EQ(deep.x, 1);
+    EXPECT_EQ(deep.y, 2);
+    EXPECT_EQ(deep.z, 30);
+    EXPECT_EQ(deep.w, 40);
+
+    // duplicated selections stay non-writable through chains
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(deep.xx().yx(), (tvec<2, int>(1, 2))));
+}
+
+TEST(Vec, SwizzleChainWriteSameType)
+{
+    // same-type chained proxy assignment must write lanes back instead of the
+    // old implicit copy assignment (which silently re-bound the proxy pointer)
+    tvec<4, int> a(1, 2, 3, 4), b(5, 6, 7, 8);
+    b.xy().yx() = a.xy().yx();
+    EXPECT_EQ(b.x, 1);
+    EXPECT_EQ(b.y, 2);
+    EXPECT_EQ(b.z, 7);
+    EXPECT_EQ(b.w, 8);
+
+    auto p = a.xy().yx();
+    p = b.xy().yx();
+    p.y() = 77; // lane y of the {1, 0} view maps back to original x
+    EXPECT_EQ(a.x, 77);
+    EXPECT_EQ(a.y, 2);
+}
+#endif
+
+// ============ Same-type proxy copy assignment ============
+TEST(Vec, SwizzleSameTypeCopyAssignValueSemantics)
+{
+    // same-type, same-selection assignment writes lanes back into the LHS
+    // vector (GLSL l-value semantics) instead of re-binding the proxy.
+    tvec<4, int> a(1, 2, 3, 4), b(5, 6, 7, 8);
+    a.xy() = b.xy();
+    EXPECT_EQ(a.x, 5);
+    EXPECT_EQ(a.y, 6);
+    EXPECT_EQ(a.z, 3);
+    EXPECT_EQ(a.w, 4);
+
+    // a stored proxy stays attached to its original vector after assignment
+    auto p = a.xy();
+    p = b.xy();
+    p.y() = 42;
+    EXPECT_EQ(a.x, 5);
+    EXPECT_EQ(a.y, 42);
+    EXPECT_EQ(b.y, 6);
+
+    // only writable, duplicate-free selections are copy assignable; views
+    // remain copy constructible so `auto q = p;` keeps view identity
+    static_assert(std::is_copy_assignable_v<swizzle_proxy<4, int, false, 0, 1>>);
+    static_assert(!std::is_copy_assignable_v<swizzle_proxy<4, int, true, 0, 1>>);
+    static_assert(!std::is_copy_assignable_v<swizzle_proxy<4, int, false, 0, 0>>);
+    static_assert(std::is_copy_constructible_v<swizzle_proxy<4, int, true, 0, 1>>);
+
+    // read-only views and duplicated selections have no write path
+    const tvec<4, int> cv(1, 2, 3, 4), cw(5, 6, 7, 8);
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(cv.xy(), cw.xy()));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(a.xx(), b.xx()));
+    (void)cv;
+    (void)cw;
+}
+
 // ==================== 12. Mixed Type Math ====================
 TEST(Vec, MixedTypes)
 {
@@ -548,6 +676,173 @@ TEST(Vec, BitwiseCompound)
     a >>= 3;
     EXPECT_EQ(a.x, 0b0100);
     EXPECT_EQ(a.y, 0b0101);
+}
+
+// ==================== 16. Behavior of GLSL ====================
+
+namespace
+{
+    // SFINAE probes for members that must not exist on the given tvec shape;
+    // they pin the compile-time side of the GLSL rules below.
+    template <typename T, typename = void>
+    struct glsl_has_field_r : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_field_r<T, std::void_t<decltype(std::declval<T>().r)>> : std::true_type
+    {};
+
+    template <typename T, typename = void>
+    struct glsl_has_field_s : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_field_s<T, std::void_t<decltype(std::declval<T>().s)>> : std::true_type
+    {};
+
+    template <typename T, typename = void>
+    struct glsl_has_field_z : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_field_z<T, std::void_t<decltype(std::declval<T>().z)>> : std::true_type
+    {};
+
+    template <typename T, typename = void>
+    struct glsl_has_call_rgba : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_call_rgba<T, std::void_t<decltype(std::declval<T>().rgba())>> : std::true_type
+    {};
+
+    template <typename T, typename = void>
+    struct glsl_has_call_stpq : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_call_stpq<T, std::void_t<decltype(std::declval<T>().stpq())>> : std::true_type
+    {};
+
+    template <typename T, typename = void>
+    struct glsl_has_call_xyzwx : std::false_type
+    {};
+    template <typename T>
+    struct glsl_has_call_xyzwx<T, std::void_t<decltype(std::declval<T>().xyzwx())>> : std::true_type
+    {};
+} // namespace
+
+TEST(Vec, GLSLBehavior)
+{
+    static_assert(!glsl_has_field_r<tvec<4, int>>::value);
+    static_assert(!glsl_has_field_s<tvec<4, int>>::value);
+    static_assert(!glsl_has_call_rgba<tvec<4, int>>::value);
+    static_assert(!glsl_has_call_stpq<tvec<4, int>>::value);
+
+    vec4i v{114, 495, 1919810, 514};
+    static_assert(std::is_same_v<decltype(v.yx()()), tvec<2, int>>);
+    static_assert(std::is_same_v<decltype(v.zyx()()), tvec<3, int>>);
+    static_assert(std::is_same_v<decltype(v.wzyx()()), tvec<4, int>>);
+    tvec<2, int> m2 = v.yx();
+    EXPECT_EQ(m2.x, 495);
+    EXPECT_EQ(m2.y, 114);
+    tvec<3, int> m3 = v.zyx();
+    EXPECT_EQ(m3.x, 1919810);
+    EXPECT_EQ(m3.y, 495);
+    EXPECT_EQ(m3.z, 114);
+    tvec<4, int> m4 = v.wzyx();
+    EXPECT_EQ(m4.x, 514);
+    EXPECT_EQ(m4.y, 1919810);
+    EXPECT_EQ(m4.z, 495);
+    EXPECT_EQ(m4.w, 114);
+
+    tvec<2, int> rep2 = v.xx();
+    EXPECT_EQ(rep2.x, 114);
+    EXPECT_EQ(rep2.y, 114);
+    tvec<4, int> rep4 = v.yxxw();
+    EXPECT_EQ(rep4.x, 495);
+    EXPECT_EQ(rep4.y, 114);
+    EXPECT_EQ(rep4.z, 114);
+    EXPECT_EQ(rep4.w, 514);
+    tvec<2, int> chain2 = v.xy().yx();
+    EXPECT_EQ(chain2.x, 495);
+    EXPECT_EQ(chain2.y, 114);
+
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xx(), (tvec<2, int>(7, 8))));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD_ASSIGN(v.xx(), 1));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_PRE_INCR(v.xx()));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xx().x(), 9));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(v.xx()[0], 9));
+    vec4i lv{1, 2, 3, 4};
+    lv.xy() = tvec<2, int>(10, 20);
+    EXPECT_EQ(lv.x, 10);
+    EXPECT_EQ(lv.y, 20);
+    EXPECT_EQ(lv.z, 3);
+    EXPECT_EQ(lv.w, 4);
+
+    vec4i wb{1, 2, 3, 4};
+    wb.wzyx() = tvec<4, int>(8, 7, 6, 5);
+    EXPECT_EQ(wb.x, 5);
+    EXPECT_EQ(wb.y, 6);
+    EXPECT_EQ(wb.z, 7);
+    EXPECT_EQ(wb.w, 8);
+
+    const vec4i c{1, 2, 3, 4};
+    tvec<2, int> cr = c.yx();
+    EXPECT_EQ(cr.x, 2);
+    EXPECT_EQ(cr.y, 1);
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(c.xy(), (tvec<2, int>(9, 9))));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD_ASSIGN(c.xy(), 1));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_PRE_INCR(c.xy()));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN((c.x), 5));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(c.xy().x(), 5));
+
+    static_assert(std::is_same_v<decltype(v.x), int>);
+    static_assert(std::is_same_v<decltype(lv.xy().x()), int&>);
+    lv.y = 77;
+    EXPECT_EQ(lv.y, 77);
+    lv.xy().x() = 88;
+    EXPECT_EQ(lv.x, 88);
+    EXPECT_EQ(lv.y, 77);
+
+    tvec<2, int> snap = v.yx(); // {495, 114}
+    v.x = 1000;
+    EXPECT_EQ(snap.x, 495);
+    EXPECT_EQ(snap.y, 114);
+    tvec<2, int> sum = v.xy() + v.zw();
+    EXPECT_EQ(sum.x, 1000 + 1919810);
+    EXPECT_EQ(sum.y, 495 + 514);
+
+    tvec<2, int> ov(1, 2);
+    ov.xy() = ov.yx();
+    EXPECT_EQ(ov.x, 2);
+    EXPECT_EQ(ov.y, 1);
+    tvec<2, int> co(1, 2);
+    co.xy() += co.yx(); // (1+2, 2+1)
+    EXPECT_EQ(co.x, 3);
+    EXPECT_EQ(co.y, 3);
+    tvec<4, int> o4(1, 2, 3, 4);
+    o4.yxwz() = o4.wzyx();
+    EXPECT_EQ(o4.x, 3);
+    EXPECT_EQ(o4.y, 4);
+    EXPECT_EQ(o4.z, 1);
+    EXPECT_EQ(o4.w, 2);
+
+    static_assert(!glsl_has_field_z<tvec<2, int>>::value);
+    static_assert(glsl_has_field_z<tvec<3, int>>::value);
+    static_assert(!glsl_has_call_xyzwx<tvec<4, int>>::value);
+
+    vec4i ch{1, 2, 3, 4};
+#if EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE == EIRIN_ENABLE
+    ch.xy().yx() = tvec<2, int>(7, 8); // y=7, x=8
+    EXPECT_EQ(ch.x, 8);
+    EXPECT_EQ(ch.y, 7);
+    EXPECT_EQ(ch.z, 3);
+    EXPECT_EQ(ch.w, 4);
+    ch.xy().xy() = ch.yx(); // 链式快照：交换 x/y
+    EXPECT_EQ(ch.x, 7);
+    EXPECT_EQ(ch.y, 8);
+#else
+    EXPECT_EQ(ch.xy().yx().x(), 2);
+    EXPECT_EQ(ch.xy().yx().y(), 1);
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ASSIGN(ch.xy().yx(), (tvec<2, int>(9, 9))));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD_ASSIGN(ch.xy().yx(), 1));
+#endif
 }
 
 // ==================== Common usage Test ====================
