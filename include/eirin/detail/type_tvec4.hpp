@@ -390,14 +390,14 @@ struct tvec<4, T> : public tvec_base<4, T, tvec<4, T>>
        Should contains: +, -, *, /, %, ^, &, |, <<, >>
     */
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
-#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                      \
-        constexpr inline tvec& operator op## = (const tvec& rhs) noexcept \
-        {                                                                 \
-            this->x op## = static_cast<T>(rhs.x);                         \
-            this->y op## = static_cast<T>(rhs.y);                         \
-            this->z op## = static_cast<T>(rhs.z);                         \
-            this->w op## = static_cast<T>(rhs.w);                         \
-            return *this;                                                 \
+#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                     \
+        constexpr inline tvec& operator op##=(const tvec & rhs) noexcept \
+        {                                                                \
+            this->x op## = static_cast<T>(rhs.x);                        \
+            this->y op## = static_cast<T>(rhs.y);                        \
+            this->z op## = static_cast<T>(rhs.z);                        \
+            this->w op## = static_cast<T>(rhs.w);                        \
+            return *this;                                                \
         }
 #    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(op, name) \
         template <typename U = T>                                       \

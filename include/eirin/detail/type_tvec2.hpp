@@ -295,12 +295,12 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
        Should contains: +, -, *, /, %, ^, &, |, <<, >>
     */
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
-#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                      \
-        constexpr inline tvec& operator op## = (const tvec& rhs) noexcept \
-        {                                                                 \
-            this->x op## = static_cast<T>(rhs.x);                         \
-            this->y op## = static_cast<T>(rhs.y);                         \
-            return *this;                                                 \
+#    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC(op)                     \
+        constexpr inline tvec& operator op##=(const tvec & rhs) noexcept \
+        {                                                                \
+            this->x op## = static_cast<T>(rhs.x);                        \
+            this->y op## = static_cast<T>(rhs.y);                        \
+            return *this;                                                \
         }
 #    define EIRIN_VEC_SWIZZLE_CONVERSION_OP_FUNC_WITH_REQUIRE(op, name) \
         template <typename U = T>                                       \

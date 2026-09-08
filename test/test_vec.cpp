@@ -297,42 +297,79 @@ TEST(Vec, Compare)
 // ==================== 11. Swizzle Test ====================
 TEST(Vec, SwizzleRead)
 {
-    // tvec<4, int> v(1, 2, 3, 4);
+    tvec<4, int> v(1, 2, 3, 4);
 
-    // // TODO: recover these after implementation.
-    // auto xy = v.xy();
-    // EXPECT_EQ(xy.x, 1);
-    // EXPECT_EQ(xy.y, 2);
+    auto xy = v.xy();
+    EXPECT_EQ(xy.x(), 1);
+    EXPECT_EQ(xy.y(), 2);
 
-    // auto xyz = v.xyz();
-    // EXPECT_EQ(xyz.x, 1);
-    // EXPECT_EQ(xyz.y, 2);
-    // EXPECT_EQ(xyz.z, 3);
+    auto xyz = v.xyz();
+    EXPECT_EQ(xyz.x(), 1);
+    EXPECT_EQ(xyz.y(), 2);
+    EXPECT_EQ(xyz.z(), 3);
 
-    // auto xyzw = v.xyzw();
-    // EXPECT_EQ(xyzw.x, 1);
-    // EXPECT_EQ(xyzw.y, 2);
-    // EXPECT_EQ(xyzw.z, 3);
-    // EXPECT_EQ(xyzw.w, 4);
+    auto xyzw = v.xyzw();
+    EXPECT_EQ(xyzw.x(), 1);
+    EXPECT_EQ(xyzw.y(), 2);
+    EXPECT_EQ(xyzw.z(), 3);
+    EXPECT_EQ(xyzw.w(), 4);
 
-    // auto xx = v.xx();
-    // EXPECT_EQ(xx.x, 1);
-    // EXPECT_EQ(xx.y, 1);
+    auto xx = v.xx();
+    EXPECT_EQ(xx.x(), 1);
+    EXPECT_EQ(xx.y(), 1);
 
-    // auto yxy = v.yxy();
-    // EXPECT_EQ(yxy.x, 2);
-    // EXPECT_EQ(yxy.y, 1);
-    // EXPECT_EQ(yxy.z, 2);
+    auto yxy = v.yxy();
+    EXPECT_EQ(yxy.x(), 2);
+    EXPECT_EQ(yxy.y(), 1);
+    EXPECT_EQ(yxy.z(), 2);
 
-    // const tvec<4, int> cv(5,6,7,8);
-    // auto cxy = cv.xy();
-    // EXPECT_EQ(cxy.x, 5);
-    // EXPECT_EQ(cxy.y, 6);
+    const tvec<4, int> cv(5, 6, 7, 8);
+    auto cxy = cv.xy();
+    EXPECT_EQ(cxy.x(), 5);
+    EXPECT_EQ(cxy.y(), 6);
+
+    auto xyxy = cv.xyzw().xyxy();
+    EXPECT_EQ(xyxy.x(), 5);
+    EXPECT_EQ(xyxy.y(), 6);
+    EXPECT_EQ(xyxy.xxxx().y(), 5);
+
+    // --- deeper nesting ------------------------------------------------
+    // v = (1,2,3,4):
+    //   wzyx -> (4,3,2,1); yxz -> (3,4,2); zz -> (2,2); z() -> 2
+    auto deep1 = v.wzyx().yxz().zz();
+    EXPECT_EQ(deep1.x(), 2);
+    EXPECT_EQ(deep1.y(), 2);
+    EXPECT_EQ(v.wzyx().yxz().z(), 2);
+
+    //   wzyx -> (4,3,2,1); yxz -> (3,4,2); xy -> (3,4)
+    tvec<2, int> deep2 = v.wzyx().yxz().xy();
+    EXPECT_EQ(deep2.x, 3);
+    EXPECT_EQ(deep2.y, 4);
+
+    //   yzxy -> (2,3,1,2); xwzy -> (2,2,1,3); yxx -> (2,2,2); x() -> 2
+    auto deep3 = v.yzxy().xwzy().yxx();
+    EXPECT_EQ(deep3.x(), 2);
+    EXPECT_EQ(deep3.y(), 2);
+    EXPECT_EQ(deep3.z(), 2);
+    EXPECT_EQ(v.yzxy().xwzy().yxx().x(), 2);
+
+    // const chain: cv = (5,6,7,8)
+    //   wzyx -> (8,7,6,5); xxyy -> (8,8,7,7); yz -> (8,7)
+    auto deep4 = cv.wzyx().xxyy().yz();
+    EXPECT_EQ(deep4.x(), 8);
+    EXPECT_EQ(deep4.y(), 7);
+    EXPECT_EQ(cv.wzyx().xxyy().yz().x(), 8);
+
+    // nested chain materialized through operator()
+    tvec<3, int> deep5 = v.xyzw().wzyx().yxz()();
+    EXPECT_EQ(deep5.x, 3);
+    EXPECT_EQ(deep5.y, 4);
+    EXPECT_EQ(deep5.z, 2);
 }
 
 TEST(Vec, SwizzleWriteValid)
 {
-    eirin::vec4f64 vf{495, 514_f64, 19, 0};
+    eirin::vec4fixed64 vf{495, 514_f64, 19, 0};
     eirin::vec4i vi{114, 514.0, 0, 0}, vii{1919810};
     vf.xyz() += 1_f32;
     vi.xyzw() = eirin::vec4i{1, 2, 3, 4} + vf.xyxy();
@@ -392,6 +429,65 @@ TEST(Vec, SwizzleWriteDuplicateCompileCheck)
     ++v.xx();
     */
     SUCCEED();
+}
+
+TEST(Vec, SwizzleProxyChain)
+{
+    tvec<4, int> v(1, 2, 3, 4);
+
+    // vector -> proxy keeps absolute component indices
+    auto xy = v.xy();
+    EXPECT_EQ(xy.size(), 2u);
+    EXPECT_EQ(xy[0], 1);
+    EXPECT_EQ(xy[1], 2);
+    EXPECT_EQ(xy.x(), 1);
+    EXPECT_EQ(xy.y(), 2);
+
+    // proxy -> proxy composes through the current selection
+    tvec<2, int> yx = v.xy().yx(); // (2, 1)
+    EXPECT_EQ(yx.x, 2);
+    EXPECT_EQ(yx.y, 1);
+
+    tvec<4, int> xxyy = v.xxyy(); // (1, 1, 2, 2)
+    EXPECT_EQ(xxyy.x, 1);
+    EXPECT_EQ(xxyy.y, 1);
+    EXPECT_EQ(xxyy.z, 2);
+    EXPECT_EQ(xxyy.w, 2);
+
+    tvec<2, int> from_chain = v.xxyy().yx(); // view (1,1,2,2).yx() = view[1],view[0]
+    EXPECT_EQ(from_chain.x, 1);
+    EXPECT_EQ(from_chain.y, 1);
+
+    // three-level chain: wzyx -> (4,3,2,1); yxz -> (3,4,2); xz -> (3,2)
+    tvec<2, int> deep = v.wzyx().yxz().xz();
+    EXPECT_EQ(deep.x, 3);
+    EXPECT_EQ(deep.y, 2);
+
+    // single-component access on a temporary proxy
+    EXPECT_EQ(v.yzxy().z(), 1); // yzxy = (2,3,1,2); z() reads its third lane
+
+    // reads through a const vector produce a const proxy
+    const tvec<4, int> cv(5, 6, 7, 8);
+    auto cxy = cv.xy();
+    EXPECT_EQ(cxy[0], 5);
+    EXPECT_EQ(cxy[1], 6);
+    EXPECT_EQ(cxy.x(), 5);
+
+    // writing through a distinct proxy maps lanes back to the original vector
+    v.yx() = tvec<2, int>(7, 8); // y=7, x=8
+    EXPECT_EQ(v.x, 8);
+    EXPECT_EQ(v.y, 7);
+    v.xy() += tvec<2, int>(1, 2);
+    EXPECT_EQ(v.x, 9);
+    EXPECT_EQ(v.y, 9);
+
+    constexpr auto constexpr_chain = []() constexpr
+    {
+        tvec<4, int> w(1, 2, 3, 4);
+        const auto p = w.yzxy().xw();
+        return p[0] == 2 && p[1] == 2 && w.xyz().z() == 3;
+    };
+    static_assert(constexpr_chain());
 }
 
 // ==================== 12. Mixed Type Math ====================
