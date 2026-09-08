@@ -16,8 +16,8 @@
 // IWYU pragma: end_exports
 
 #define EIRIN_MATH_MAJOR_VERSION 1
-#define EIRIN_MATH_MINOR_VERSION 2
-#define EIRIN_MATH_PATCH_VERSION 0
+#define EIRIN_MATH_MINOR_VERSION 5
+#define EIRIN_MATH_PATCH_VERSION 2
 
 #include <tuple>
 

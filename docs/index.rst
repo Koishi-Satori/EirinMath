@@ -33,6 +33,7 @@ Contents:
    basic
    operators
    numeric
+   vec
    io
 
 .. toctree::
