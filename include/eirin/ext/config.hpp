@@ -16,7 +16,7 @@
 #include "../macro.hpp"
 
 #ifndef EIRIN_MATH_MARCO_HPP
-#warning "This file is not included after macro.hpp or directly included in user code." 
+#    warning "This file is not included after macro.hpp or directly included in user code."
 #endif
 
 // if the ++/-- operator should mod-warp or sat the value when meet UQ(N) or Q(N-1).
@@ -37,11 +37,19 @@
 #    define EIRIN_FIXED_NUM_SELF_DEC_OVERFLOW EIRIN_OVERFLOW_DEFAULT
 #endif
 
-// use which type of int128, builtin or extention
-// in MSVC, the default is builtin int128 due to performance issue of _Signed128
+// Which 128-bit backend to use: the compiler builtin (__int128 /
+// std::_Signed128) or the software eirin::ext::int128 implementation.
+//   - MSVC defaults to the software implementation because std::_Signed128
+//     is slow;
+//   - GCC/Clang default to the compiler builtin __int128 when it is
+//     available (detected via __SIZEOF_INT128__);
+//   - toolchains without any native 128-bit integer automatically fall back
+//     to the software implementation.
+// Define EIRIN_USE_EXT_BUILTIN_INT128 or EIRIN_FORCE_EXT_BUILTIN_INT128 to
+// override the default.
 #ifndef EIRIN_USE_EXT_BUILTIN_INT128
-#    ifdef _MSC_VER
-#        define EIRIN_FORCE_EXT_BUILTIN_INT128
+#    if defined(_MSC_VER) || !defined(__SIZEOF_INT128__)
+#        define EIRIN_USE_EXT_BUILTIN_INT128 EIRIN_ENABLE
 #    endif
 #endif
 

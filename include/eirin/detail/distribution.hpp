@@ -16,6 +16,9 @@ namespace eirin
 /**
  * @brief A adapter to distribute fixed point numbers using integral distribution.
  * @note Different from `fixed_distribution_adapter`, this adapter works directly with standard random engines.
+ * @note `DistType` must be a standard uniform integer distribution type (for
+ *       example `std::uniform_int_distribution`): the adapter samples the raw
+ *       internal values of `FixedType` uniformly in `[a, b]`.
  * @code {.cpp}
  * using namespace eirin;
  * random_device rd;
@@ -101,8 +104,8 @@ public:
     template <typename _UniformRandomBitGenerator>
     FixedType operator()(_UniformRandomBitGenerator& g, const param_type& param)
     {
-        // the m_param and the underlying distribution should be consistent, so just call m_dist.operator(g)
-        auto raw_val = m_dist(g);
+        // the m_param and the underlying distribution should be consistent, so just call m_dist.operator()
+        auto raw_val = m_dist(g, param.to_underlying());
         return FixedType::template from_fixed_num_value<result_type::precision>(static_cast<value_type>(raw_val));
     }
 
@@ -152,6 +155,9 @@ private:
 /**
  * @brief A adapter to distribute fixed point numbers using integral distribution with the adapter `fixed_random_engine_adapter`.
  * @note This is similar to `fixed_int_distribution_adapter`, but designed to work with `fixed_random_engine_adapter`.
+ * @note `DistType` must be a standard uniform integer distribution type (for
+ *       example `std::uniform_int_distribution`): the adapter samples the raw
+ *       internal values of `FixedType` uniformly in `[a, b]`.
  * @code {.cpp}
  * using namespace eirin;
  * random_device rd;
@@ -237,8 +243,8 @@ public:
     template <typename _UniformRandomBitGeneratorAdapter>
     FixedType operator()(_UniformRandomBitGeneratorAdapter& a, const param_type& param)
     {
-        // the m_param and the underlying distribution should be consistent, so just call m_dist.operator(g)
-        auto raw_val = m_dist(a.__underlying_engine());
+        // the m_param and the underlying distribution should be consistent, so just call m_dist.operator()
+        auto raw_val = m_dist(a.__underlying_engine(), param.to_underlying());
         return FixedType::template from_fixed_num_value<result_type::precision>(static_cast<value_type>(raw_val));
     }
 

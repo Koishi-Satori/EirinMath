@@ -345,7 +345,7 @@ public:
             return *this;                                                                                                        \
         }
 
-#    include <eirin/detail/vec_swizzle_decl.hpp>
+#    include "vec_swizzle_decl.hpp"
 
 // IsConst flag of a chain selector's result.  The first hop from a vector
 // always yields a writable proxy; every deeper hop returns a read-only view

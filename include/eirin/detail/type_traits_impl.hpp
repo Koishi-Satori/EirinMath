@@ -339,6 +339,14 @@ struct __generator_word_selector<T, Word, Rest...>
         typename __generator_word_selector<T, Rest...>::word_type>;
 };
 
+template <typename T, typename = void>
+struct __can_apply_bit_width : std::false_type
+{};
+
+template <typename T>
+struct __can_apply_bit_width<T, std::void_t<decltype(std::bit_width(std::declval<T>()))>> : std::true_type
+{};
+
 /**
  * @brief Return the number of bits needed to represent `x`.
  *
@@ -357,7 +365,7 @@ struct __generator_word_selector<T, Word, Rest...>
 template <typename T>
 EIRIN_MATH_FUNC_API std::size_t bit_width(T x) noexcept
 {
-    if constexpr(std::is_integral_v<T> && !std::is_same_v<T, detail::int128_t> && !std::is_same_v<T, detail::uint128_t>)
+    if constexpr(__can_apply_bit_width<T>::value)
     {
         return std::bit_width(x);
     }

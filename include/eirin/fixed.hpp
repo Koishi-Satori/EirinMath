@@ -241,7 +241,11 @@ public:
         if constexpr(detail::is_unsigned_v<Type>)
             return 0;
         else
-            return static_cast<Type>(1) << (sizeof(Type) * 8 - 1);
+        {
+            // fixed: ~result + (1 << fraction) may be overflowed.
+            using u_type = detail::make_unsigned_t<Type>;
+            return static_cast<Type>(static_cast<u_type>(1) << (sizeof(Type) * 8 - 1));
+        }
     }
 
     EIRIN_ALWAYS_INLINE friend constexpr bool signbit(const fixed_num& f) noexcept
@@ -265,8 +269,12 @@ public:
         Type result = m_value;
         if(signbit(*this))
         {
-            result = ~result;
-            result += static_cast<Type>(1) << fraction;
+            // fixed: `~result + (1 << fraction)` overflowed signed Type for values
+            // near the minimum (e.g. fixed64::min()), replaced with unsigned type.
+            using u_type = detail::make_unsigned_t<Type>;
+            u_type u = static_cast<u_type>(~result);
+            u += static_cast<u_type>(1) << fraction;
+            result = static_cast<Type>(u);
         }
         result >>= fraction; // Drop fractional part
 
@@ -717,7 +725,9 @@ public:
     template <unsigned int _fraction, typename T, typename std::enable_if_t<(_fraction <= fraction), T*> = nullptr>
     EIRIN_ALWAYS_INLINE static constexpr fixed_num from_fixed_num_value(T inner_value) noexcept
     {
-        return fixed_num(static_cast<Type>(inner_value * (T(1) << (fraction - _fraction))), raw_value_construct_tag{});
+        // scale in the destination storage type so that widening conversions will not overflow.
+        const Type scaled = static_cast<Type>(inner_value) * (static_cast<Type>(1) << (fraction - _fraction));
+        return fixed_num(scaled, raw_value_construct_tag{});
     }
 
     static constexpr fixed_num from_internal_value(Type internal_value) noexcept
