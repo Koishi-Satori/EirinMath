@@ -4,11 +4,11 @@
 #pragma once
 
 #include <limits>
-#include <eirin/detail/type_tvec.hpp>
-#include <eirin/detail/type_tvec2.hpp>
-#include <eirin/detail/type_tvec4.hpp>
-#include <eirin/detail/compute_vec_rel.hpp>
-#include <eirin/detail/vec_swizzle.hpp>
+#include "type_tvec.hpp"
+#include "type_tvec2.hpp"
+#include "type_tvec3.hpp"
+#include "compute_vec_rel.hpp"
+#include "vec_swizzle.hpp"
 
 namespace eirin
 {

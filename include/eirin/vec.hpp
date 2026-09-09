@@ -10,10 +10,10 @@
 #        include <stdfloat>
 #    endif
 #endif
-#include <eirin/macro.hpp>
-#include <eirin/detail/type_tvec2.hpp>
-#include <eirin/detail/type_tvec3.hpp>
-#include <eirin/detail/type_tvec4.hpp>
+#include "macro.hpp"
+#include "detail/type_tvec2.hpp"
+#include "detail/type_tvec3.hpp"
+#include "detail/type_tvec4.hpp"
 #include "detail/int128.hpp"
 
 namespace eirin
@@ -123,11 +123,13 @@ using vec4fixed = tvec<4, fixed_num<T, I, f, r>>;
 
 // Concrete fixed-point vectors.
 using vec2fixed32 = tvec<2, fixed32>;
-using vec2fixed64 = tvec<2, fixed64>;
 using vec3fixed32 = tvec<3, fixed32>;
-using vec3fixed64 = tvec<3, fixed64>;
 using vec4fixed32 = tvec<4, fixed32>;
+#ifdef EIRIN_MATH_HAS_INT128
+using vec2fixed64 = tvec<2, fixed64>;
+using vec3fixed64 = tvec<3, fixed64>;
 using vec4fixed64 = tvec<4, fixed64>;
+#endif
 } // namespace eirin
 
 #endif

@@ -8,7 +8,7 @@
 // included on its own with EIRIN_VEC_SWIZZLE_ENABLE == 0, in which case an
 // undefined EIRIN_ENABLE used to make the guard compare 0 == 0 and compile
 // the whole swizzle block anyway.
-#include <eirin/macro.hpp>
+#include "../macro.hpp"
 
 #if EIRIN_VEC_SWIZZLE_ENABLE == EIRIN_ENABLE
 
@@ -16,7 +16,7 @@
 #    include <cstddef>
 #    include <type_traits>
 #    include <utility>
-#    include <eirin/detail/type_tvec.hpp>
+#    include "type_tvec.hpp"
 
 namespace eirin
 {
@@ -129,18 +129,18 @@ public:
         return (*m_data)[index_table()[i]];
     }
 
-#    define EIRIN_SWIZZLE_PROXY_COMPONENT_ACCESS(letter, position) \
-        template <typename Dummy = void>                           \
+#    define EIRIN_SWIZZLE_PROXY_COMPONENT_ACCESS(letter, position)   \
+        template <typename Dummy = void>                             \
         requires(!IsConst && k_distinct && k_size >= (position + 1)) \
-        constexpr T& letter() noexcept                             \
-        {                                                          \
-            return (*m_data)[mapped<position>()];                  \
-        }                                                          \
-        template <typename Dummy = void>                           \
-        requires(k_size >= (position + 1))                         \
-        constexpr const T& letter() const noexcept                 \
-        {                                                          \
-            return (*m_data)[mapped<position>()];                  \
+        constexpr T& letter() noexcept                               \
+        {                                                            \
+            return (*m_data)[mapped<position>()];                    \
+        }                                                            \
+        template <typename Dummy = void>                             \
+        requires(k_size >= (position + 1))                           \
+        constexpr const T& letter() const noexcept                   \
+        {                                                            \
+            return (*m_data)[mapped<position>()];                    \
         }
 
     EIRIN_SWIZZLE_PROXY_COMPONENT_ACCESS(x, 0)
@@ -345,7 +345,7 @@ public:
             return *this;                                                                                                        \
         }
 
-#    include <eirin/detail/vec_swizzle_decl.hpp>
+#    include "vec_swizzle_decl.hpp"
 
 // IsConst flag of a chain selector's result.  The first hop from a vector
 // always yields a writable proxy; every deeper hop returns a read-only view

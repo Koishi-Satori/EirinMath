@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include <eirin/macro.hpp>
-#include <eirin/fixed.hpp>
+#include "../macro.hpp"
+#include "../fixed.hpp"
 #include <cstdlib>
 
 namespace eirin

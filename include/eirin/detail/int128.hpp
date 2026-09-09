@@ -11,7 +11,7 @@
 #include <version>
 #include "../macro.hpp"
 #if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
-#    include "eirin/ext/builtin_ints.hpp"
+#    include "../ext/builtin_ints.hpp"
 #endif
 
 #ifdef _MSC_VER
@@ -22,7 +22,7 @@
 #    include <__msvc_int128.hpp>
 #endif
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && defined(__SIZEOF_INT128__)
 #    define EIRIN_MATH_HAS_INT128
 // Built-in __int128
 #    define EIRIN_MATH_DETAIL_BUILTIN__INT128
@@ -39,11 +39,13 @@ namespace eirin::detail
 #if EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_ENABLE
 using int128_t = ::eirin::ext::int128;
 using uint128_t = ::eirin::ext::uint128;
+#    define EIRIN_MATH_HAS_DEFINED_INT128
 #else
 #    ifdef EIRIN_MATH_DETAIL_INT128_MSVC_STL
 
 using int128_t = std::_Signed128;
 using uint128_t = std::_Unsigned128;
+#        define EIRIN_MATH_HAS_DEFINED_INT128
 
 #    endif
 
@@ -51,8 +53,16 @@ using uint128_t = std::_Unsigned128;
 
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
+#        define EIRIN_MATH_HAS_DEFINED_INT128
 
 #    endif
+#endif
+
+// int128 is not defined
+#ifndef EIRIN_MATH_HAS_DEFINED_INT128
+#    undef EIRIN_MATH_HAS_INT128
+#else
+#    undef EIRIN_MATH_HAS_DEFINED_INT128
 #endif
 } // namespace eirin::detail
 

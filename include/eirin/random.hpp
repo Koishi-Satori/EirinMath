@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <vector>
 #include <random>
+#include <istream>
+#include <ostream>
 #include "macro.hpp"
 #include "fixed.hpp"
 #include "detail/distribution.hpp"
@@ -16,7 +18,30 @@ namespace eirin
 namespace detail
 {
     template <typename T, T state, T multiplier, T increment, T mix_multiplier, T xor_multiplier>
-    concept pcg_params_check = is_unsigned_v<T>;
+    concept pcg_params_check = is_unsigned_v<T> && multiplier != T{0} && increment != T{0} && mix_multiplier != T{0} && xor_multiplier != T{0};
+
+    /**
+     * @brief The mixing kernel of the Stellaris CNoiseRandom-style generator, operating
+     *        on one 32-bit lane.
+     *
+     * Reproduces the decompiled sequence:
+     *   x = (x >> 8) ^ x;  x += increment;
+     *   x = (x * 0x100) ^ x;  x *= xor_multiplier;
+     *   x = (x >> 8) ^ x;  x *= mix_multiplier;
+     *
+     * @tparam Word lane type (uint32_t).
+     * @return the mixed raw lane value; the caller applies the final
+     *         full-width `x ^ (x >> 8)` output mixing.
+     */
+    template <typename Word>
+    EIRIN_ALWAYS_INLINE constexpr Word __pcg_mix(Word x, Word increment, Word xor_multiplier, Word mix_multiplier) noexcept
+    {
+        x = (x ^ (x >> 8)) + increment;
+        x = (x * static_cast<Word>(0x100)) ^ x;
+        x *= xor_multiplier;
+        x = (x ^ (x >> 8)) * mix_multiplier;
+        return x;
+    }
 
     template <typename FixedType, typename _RandomNumberEngine>
     concept fixed_random_engine_type_check = requires {
@@ -48,33 +73,33 @@ protected:
     UIntType m_seed;
     UIntType m_state;
 
-    EIRIN_ALWAYS_INLINE UIntType mix_first(UIntType x)
-    {
-        x >>= 8 ^ x;
-        x += increment;
-        return x;
-    }
-
-    EIRIN_ALWAYS_INLINE UIntType _xor(UIntType x)
-    {
-        x = x * 0x100 ^ x;
-        x *= xor_multiplier;
-        return x;
-    }
-
-    EIRIN_ALWAYS_INLINE UIntType mix_second(UIntType x)
-    {
-        x >>= 8 ^ x;
-        x *= mix_multiplier;
-        return x;
-    }
-
     EIRIN_ALWAYS_INLINE UIntType generate()
     {
-        result_type val = m_state * multiplier + m_seed;
-        val = mix_second(_xor(mix_first(val)));
-        ++m_state;
-        return (val & 0x7FFFFFFE) ^ (val >> 8);
+        if constexpr(sizeof(UIntType) == 8)
+        {
+            const uint32_t c = static_cast<uint32_t>(m_state);
+            const uint32_t s = static_cast<uint32_t>(m_seed);
+            const uint32_t mul = static_cast<uint32_t>(multiplier);
+            const uint32_t inc = static_cast<uint32_t>(increment);
+            const uint32_t xm = static_cast<uint32_t>(xor_multiplier);
+            const uint32_t mm = static_cast<uint32_t>(mix_multiplier);
+
+            const uint32_t raw0 = detail::__pcg_mix<uint32_t>(c * mul + s, inc, xm, mm);
+            const uint32_t raw1 = detail::__pcg_mix<uint32_t>((c + 1u) * mul + s, inc, xm, mm);
+            m_state = static_cast<UIntType>(c) + UIntType{2};
+
+            const UIntType out0 = static_cast<UIntType>(raw0 ^ (raw0 >> 8));
+            const UIntType out1 = static_cast<UIntType>(raw1 ^ (raw1 >> 8));
+            return (out0 << 32) | out1;
+        }
+        else
+        {
+            const UIntType raw = detail::__pcg_mix<UIntType>(
+                m_state * multiplier + m_seed, increment, xor_multiplier, mix_multiplier
+            );
+            ++m_state;
+            return raw ^ (raw >> 8);
+        }
     }
 
 public:
@@ -101,9 +126,11 @@ public:
     void seed(result_type seed = default_seed)
     {
         m_seed = seed;
+        m_state = state;
     }
 
-    void seed(std::seed_seq& seq)
+    template <typename Sseq>
+    void seed(Sseq& seq)
     {
         std::vector<result_type> seeds(2);
         seq.generate(seeds.begin(), seeds.end());
@@ -136,14 +163,14 @@ public:
         return !(lhs == rhs);
     }
 
+    template <typename U_, U_ s_, U_ m_, U_ i_, U_ mm_, U_ xm_, typename charT_, typename charTraits_>
+    friend std::basic_ostream<charT_, charTraits_>& operator<<(std::basic_ostream<charT_, charTraits_>& os, const permuted_congruential_engine<U_, s_, m_, i_, mm_, xm_>& obj);
+
     template <typename charT, typename charTraits>
-    inline friend std::basic_ostream<charT, charTraits>& operator<<(std::basic_ostream<charT, charTraits>& os, const permuted_congruential_engine& obj)
+    inline friend std::basic_istream<charT, charTraits>& operator>>(std::basic_istream<charT, charTraits>& is, permuted_congruential_engine& obj)
     {
-        // set fmtflags to dec and left, padding with space.
-        os.setf(std::ios::fmtflags(os.flags() | std::ios::dec | std::ios_base::left), std::ios::basefield);
-        // write the current state into the stream.
-        os << obj.m_seed << ' ' << obj.m_state;
-        return os;
+        is >> obj.m_seed >> obj.m_state;
+        return is;
     }
 };
 
@@ -177,8 +204,7 @@ public:
     typedef FixedType result_type;
     typedef _RandomNumberEngine underlying_type;
 
-    fixed_random_engine_adapter()
-        : m_engine(default_engine()) {}
+    fixed_random_engine_adapter() = default;
 
     result_type operator()()
     {
@@ -200,7 +226,8 @@ public:
         m_engine.seed(seed);
     }
 
-    void seed(std::seed_seq& seq)
+    template <typename Sseq>
+    void seed(Sseq& seq)
     {
         m_engine.seed(seq);
     }
@@ -227,18 +254,19 @@ public:
         return os;
     }
 
+    template <typename charT, typename charTraits>
+    inline friend std::basic_istream<charT, charTraits>& operator>>(std::basic_istream<charT, charTraits>& is, fixed_random_engine_adapter& obj)
+    {
+        is >> obj.m_engine;
+        return is;
+    }
+
     underlying_type& __underlying_engine()
     {
         return m_engine;
     }
 
 private:
-    static underlying_type default_engine()
-    {
-        static underlying_type instance;
-        return instance;
-    }
-
     underlying_type m_engine;
 };
 
@@ -250,57 +278,9 @@ using minstd_rand = std::minstd_rand;
 using ranlux24_base = std::ranlux24_base;
 using ranlux48_base = std::ranlux48_base;
 
-typedef permuted_congruential_engine<uint32_t, 0x0, 0xB5297A4D, 0x68E31DA4, 0x1B56C4E9, 0x92D68CA2> pcg2014;
-typedef permuted_congruential_engine<uint64_t, 0x0, 0x5851F42D4C957F2D, 0x9E3779B97F4A7C15, 0x94D049BB133111EB, 0xBF58476D1CE4E5B9> pcg2014_64;
+typedef permuted_congruential_engine<uint32_t, 0x0, 0xB5297A4D, 0x68E31DA4, 0x92D68CA2, 0x1B56C4E9> pcg2014;
+typedef permuted_congruential_engine<uint64_t, 0x0, 0xB5297A4D, 0x68E31DA4, 0x92D68CA2, 0x1B56C4E9> pcg2014_64;
 
-// /**
-//  * @brief Temporary test function for random number generator, remove it in the future.
-//  *
-//  */
-// inline void test()
-// {
-//     auto seed = 114514u;
-//     std::unordered_map<int32_t, uint32_t> rands;
-//     // open a file stream to write the random results
-//     auto fs = std::ofstream("random_res.txt", std::ios::out);
-//     pcg2014 rng(seed);
-//     std::random_device rd;
-//     std::mt19937 mt(rd());
-//     pcg2014 pcg(rd());
-//     std::uniform_int_distribution<uint32_t> dist(0, 114514);
-//     printf("test mt: %ud\n", dist(mt));
-//     printf("test pcg: %ud\n", dist(pcg));
-//     for(int i = 0; i < 114514; ++i)
-//     {
-//         auto val = rng();
-//         rng.seed(val);
-//         rands[val]++;
-//         if(fs.is_open())
-//         {
-//             fs << "random " << i << " for seed " << seed << " " << val << '\n';
-//         }
-//         else
-//             printf("random %d for seed %u %u\n", i, seed, val);
-//     }
-//     fs.close();
-//     std::vector<std::pair<int32_t, int32_t>> pairs;
-//     pairs.reserve(rands.size());
-//     fs.open("random_res_summary.txt", std::ios::out);
-//     for(const auto& [key, value] : rands)
-//     {
-//         pairs.push_back(std::make_pair(key, value));
-//     }
-//     std::sort(pairs.begin(), pairs.end(), [](const auto& a, const auto& b)
-//               { return a.second > b.second; });
-//     for(const auto& [key, value] : pairs)
-//     {
-//         if(fs.is_open())
-//         {
-//             fs << "value " << key << " appears " << value << " times\n";
-//         }
-//     }
-//     fs.close();
-// }
 } // namespace eirin
 
 #endif

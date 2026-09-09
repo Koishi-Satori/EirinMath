@@ -1,11 +1,28 @@
+/**
+ * @file util.hpp
+ * @author KKoishi_
+ * @brief INTERNAL ALGORITHM DEVELOPMENT/TESTING ONLY.
+ * @date 2025-04-26
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
 #ifndef EIRIN_MATH_UTIL_HPP
 #define EIRIN_MATH_UTIL_HPP
+
+// INTERNAL ALGORITHM DEVELOPMENT/TESTING ONLY.
+//
+// This header exists to support the library's own constant generation,
+// accuracy checks, benchmarks and tests. It is not part of the public API:
+// it includes the whole library, uses compiler/platform intrinsics, and
+// refers to types (e.g. fixed64) that may be unavailable in reduced
+// configurations. Do not include it from application code or from other
+// headers.
 
 #include <cmath>
 #include <array>
 #include <cstdio>
 #include "../eirin.hpp"
-#include "int128.hpp"
 #ifndef EIRIN_MATH_NO_SIMD
 #    include <immintrin.h>
 #endif
@@ -130,68 +147,7 @@ inline void print_constants(int fraction = 61)
     }
 }
 
-namespace pi_calc
-{
-    template <int N, int value>
-    concept greater_than = (N > value);
-    template <typename T, int fraction>
-    concept check_valid_fixed_store_type = std::is_integral_v<T> && fraction > 0 && fraction <= sizeof(T) * 8 - 1;
-
-    template <typename T, int fraction, int N>
-    requires check_valid_fixed_store_type<T, fraction> || greater_than<N, 0>
-    struct ret_value
-    {
-        T value;
-        T error;
-        int iterations;
-
-        ret_value(const T v, const T e, int iters = N)
-            : value(v), error(e), iterations(iters) {}
-    };
-
-    /**
- * @brief Calculate the internal fixed value for pi using BBP formula.
- *
- * @tparam T
- * @param fraction
- * @param N The number of terms to calculate.
- * @return requires
- */
-    template <typename T = int64_t, int fraction = 61, int N>
-    requires check_valid_fixed_store_type<T, fraction>
-    inline T bbp_calc_pi()
-    {
-// BBP formula: pi = sum(k=0~inf){1/16^k * (4/(8k+1) - 2/(8k+4) - 1/(8k+5) - 1/(8k+6))}
 #ifdef EIRIN_MATH_HAS_INT128
-        using intermediate_t = typename std::conditional<sizeof(T) <= 4, std::conditional<sizeof(T) <= 2, int32_t, int64_t>, detail::int128_t>::type;
-#else
-        if constexpr(sizeof(T) <= 2)
-            using intermediate_t = int32_t;
-        else if constexpr(sizeof(T) <= 4)
-            using intermediate_t = int64_t;
-        else
-            static_assert(false, "Type too large, int128_t not supported.");
-#endif
-        // simulate fixed point calculation using integer arithmetic.
-        intermediate_t sum = 0;
-        intermediate_t frac_mult = intermediate_t(1) << fraction;
-        for(int k = 0; k < N; ++k)
-        {
-            intermediate_t factor = frac_mult;
-            for(int i = 0; i < 4 * k; ++i)
-                factor /= 16;
-
-            intermediate_t term1 = (4 * factor) / (8 * k + 1);
-            intermediate_t term2 = (2 * factor) / (8 * k + 4);
-            intermediate_t term3 = (1 * factor) / (8 * k + 5);
-            intermediate_t term4 = (1 * factor) / (8 * k + 6);
-
-            sum += term1 - term2 - term3 - term4;
-        }
-        return static_cast<T>(sum);
-    }
-}; // namespace pi_calc
-
 namespace lut
 {
     template <size_t N>
@@ -247,6 +203,7 @@ namespace lut
         return negate ? -result : result;
     }
 } // namespace lut
+#endif
 
 } // namespace eirin::util
 
