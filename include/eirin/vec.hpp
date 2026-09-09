@@ -10,10 +10,10 @@
 #        include <stdfloat>
 #    endif
 #endif
-#include <eirin/macro.hpp>
-#include <eirin/detail/type_tvec2.hpp>
-#include <eirin/detail/type_tvec3.hpp>
-#include <eirin/detail/type_tvec4.hpp>
+#include "macro.hpp"
+#include "detail/type_tvec2.hpp"
+#include "detail/type_tvec3.hpp"
+#include "detail/type_tvec4.hpp"
 #include "detail/int128.hpp"
 
 namespace eirin

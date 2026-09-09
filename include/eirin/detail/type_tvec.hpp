@@ -5,9 +5,9 @@
 
 #include <cstddef>
 #include <type_traits>
-#include <eirin/macro.hpp>
-#include "eirin/fixed.hpp"
-#include "eirin/detail/compute_vec_rel.hpp"
+#include "../macro.hpp"
+#include "../fixed.hpp"
+#include "compute_vec_rel.hpp"
 
 namespace eirin
 {
