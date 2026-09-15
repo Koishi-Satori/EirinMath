@@ -72,6 +72,75 @@ TEST(Vec, ElementAccess)
     EXPECT_EQ(cv[2], 3);
 }
 
+// The checked accessors, like the rest of the vector API, work in constant
+// expressions.
+namespace
+{
+    constexpr vec3i kConstexprVec(1, 2, 3);
+
+    constexpr int constexpr_element(int i) noexcept
+    {
+        vec3i v(1, 2, 3);
+        return v.element(i);
+    }
+
+    constexpr int constexpr_at(int i)
+    {
+        vec3i v(1, 2, 3);
+        return v.at(i);
+    }
+
+    static_assert((kConstexprVec + vec3i(1, 1, 1)).z == 4);
+    static_assert(constexpr_element(-1) == 3);
+    static_assert(constexpr_element(3) == 1);
+    static_assert(constexpr_at(2) == 3);
+} // namespace
+
+TEST(Vec, CheckedElementAccess)
+{
+    vec3i v(10, 20, 30);
+    const vec3i cv(10, 20, 30);
+
+    // at(): bounds checked, writable through a non-const vector.
+    EXPECT_EQ(v.at(0), 10);
+    EXPECT_EQ(v.at(2), 30);
+    EXPECT_EQ(cv.at(1), 20);
+    v.at(1) = 99;
+    EXPECT_EQ(v.y, 99);
+
+    EXPECT_THROW((void)v.at(3), std::out_of_range);
+    EXPECT_THROW((void)cv.at(3), std::out_of_range);
+    EXPECT_THROW((void)v.at(-1), std::out_of_range);
+
+    // element(): wrapping, negative indices count from the end.
+    EXPECT_EQ(v.element(0), 10);
+    EXPECT_EQ(v.element(1), 99);
+    EXPECT_EQ(v.element(-1), 30);
+    EXPECT_EQ(v.element(-2), 99);
+    EXPECT_EQ(v.element(-3), 10);
+    EXPECT_EQ(v.element(-4), 30);
+    EXPECT_EQ(v.element(3), 10);
+    EXPECT_EQ(v.element(4), 99);
+    EXPECT_EQ(v.element(5), 30);
+    EXPECT_EQ(v.element(2u), 30);
+    EXPECT_EQ(cv.element(-1), 30);
+
+    // element() writes through as well.
+    v.element(-1) = 7;
+    v.element(3) = 8;
+    EXPECT_EQ(v.x, 8);
+    EXPECT_EQ(v.y, 99);
+    EXPECT_EQ(v.z, 7);
+
+    // Every supported vector length behaves the same way.
+    vec2i v2(1, 2);
+    vec4i v4(1, 2, 3, 4);
+    EXPECT_EQ(v2.element(-1), 2);
+    EXPECT_EQ(v4.element(-1), 4);
+    EXPECT_EQ(v2.element(2), 1);
+    EXPECT_EQ(v4.element(4), 1);
+}
+
 // ==================== Arithmetic Compute ====================
 TEST(Vec, Arithmetic)
 {

@@ -4,15 +4,29 @@
 #pragma once
 
 #include <cstddef>
+#include <concepts>
 #include <type_traits>
+#include <stdexcept>
 #include "../macro.hpp"
 #include "../fixed.hpp"
+#include "../error.hpp"
 #include "compute_vec_rel.hpp"
 
 namespace eirin
 {
 namespace detail
 {
+    template <typename T, typename = void>
+    struct is_vector_type : std::false_type
+    {};
+
+    template <typename T>
+    struct is_vector_type<T, std::void_t<typename std::remove_cvref_t<T>::is_tvec_type>> : std::true_type
+    {};
+
+    template <typename T>
+    inline constexpr bool is_vector_type_v = is_vector_type<T>::value;
+
     template <typename T>
     concept has_operator_bit_xor = requires(T a, T b) { a ^ b; };
     template <typename T>
@@ -26,6 +40,9 @@ namespace detail
     template <typename T>
     concept has_operator_right_shift = requires(T a, T b) { a >> b; };
 } // namespace detail
+
+template <typename T>
+concept vector_type = detail::is_vector_type_v<T>;
 
 template <std::size_t N, typename T>
 struct tvec;
@@ -127,6 +144,36 @@ struct tvec_base
         return derived() == rhs;
     }
 
+    EIRIN_ALWAYS_INLINE constexpr value_type& at(std::integral auto i)
+    {
+        size_type index = static_cast<size_type>(i);
+        if(index >= this->size())
+        {
+            EIRIN_THROW_EXCEPTION(std::out_of_range, "vec index out of range.");
+        }
+        return derived()[index];
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr const value_type& at(std::integral auto i) const
+    {
+        size_type index = static_cast<size_type>(i);
+        if(index >= this->size())
+        {
+            EIRIN_THROW_EXCEPTION(std::out_of_range, "vec index out of range.");
+        }
+        return derived()[index];
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr value_type& element(std::integral auto i) noexcept
+    {
+        return derived()[wrap_index(i)];
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr const value_type& element(std::integral auto i) const noexcept
+    {
+        return derived()[wrap_index(i)];
+    }
+
     EIRIN_ALWAYS_INLINE constexpr bool nearly_eq(const Derived& rhs) const noexcept
     {
         if constexpr(is_fixed_point_v<T>)
@@ -147,12 +194,30 @@ struct tvec_base
     }
 
 private:
-    Derived& derived() noexcept
+    // mod-warp a (possibly negative) integral index into [0, N): negative values
+    // count from the end, out-of-range values wrap around.
+    [[nodiscard]]
+    EIRIN_ALWAYS_INLINE constexpr static size_type wrap_index(std::integral auto i) noexcept
+    {
+        if constexpr(std::is_signed_v<decltype(i)>)
+        {
+            using signed_size = std::make_signed_t<size_type>;
+            constexpr auto len = static_cast<signed_size>(N);
+            const auto rem = static_cast<signed_size>(i) % len;
+            return static_cast<size_type>(rem < 0 ? rem + len : rem);
+        }
+        else
+        {
+            return static_cast<size_type>(i) % N;
+        }
+    }
+
+    EIRIN_ALWAYS_INLINE constexpr Derived& derived() noexcept
     {
         return static_cast<Derived&>(*this);
     }
 
-    const Derived& derived() const noexcept
+    EIRIN_ALWAYS_INLINE constexpr const Derived& derived() const noexcept
     {
         return static_cast<const Derived&>(*this);
     }

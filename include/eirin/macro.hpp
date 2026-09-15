@@ -14,6 +14,10 @@
 #define EIRIN_OVERFLOW_MODWRAP 1
 #define EIRIN_OVERFLOW_SAT     2
 
+#ifndef NDEBUG
+#    define EIRIN_DEBUG
+#endif
+
 #ifdef __GNUC__
 #    ifndef __clang__
 #        define EIRIN_ALWAYS_INLINE __attribute__((always_inline)) inline
@@ -88,6 +92,17 @@
 #    define EIRIN_UNREACHABLE __assume(false)
 #else
 #    define EIRIN_UNREACHABLE __builtin_unreachable()
+#endif
+
+#ifdef EIRIN_DEBUG
+#    include <cassert>
+#    define EIRIN_INDEX_LENGTH_ASSERT(i, max) (assert((i) < (max)))
+#else
+#    define EIRIN_INDEX_LENGTH_ASSERT(i, max)
+#endif
+
+#if defined(__cpp_multidimensional_subscript) && __cpp_multidimensional_subscript >= 202110L
+#define EIRIN_HAS_CXX_FEATURE_MULTIDIM_SUBSCRIPT
 #endif
 
 // must include this, as config header.

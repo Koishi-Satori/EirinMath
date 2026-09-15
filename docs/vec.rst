@@ -69,8 +69,33 @@ indexed with ``operator[]``:
     int a = v[2];        // index access, a == 3
     v[1] = 20;           // v == (10, 20, 3, 4)
 
-``tvec<N, T>::size()`` is a compile-time constant returning ``N``. Indices
-are not range checked; use values in ``[0, N)``.
+``tvec<N, T>::size()`` is a compile-time constant returning ``N``.
+
+``operator[]`` is a precondition-checked accessor: the index must be in
+``[0, N)``. When ``EIRIN_DEBUG`` is defined (the default unless ``NDEBUG``
+is defined) the precondition is checked with ``assert``; in a release build
+an out-of-range index is a precondition violation and therefore undefined
+behavior.
+
+Two checked accessors are available on top of ``operator[]``:
+
+- ``at(i)`` requires ``i`` in ``[0, N)`` and throws ``std::out_of_range``
+  otherwise (it calls ``std::terminate()`` when the library is built with
+  ``EIRIN_NO_EXCEPTIONS``). Negative indices are out of range;
+- ``element(i)`` never fails: the index wraps around modulo ``N``, and a
+  negative index counts from the end, so ``element(-1)`` is the last
+  component. This is a library extension, GLSL has no equivalent.
+
+Both are ``constexpr`` and both have a ``const`` overload returning
+``const T&``; on a non-const vector they give a writable reference.
+
+.. code-block:: c++
+
+    vec3i v(1, 2, 3);
+    v.at(1) = 9;                     // v == (1, 9, 3)
+    int a = v.element(-1);           // a == 3, last component
+    int b = v.element(v.size());     // b == 1, index wraps modulo size()
+    int c = v.at(3);                 // throws std::out_of_range
 
 Arithmetic and Logical Operators
 --------------------------------

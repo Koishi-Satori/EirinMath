@@ -4,6 +4,7 @@
 #pragma once
 
 #include <limits>
+#include <cassert>
 #include "type_tvec.hpp"
 #include "type_tvec2.hpp"
 #include "type_tvec3.hpp"
@@ -75,6 +76,7 @@ struct tvec<4, T> : public tvec_base<4, T, tvec<4, T>>
 
     constexpr inline T& operator[](std::size_t i) noexcept
     {
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
         switch(i)
         {
         case 3:
@@ -92,6 +94,7 @@ struct tvec<4, T> : public tvec_base<4, T, tvec<4, T>>
 
     constexpr inline const T& operator[](std::size_t i) const noexcept
     {
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
         switch(i)
         {
         case 3:

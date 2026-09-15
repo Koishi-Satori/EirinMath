@@ -4,6 +4,7 @@
 #pragma once
 
 #include <limits>
+#include <cassert>
 #include "type_tvec.hpp"
 #include "type_tvec3.hpp"
 #include "type_tvec4.hpp"
@@ -56,14 +57,30 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
 
     constexpr inline T& operator[](std::size_t i) noexcept
     {
-        if(i == 0) return x;
-        return y;
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
+        switch(i)
+        {
+        case 0:
+            return x;
+        case 1:
+            return y;
+        default:
+            EIRIN_UNREACHABLE;
+        }
     }
 
     constexpr inline const T& operator[](std::size_t i) const noexcept
     {
-        if(i == 0) return x;
-        return y;
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
+        switch(i)
+        {
+        case 0:
+            return x;
+        case 1:
+            return y;
+        default:
+            EIRIN_UNREACHABLE;
+        }
     }
 
     template <typename U>

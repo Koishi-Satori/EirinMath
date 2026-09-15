@@ -5,6 +5,7 @@
 
 #include <limits>
 #include "type_tvec.hpp"
+#include <cassert>
 #include "type_tvec2.hpp"
 #include "type_tvec3.hpp"
 #include "compute_vec_rel.hpp"
@@ -62,6 +63,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
 
     constexpr inline T& operator[](std::size_t i) noexcept
     {
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
         switch(i)
         {
         case 2:
@@ -77,6 +79,7 @@ struct tvec<3, T> : public tvec_base<3, T, tvec<3, T>>
 
     constexpr inline const T& operator[](std::size_t i) const noexcept
     {
+        EIRIN_INDEX_LENGTH_ASSERT(i, this->size());
         switch(i)
         {
         case 2:

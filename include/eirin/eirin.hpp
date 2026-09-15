@@ -12,6 +12,7 @@
 #include "numbers.hpp"
 #include "random.hpp"
 #include "vec.hpp"
+#include "mat.hpp"
 
 // IWYU pragma: end_exports
 

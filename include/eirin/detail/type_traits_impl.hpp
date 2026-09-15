@@ -305,6 +305,13 @@ struct has_make_unsigned<T, std::void_t<typename make_unsigned<T>::type>> : std:
 template <typename T>
 inline constexpr bool has_make_unsigned_v = has_make_unsigned<T>::value;
 
+// A dependent `false`, so that the static assertions below only fire when
+// the corresponding shape is actually instantiated.  A plain
+// `static_assert(false, ...)` is rejected by GCC as soon as the template is
+// parsed, even if no specialization is ever instantiated.
+template <typename...>
+inline constexpr bool __always_false = false;
+
 /**
  * @brief Picks the first word type, in priority order (wider preferred), for
  * which a generator specialization exists.
