@@ -76,24 +76,24 @@ TEST(Vec, ElementAccess)
 // expressions.
 namespace
 {
-    constexpr vec3i kConstexprVec(1, 2, 3);
+constexpr vec3i kConstexprVec(1, 2, 3);
 
-    constexpr int constexpr_element(int i) noexcept
-    {
-        vec3i v(1, 2, 3);
-        return v.element(i);
-    }
+constexpr int constexpr_element(int i) noexcept
+{
+    vec3i v(1, 2, 3);
+    return v.element(i);
+}
 
-    constexpr int constexpr_at(int i)
-    {
-        vec3i v(1, 2, 3);
-        return v.at(i);
-    }
+constexpr int constexpr_at(int i)
+{
+    vec3i v(1, 2, 3);
+    return v.at(i);
+}
 
-    static_assert((kConstexprVec + vec3i(1, 1, 1)).z == 4);
-    static_assert(constexpr_element(-1) == 3);
-    static_assert(constexpr_element(3) == 1);
-    static_assert(constexpr_at(2) == 3);
+static_assert((kConstexprVec + vec3i(1, 1, 1)).z == 4);
+static_assert(constexpr_element(-1) == 3);
+static_assert(constexpr_element(3) == 1);
+static_assert(constexpr_at(2) == 3);
 } // namespace
 
 TEST(Vec, CheckedElementAccess)
@@ -108,9 +108,11 @@ TEST(Vec, CheckedElementAccess)
     v.at(1) = 99;
     EXPECT_EQ(v.y, 99);
 
+#ifndef EIRIN_NO_EXCEPTIONS
     EXPECT_THROW((void)v.at(3), std::out_of_range);
     EXPECT_THROW((void)cv.at(3), std::out_of_range);
     EXPECT_THROW((void)v.at(-1), std::out_of_range);
+#endif
 
     // element(): wrapping, negative indices count from the end.
     EXPECT_EQ(v.element(0), 10);
@@ -751,49 +753,55 @@ TEST(Vec, BitwiseCompound)
 
 namespace
 {
-    // SFINAE probes for members that must not exist on the given tvec shape;
-    // they pin the compile-time side of the GLSL rules below.
-    template <typename T, typename = void>
-    struct glsl_has_field_r : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_field_r<T, std::void_t<decltype(std::declval<T>().r)>> : std::true_type
-    {};
+// SFINAE probes for members that must not exist on the given tvec shape;
+// they pin the compile-time side of the GLSL rules below.
+template <typename T, typename = void>
+struct glsl_has_field_r : std::false_type
+{};
 
-    template <typename T, typename = void>
-    struct glsl_has_field_s : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_field_s<T, std::void_t<decltype(std::declval<T>().s)>> : std::true_type
-    {};
+template <typename T>
+struct glsl_has_field_r<T, std::void_t<decltype(std::declval<T>().r)>> : std::true_type
+{};
 
-    template <typename T, typename = void>
-    struct glsl_has_field_z : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_field_z<T, std::void_t<decltype(std::declval<T>().z)>> : std::true_type
-    {};
+template <typename T, typename = void>
+struct glsl_has_field_s : std::false_type
+{};
 
-    template <typename T, typename = void>
-    struct glsl_has_call_rgba : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_call_rgba<T, std::void_t<decltype(std::declval<T>().rgba())>> : std::true_type
-    {};
+template <typename T>
+struct glsl_has_field_s<T, std::void_t<decltype(std::declval<T>().s)>> : std::true_type
+{};
 
-    template <typename T, typename = void>
-    struct glsl_has_call_stpq : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_call_stpq<T, std::void_t<decltype(std::declval<T>().stpq())>> : std::true_type
-    {};
+template <typename T, typename = void>
+struct glsl_has_field_z : std::false_type
+{};
 
-    template <typename T, typename = void>
-    struct glsl_has_call_xyzwx : std::false_type
-    {};
-    template <typename T>
-    struct glsl_has_call_xyzwx<T, std::void_t<decltype(std::declval<T>().xyzwx())>> : std::true_type
-    {};
+template <typename T>
+struct glsl_has_field_z<T, std::void_t<decltype(std::declval<T>().z)>> : std::true_type
+{};
+
+template <typename T, typename = void>
+struct glsl_has_call_rgba : std::false_type
+{};
+
+template <typename T>
+struct glsl_has_call_rgba<T, std::void_t<decltype(std::declval<T>().rgba())>> : std::true_type
+{};
+
+template <typename T, typename = void>
+struct glsl_has_call_stpq : std::false_type
+{};
+
+template <typename T>
+struct glsl_has_call_stpq<T, std::void_t<decltype(std::declval<T>().stpq())>> : std::true_type
+{};
+
+template <typename T, typename = void>
+struct glsl_has_call_xyzwx : std::false_type
+{};
+
+template <typename T>
+struct glsl_has_call_xyzwx<T, std::void_t<decltype(std::declval<T>().xyzwx())>> : std::true_type
+{};
 } // namespace
 
 TEST(Vec, GLSLBehavior)
