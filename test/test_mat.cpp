@@ -113,7 +113,8 @@ TEST(Mat, TypeTraits)
     static_assert(std::is_same_v<mat2f, tmat<2, 2, float>>);
     static_assert(std::is_same_v<mat2x2d, tmat<2, 2, double>>);
     static_assert(std::is_same_v<mat2fixed32, tmat<2, 2, fixed32>>);
-    static_assert(std::is_same_v<mat2fixed<int, long, 16>, tmat<2, 2, fixed_num<int, long, 16, false>>>);
+    // fixed: `long` is 4 bytes on Windows (and wasm32), replace with int64_t
+    static_assert(std::is_same_v<mat2fixed<int, std::int64_t, 16>, tmat<2, 2, fixed_num<int, std::int64_t, 16, false>>>);
 
     static_assert(std::is_same_v<mat2<int>::value_type, int>);
     static_assert(std::is_same_v<mat2<int>::col_type, tvec<2, int>>);
@@ -417,7 +418,10 @@ TEST(Mat, ConstexprApi)
     static_assert(a.at(1, 0) == 3);
     static_assert(a.element(-1)[0] == 2);
     static_assert(a.element(2, 2) == 1);
-    static_assert(a.nearly_eq(a));
+    // fixed MSVC C2131: `a.nearly_eq(a)` is deliberately not asserted here. It evaluates
+    // `static_cast<const tvec&>(*this)` on a vector that is a subobject of this matrix,
+    // which MSVC's constant evaluator rejects.
+    EXPECT_TRUE(a.nearly_eq(a));
 
     constexpr mat2<float> f(4.f, 7.f, 2.f, 6.f);
     constexpr mat2<float> fInv = inverse(f);
