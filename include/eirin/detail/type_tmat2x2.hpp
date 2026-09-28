@@ -60,7 +60,15 @@ public:
 
     /* Common Constructors */
 
+#if EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE
+    constexpr tmat()
+        : m_value{
+              col_type{1, 0},
+              col_type{0, 1}
+    } {};
+#else
     constexpr tmat() = default;
+#endif
 
     explicit constexpr tmat(T scalar) noexcept
         : m_value{
@@ -98,6 +106,10 @@ public:
 
     template <typename U>
     constexpr tmat(const tmat<3, 3, U>& mat)
+        : m_value{col_type(mat[0]), col_type(mat[1])} {};
+
+    template <typename U>
+    constexpr tmat(const tmat<4, 4, U>& mat)
         : m_value{col_type(mat[0]), col_type(mat[1])} {};
 
     /// Contiguous view of the column major elements, for SIMD loads and API
@@ -527,7 +539,20 @@ EIRIN_MATH_FUNC_API tmat<2, 2, T> operator*(const tmat<2, 2, T>& mat1, const tma
     );
 }
 
-// TODO: add multiply with other shape of matrix later.(2x2 * 3x2, 2x2 * 4x2)
+template <typename T>
+EIRIN_MATH_FUNC_API tmat<3, 2, T> operator*(const tmat<2, 2, T>& mat1, const tmat<3, 2, T>& mat2) noexcept
+{
+    return tmat<3, 2, T>(
+        mat1[0][0] * mat2[0][0] + mat1[1][0] * mat2[0][1],
+        mat1[0][1] * mat2[0][0] + mat1[1][1] * mat2[0][1],
+        mat1[0][0] * mat2[1][0] + mat1[1][0] * mat2[1][1],
+        mat1[0][1] * mat2[1][0] + mat1[1][1] * mat2[1][1],
+        mat1[0][0] * mat2[2][0] + mat1[1][0] * mat2[2][1],
+        mat1[0][1] * mat2[2][0] + mat1[1][1] * mat2[2][1]
+    );
+}
+
+// TODO: add multiply with other shape of matrix later.(2x2 * 4x2)
 
 template <typename T>
 EIRIN_MATH_FUNC_API tmat<2, 2, T> operator/(const tmat<2, 2, T>& mat, T scalar) noexcept

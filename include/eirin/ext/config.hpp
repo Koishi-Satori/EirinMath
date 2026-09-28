@@ -127,6 +127,16 @@
 #    define EIRIN_MATRIX_ENABLE_SIMD EIRIN_DISABLE
 #endif
 
+// Feature: Default CTOR init matrix into a identify matrix.
+// This feature is default to be disabled.
+#ifdef EIRIN_MATRIX_ENABLE_INIT_IDENTIFY
+#    define EIRIN_MATRIX_INIT_IDENTIFY EIRIN_ENABLE
+#endif
+
+#ifndef EIRIN_MATRIX_INIT_IDENTIFY
+#    define EIRIN_MATRIX_INIT_IDENTIFY EIRIN_DISABLE
+#endif
+
 #define EIRIN_MATH_HAS_INCLUDE_CONFIG
 
 #endif

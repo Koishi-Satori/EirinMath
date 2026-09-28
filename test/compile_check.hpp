@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <eirin/detail/matrix_func.hpp>
+
 // Dependent-context, type-level compile probes for negative compile checks.
 //
 // A requires-expression written directly inside a non-template test body is a
@@ -27,18 +29,54 @@ namespace testing
     template <typename L, typename R>
     inline constexpr bool can_assign_v = requires(L lhs, R rhs) { lhs = rhs; };
 
-    template <typename L>
-    inline constexpr bool can_preincrement_v = requires(L lhs) { ++lhs; };
+    // register binary operator call testing concept
+#define EIRIN_TESTING_BINARY_ARITH_PROBE(name, op) \
+    template <typename L, typename R>              \
+    inline constexpr bool name = requires(L lhs, R rhs) { lhs op rhs; };
 
-    template <typename L>
-    inline constexpr bool can_postincrement_v = requires(L lhs) { lhs++; };
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_add_v, +)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_sub_v, -)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_mul_v, *)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_div_v, /)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_mod_v, %)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_xor_v, ^)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_and_v, &)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_or_v, |)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_shl_v, <<)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_shr_v, >>)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_equal_v, ==)
+    EIRIN_TESTING_BINARY_ARITH_PROBE(can_not_equal_v, !=)
 
-    template <typename L>
-    inline constexpr bool can_predecrement_v = requires(L lhs) { --lhs; };
+#undef EIRIN_TESTING_BINARY_ARITH_PROBE
 
-    template <typename L>
-    inline constexpr bool can_postdecrement_v = requires(L lhs) { lhs--; };
+    // register single argument function call testing concept
+#define EIRIN_TESTING_SINGLE_ARG_CALL_PROBE(name, fn) \
+    template <typename T>                             \
+    inline constexpr bool name = requires(T value) { fn(value); };
 
+    EIRIN_TESTING_SINGLE_ARG_CALL_PROBE(can_inverse_v, eirin::inverse)
+    EIRIN_TESTING_SINGLE_ARG_CALL_PROBE(can_transpose_v, eirin::transpose)
+    EIRIN_TESTING_SINGLE_ARG_CALL_PROBE(can_determinant_v, eirin::determinant)
+
+#undef EIRIN_TESTING_SINGLE_ARG_CALL_PROBE
+
+#define EIRIN_TESTING_PREFIX_ARITH_PROBE(name, op) \
+    template <typename T>                          \
+    inline constexpr bool name = requires(T value) { op value; };
+
+#define EIRIN_TESTING_POSTFIX_ARITH_PROBE(name, op) \
+    template <typename T>                           \
+    inline constexpr bool name = requires(T value) { value op; };
+
+    EIRIN_TESTING_PREFIX_ARITH_PROBE(can_preincrement_v, ++)
+    EIRIN_TESTING_PREFIX_ARITH_PROBE(can_predecrement_v, --)
+    EIRIN_TESTING_POSTFIX_ARITH_PROBE(can_postincrement_v, ++)
+    EIRIN_TESTING_POSTFIX_ARITH_PROBE(can_postdecrement_v, --)
+
+#undef EIRIN_TESTING_PREFIX_ARITH_PROBE
+#undef EIRIN_TESTING_POSTFIX_ARITH_PROBE
+
+    // register compound assign call testing concept
 #define EIRIN_TESTING_COMPOUND_ASSIGN_PROBE(name, op) \
     template <typename L, typename R>                 \
     inline constexpr bool name = requires(L lhs, R rhs) { lhs op rhs; };
@@ -63,6 +101,21 @@ namespace testing
 // negate it (e.g. with EXPECT_FALSE) to assert that an expression must not
 // compile.  The operands are only inspected through decltype, never evaluated.
 #define EIRIN_TESTING_COMPILE_ASSIGN(lhs, rhs)     (eirin::testing::can_assign_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_ADD(lhs, rhs)        (eirin::testing::can_add_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_SUB(lhs, rhs)        (eirin::testing::can_sub_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_MUL(lhs, rhs)        (eirin::testing::can_mul_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_DIV(lhs, rhs)        (eirin::testing::can_div_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_MOD(lhs, rhs)        (eirin::testing::can_mod_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_XOR(lhs, rhs)        (eirin::testing::can_xor_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_AND(lhs, rhs)        (eirin::testing::can_and_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_OR(lhs, rhs)         (eirin::testing::can_or_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_SHL(lhs, rhs)        (eirin::testing::can_shl_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_SHR(lhs, rhs)        (eirin::testing::can_shr_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_EQUAL(lhs, rhs)      (eirin::testing::can_equal_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_NOT_EQUAL(lhs, rhs)  (eirin::testing::can_not_equal_v<decltype(lhs), decltype(rhs)>)
+#define EIRIN_TESTING_COMPILE_INVERSE(expr)        (eirin::testing::can_inverse_v<decltype(expr)>)
+#define EIRIN_TESTING_COMPILE_TRANSPOSE(expr)      (eirin::testing::can_transpose_v<decltype(expr)>)
+#define EIRIN_TESTING_COMPILE_DETERMINANT(expr)    (eirin::testing::can_determinant_v<decltype(expr)>)
 #define EIRIN_TESTING_COMPILE_ADD_ASSIGN(lhs, rhs) (eirin::testing::can_add_assign_v<decltype(lhs), decltype(rhs)>)
 #define EIRIN_TESTING_COMPILE_SUB_ASSIGN(lhs, rhs) (eirin::testing::can_sub_assign_v<decltype(lhs), decltype(rhs)>)
 #define EIRIN_TESTING_COMPILE_MUL_ASSIGN(lhs, rhs) (eirin::testing::can_mul_assign_v<decltype(lhs), decltype(rhs)>)

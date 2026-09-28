@@ -61,8 +61,16 @@ public:
     }
 
     /* Common Constructors */
-
+#if EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE
+    constexpr tmat()
+        : m_value{
+              col_type{1, 0, 0},
+              col_type{0, 1, 0},
+              col_type{0, 0, 1}
+    } {};
+#else
     constexpr tmat() = default;
+#endif
 
     explicit constexpr tmat(T scalar) noexcept
         : m_value{
@@ -74,9 +82,19 @@ public:
     constexpr tmat(const col_type& v1, const col_type& v2, const col_type& v3)
         : m_value{v1, v2, v3} {};
 
-    /* Convert Constructors */
-
     // clang-format off
+
+    constexpr tmat(
+        const T& m00, const T& m10, const T& m20,
+        const T& m01, const T& m11, const T& m21,
+        const T& m02, const T& m12, const T& m22
+    ) : m_value{
+        col_type{m00, m10, m20},
+        col_type{m01, m11, m21},
+        col_type{m02, m12, m22}
+    } {};
+
+    /* Convert Constructors */
 
     template <
         typename X1, typename Y1, typename Z1,
@@ -86,7 +104,11 @@ public:
         const X1& m00, const Y1& m10, const Z1& m20,
         const X2& m01, const Y2& m11, const Z2& m21,
         const X3& m02, const Y3& m12, const Z3& m22
-    ) : m_value{col_type{m00, m10, m20}, col_type{m01, m11, m21}, col_type{m02, m12, m22}} {};
+    ) : m_value{
+        col_type{m00, m10, m20},
+        col_type{m01, m11, m21},
+        col_type{m02, m12, m22}
+    } {};
 
     // clang-format on
 
@@ -570,7 +592,40 @@ EIRIN_MATH_FUNC_API tmat<3, 3, T> operator*(const tmat<3, 3, T>& mat1, const tma
     return detail::__mat3x3mul3x3(mat1, mat2);
 }
 
-// TODO: add multiply with other shape of matrix later. (3x3 * 2x3, 3x3 * 4x3)
+template <typename T>
+EIRIN_MATH_FUNC_API tmat<2, 3, T> operator*(const tmat<3, 3, T>& mat1, const tmat<2, 3, T>& mat2) noexcept
+{
+    return tmat<2, 3, T>(
+        mat1[0][0] * mat2[0][0] + mat1[1][0] * mat2[0][1] + mat1[2][0] * mat2[0][2],
+        mat1[0][1] * mat2[0][0] + mat1[1][1] * mat2[0][1] + mat1[2][1] * mat2[0][2],
+        mat1[0][2] * mat2[0][0] + mat1[1][2] * mat2[0][1] + mat1[2][2] * mat2[0][2],
+        mat1[0][0] * mat2[1][0] + mat1[1][0] * mat2[1][1] + mat1[2][0] * mat2[1][2],
+        mat1[0][1] * mat2[1][0] + mat1[1][1] * mat2[1][1] + mat1[2][1] * mat2[1][2],
+        mat1[0][2] * mat2[1][0] + mat1[1][2] * mat2[1][1] + mat1[2][2] * mat2[1][2]
+    );
+}
+
+template <typename T>
+EIRIN_MATH_FUNC_API tmat<4, 3, T> operator*(const tmat<3, 3, T>& mat1, const tmat<4, 3, T>& mat2) noexcept
+{
+    return tmat<4, 3, T>(
+        mat1[0][0] * mat2[0][0] + mat1[1][0] * mat2[0][1] + mat1[2][0] * mat2[0][2],
+        mat1[0][1] * mat2[0][0] + mat1[1][1] * mat2[0][1] + mat1[2][1] * mat2[0][2],
+        mat1[0][2] * mat2[0][0] + mat1[1][2] * mat2[0][1] + mat1[2][2] * mat2[0][2],
+        mat1[0][0] * mat2[1][0] + mat1[1][0] * mat2[1][1] + mat1[2][0] * mat2[1][2],
+        mat1[0][1] * mat2[1][0] + mat1[1][1] * mat2[1][1] + mat1[2][1] * mat2[1][2],
+        mat1[0][2] * mat2[1][0] + mat1[1][2] * mat2[1][1] + mat1[2][2] * mat2[1][2],
+        mat1[0][0] * mat2[2][0] + mat1[1][0] * mat2[2][1] + mat1[2][0] * mat2[2][2],
+        mat1[0][1] * mat2[2][0] + mat1[1][1] * mat2[2][1] + mat1[2][1] * mat2[2][2],
+        mat1[0][2] * mat2[2][0] + mat1[1][2] * mat2[2][1] + mat1[2][2] * mat2[2][2],
+        mat1[0][0] * mat2[3][0] + mat1[1][0] * mat2[3][1] + mat1[2][0] * mat2[3][2],
+        mat1[0][1] * mat2[3][0] + mat1[1][1] * mat2[3][1] + mat1[2][1] * mat2[3][2],
+        mat1[0][2] * mat2[3][0] + mat1[1][2] * mat2[3][1] + mat1[2][2] * mat2[3][2]
+    );
+}
+
+// TODO: add multiply with other shape of matrix later. (3x3 * 4x3, needs the
+// 4x3 shape first)
 
 template <typename T>
 EIRIN_MATH_FUNC_API tmat<3, 3, T> operator/(const tmat<3, 3, T>& mat, T scalar) noexcept

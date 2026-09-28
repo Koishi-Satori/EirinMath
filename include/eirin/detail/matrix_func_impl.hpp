@@ -140,6 +140,42 @@ struct compute_transpose<3, 3, T, matrix_scalar_kernel>
 };
 
 template <typename T>
+struct compute_transpose<2, 3, T, matrix_scalar_kernel>
+{
+    EIRIN_MATH_SMALL_FUNC_API static typename tmat<2, 3, T>::transpose_type eval(const tmat<2, 3, T>& mat) noexcept
+    {
+        using transpose_type = typename tmat<2, 3, T>::transpose_type;
+        transpose_type result;
+        // transpose: T[c][r] = M[r][c]
+        result[0][0] = mat[0][0];
+        result[0][1] = mat[1][0];
+        result[1][0] = mat[0][1];
+        result[1][1] = mat[1][1];
+        result[2][0] = mat[0][2];
+        result[2][1] = mat[1][2];
+        return result;
+    }
+};
+
+template <typename T>
+struct compute_transpose<3, 2, T, matrix_scalar_kernel>
+{
+    EIRIN_MATH_SMALL_FUNC_API static typename tmat<3, 2, T>::transpose_type eval(const tmat<3, 2, T>& mat) noexcept
+    {
+        using transpose_type = typename tmat<3, 2, T>::transpose_type;
+        transpose_type result;
+        // transpose: T[c][r] = M[r][c]
+        result[0][0] = mat[0][0];
+        result[0][1] = mat[1][0];
+        result[0][2] = mat[2][0];
+        result[1][0] = mat[0][1];
+        result[1][1] = mat[1][1];
+        result[1][2] = mat[2][1];
+        return result;
+    }
+};
+
+template <typename T>
 struct compute_transpose<4, 4, T, matrix_scalar_kernel>
 {
     EIRIN_MATH_SMALL_FUNC_API static typename tmat<4, 4, T>::transpose_type eval(const tmat<4, 4, T>& mat) noexcept

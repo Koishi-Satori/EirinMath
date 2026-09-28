@@ -11,6 +11,10 @@
 using namespace eirin;
 using namespace eirin::literals;
 
+#if defined(EIRIN_TEST_MAT_INIT_IDENTIFY)
+static_assert(EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE, "this test target must enable the feature");
+#endif
+
 namespace
 {
 template <typename T>
@@ -32,15 +36,55 @@ template <typename T>
     return ::testing::AssertionSuccess();
 }
 
-/// Compile-time probes: the operands are only inspected through decltype.
-template <typename M>
-inline constexpr bool has_inverse_v = requires(M m) { inverse(m); };
+    /// Independent reference for a matrix product of any two shapes, used to
+    /// check the hand written (and the cross shape) product overloads.
+    template <typename A, typename B>
+    auto mat_product_reference(const A& lhs, const B& rhs)
+    {
+        using result_type = decltype(lhs * rhs);
+        result_type result(0);
+        for(std::size_t c = 0; c < result_type::cols(); ++c)
+        {
+            for(std::size_t r = 0; r < result_type::rows(); ++r)
+            {
+                typename result_type::value_type sum = 0;
+                for(std::size_t k = 0; k < A::cols(); ++k)
+                    sum += lhs[k][r] * rhs[c][k];
+                result[c][r] = sum;
+            }
+        }
+        return result;
+    }
 
-template <typename M>
-inline constexpr bool has_transpose_v = requires(M m) { transpose(m); };
+    /// True iff `m` is the identity (1 on the main diagonal, 0 elsewhere).
+    template <typename M>
+    bool is_identity_matrix(const M& m)
+    {
+        for(std::size_t c = 0; c < M::cols(); ++c)
+        {
+            for(std::size_t r = 0; r < M::rows(); ++r)
+            {
+                if(m[c][r] != (r == c ? typename M::value_type{1} : typename M::value_type{0}))
+                    return false;
+            }
+        }
+        return true;
+    }
 
-template <typename M>
-inline constexpr bool has_determinant_v = requires(M m) { determinant(m); };
+    /// True iff every element of `m` is zero.
+    template <typename M>
+    bool is_zero_matrix(const M& m)
+    {
+        for(std::size_t c = 0; c < M::cols(); ++c)
+        {
+            for(std::size_t r = 0; r < M::rows(); ++r)
+            {
+                if(m[c][r] != typename M::value_type{0})
+                    return false;
+            }
+        }
+        return true;
+    }
 } // namespace
 
 // ==================== Construction ====================
@@ -48,10 +92,18 @@ TEST(Mat, Constructors)
 {
     // Default construct does not initialize, `{}` value initializes to zero.
     mat2<int> zero{};
+#if EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE
+    EXPECT_EQ(zero(0, 0), 1);
+#else
     EXPECT_EQ(zero(0, 0), 0);
+#endif
     EXPECT_EQ(zero(0, 1), 0);
     EXPECT_EQ(zero(1, 0), 0);
+#if EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE
+    EXPECT_EQ(zero(1, 1), 1);
+#else
     EXPECT_EQ(zero(1, 1), 0);
+#endif
 
     // Construct from a scalar: GLSL `mat(2.0)` semantics, diagonal matrix.
     mat2<int> diag(2);
@@ -100,6 +152,61 @@ TEST(Mat, Constructors)
     EXPECT_EQ(fcols[1], vec2<fixed32>(3_f32, 4_f32));
 }
 
+// ==================== Default Construction Semantics ====================
+TEST(Mat, DefaultConstructionSemantics)
+{
+    // `tmat<T>(1)` is the identity and `tmat<T>(0)` the zero matrix for every
+    // shape, independently of the initialization switch.
+    EXPECT_TRUE(is_identity_matrix(mat2<int>(1)));
+    EXPECT_TRUE(is_identity_matrix(mat2x3i(1)));
+    EXPECT_TRUE(is_identity_matrix(mat3x2i(1)));
+    EXPECT_TRUE(is_identity_matrix(mat3<int>(1)));
+    EXPECT_TRUE(is_identity_matrix(mat4<int>(1)));
+    EXPECT_TRUE(is_zero_matrix(mat2<int>(0)));
+    EXPECT_TRUE(is_zero_matrix(mat2x3i(0)));
+    EXPECT_TRUE(is_zero_matrix(mat3x2i(0)));
+    EXPECT_TRUE(is_zero_matrix(mat3<int>(0)));
+    EXPECT_TRUE(is_zero_matrix(mat4<int>(0)));
+
+#if EIRIN_MATRIX_INIT_IDENTIFY == EIRIN_ENABLE
+    // Feature enabled: both the braced and the plain default construction give
+    // the identity matrix (the sentinel above proves the feature is on).
+    mat2<int> v2{};
+    mat2x3i v23{};
+    mat3x2i v32{};
+    mat3<int> v3{};
+    mat4<int> v4{};
+    EXPECT_TRUE(is_identity_matrix(v2));
+    EXPECT_TRUE(is_identity_matrix(v23));
+    EXPECT_TRUE(is_identity_matrix(v32));
+    EXPECT_TRUE(is_identity_matrix(v3));
+    EXPECT_TRUE(is_identity_matrix(v4));
+    mat2<int> u2;
+    mat2x3i u23;
+    mat3x2i u32;
+    mat3<int> u3;
+    mat4<int> u4;
+    EXPECT_TRUE(is_identity_matrix(u2));
+    EXPECT_TRUE(is_identity_matrix(u23));
+    EXPECT_TRUE(is_identity_matrix(u32));
+    EXPECT_TRUE(is_identity_matrix(u3));
+    EXPECT_TRUE(is_identity_matrix(u4));
+#else
+    // Feature disabled: `{}` is the documented zero initialization; the plain
+    // form is intentionally left uninitialized and is not read here.
+    mat2<int> v2{};
+    mat2x3i v23{};
+    mat3x2i v32{};
+    mat3<int> v3{};
+    mat4<int> v4{};
+    EXPECT_TRUE(is_zero_matrix(v2));
+    EXPECT_TRUE(is_zero_matrix(v23));
+    EXPECT_TRUE(is_zero_matrix(v32));
+    EXPECT_TRUE(is_zero_matrix(v3));
+    EXPECT_TRUE(is_zero_matrix(v4));
+#endif
+}
+
 // ==================== Type Traits and Aliases ====================
 TEST(Mat, TypeTraits)
 {
@@ -139,6 +246,19 @@ TEST(Mat, TypeTraits)
     static_assert(std::is_same_v<mat4fixed<int, std::int64_t, 16>, tmat<4, 4, fixed_num<int, std::int64_t, 16, false>>>);
     static_assert(std::is_same_v<mat4<int>::col_type, tvec<4, int>>);
     static_assert(std::is_same_v<mat4<int>::transpose_type, tmat<4, 4, int>>);
+    static_assert(std::is_same_v<mat2x3<int>, tmat<2, 3, int>>);
+    static_assert(std::is_same_v<mat3x2<int>, tmat<3, 2, int>>);
+    static_assert(std::is_same_v<mat2x3i, tmat<2, 3, int>>);
+    static_assert(std::is_same_v<mat3x2u, tmat<3, 2, unsigned int>>);
+    static_assert(std::is_same_v<mat2x3i32, tmat<2, 3, std::int32_t>>);
+    static_assert(std::is_same_v<mat3x2u64, tmat<3, 2, std::uint64_t>>);
+    static_assert(std::is_same_v<mat2x3f, tmat<2, 3, float>>);
+    static_assert(std::is_same_v<mat3x2d, tmat<3, 2, double>>);
+    static_assert(std::is_same_v<mat2x3fixed32, tmat<2, 3, fixed32>>);
+    static_assert(std::is_same_v<mat3x2fixed32, tmat<3, 2, fixed32>>);
+    static_assert(std::is_same_v<mat2x3fixed<int, std::int64_t, 16>, tmat<2, 3, fixed_num<int, std::int64_t, 16, false>>>);
+    static_assert(std::is_same_v<mat2x3<int>::transpose_type, tmat<3, 2, int>>);
+    static_assert(std::is_same_v<mat3x2<int>::transpose_type, tmat<2, 3, int>>);
 
     static_assert(std::is_same_v<mat2<int>::value_type, int>);
     static_assert(std::is_same_v<mat2<int>::col_type, tvec<2, int>>);
@@ -635,6 +755,180 @@ TEST(Mat, FourByFour)
     EXPECT_EQ(transpose(f)(1, 2), f(2, 1));
 }
 
+// ==================== 2x3 (2 columns, 3 rows) ====================
+TEST(Mat, TwoByThree)
+{
+    using mat23 = tmat<2, 3, int>; // 2 columns, 3 rows
+    using mat32 = tmat<3, 2, int>;
+    mat23 a(tvec<3, int>(1, 2, 3), tvec<3, int>(4, 5, 6));
+
+    static_assert(mat23::cols() == 2);
+    static_assert(mat23::rows() == 3);
+    static_assert(mat23::size() == 2); // the operator[] domain is the column count
+    static_assert(sizeof(mat23) == 6 * sizeof(int));
+    static_assert(std::is_same_v<mat23::col_type, tvec<3, int>>);
+    static_assert(std::is_same_v<mat23::row_type, tvec<2, int>>);
+    static_assert(std::is_same_v<mat23::transpose_type, mat32>);
+    static_assert(std::is_same_v<mat2x3<int>, mat23>);
+    static_assert(std::is_trivially_copyable_v<mat23>);
+
+    // Element access: m[c][r] is the same element as m(r, c).
+    EXPECT_EQ(a(0, 0), 1);
+    EXPECT_EQ(a(1, 0), 2);
+    EXPECT_EQ(a(2, 0), 3);
+    EXPECT_EQ(a(0, 1), 4);
+    EXPECT_EQ(a(1, 1), 5);
+    EXPECT_EQ(a(2, 1), 6);
+    EXPECT_EQ(a[1][2], a(2, 1));
+    a(0, 0) = 10;
+    EXPECT_EQ(a[0][0], 10);
+    a[0][0] = 1;
+    EXPECT_EQ(a.to_array(), (std::array<int, 6>{1, 2, 3, 4, 5, 6}));
+    EXPECT_EQ(a.data()[5], 6);
+    EXPECT_EQ(a.data() + 3, a[1].data()); // the columns are contiguous
+
+    // 6 scalars are column major; mixed component types convert.
+    EXPECT_EQ(mat23(1, 2, 3, 4, 5, 6), a);
+    EXPECT_EQ(mat23(1.0, 2.0, 3.0, 4.0, 5.0, 6.0), a);
+    EXPECT_EQ(mat23(tvec<3, float>(1, 2, 3), tvec<3, double>(4, 5, 6)), a);
+    // A scalar sets the diagonal, a smaller matrix is embedded top left.
+    mat23 diagonal(2);
+    EXPECT_EQ(diagonal(0, 0), 2);
+    EXPECT_EQ(diagonal(1, 1), 2);
+    EXPECT_EQ(diagonal(0, 1), 0);
+    EXPECT_EQ(diagonal(2, 0), 0);
+    EXPECT_EQ(diagonal(2, 1), 0);
+    mat2<int> m22(1, 2, 3, 4);
+    EXPECT_EQ(mat23(m22), mat23(1, 2, 0, 3, 4, 0));
+    mat3<int> m33(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    EXPECT_EQ(mat23(m33), mat23(1, 2, 3, 4, 5, 6));
+    tmat<4, 4, int> m44(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    EXPECT_EQ(mat23(m44), mat23(1, 2, 3, 5, 6, 7));
+
+    // Comparison, compound assignment and increment.
+    EXPECT_TRUE(a == a);
+    EXPECT_TRUE(a != mat23(0));
+    EXPECT_FALSE(a == mat23(0));
+    mat23 c(a);
+    c += a;
+    EXPECT_EQ(c, a + a);
+    c = a;
+    c -= a;
+    EXPECT_EQ(c, mat23(0));
+    c = a;
+    c *= 2;
+    EXPECT_EQ(c, a + a);
+    c = a;
+    EXPECT_EQ(++c, a + 1);
+    c = a;
+    EXPECT_EQ(c--, a);
+    EXPECT_EQ(c, a - 1);
+    EXPECT_EQ(a * 2, a + a);
+    EXPECT_EQ(a / 2, mat23(0, 1, 1, 2, 2, 3));
+    EXPECT_TRUE(a.nearly_eq(a));
+    EXPECT_FALSE(a.nearly_eq(mat23(0)));
+
+    // Products: (2x3) * (2x2) = 2x3 and (2x3) * (3x2) = 3x3.
+    mat2<int> b(1, 2, 3, 4);
+    EXPECT_EQ(a * b, mat_product_reference(a, b));
+    mat32 bt(tvec<2, int>(1, 2), tvec<2, int>(3, 4), tvec<2, int>(5, 6));
+    EXPECT_EQ(a * bt, mat_product_reference(a, bt));
+    EXPECT_EQ((a * tvec<2, int>(1, 2)), (tvec<3, int>(1 * 1 + 4 * 2, 2 * 1 + 5 * 2, 3 * 1 + 6 * 2)));
+    EXPECT_EQ((tvec<3, int>(1, 2, 3) * a), (tvec<2, int>(1 * 1 + 2 * 2 + 3 * 3, 1 * 4 + 2 * 5 + 3 * 6)));
+    // (3x3) * (2x3) = 2x3: the columns of the result are the left hand matrix
+    // applied to the columns of the right hand side.
+    EXPECT_EQ(m33 * a, mat_product_reference(m33, a));
+    EXPECT_EQ(m33 * a, mat23(tvec<3, int>(30, 36, 42), tvec<3, int>(66, 81, 96)));
+
+    // transpose: (2x3) -> (3x2); the column j of the result is the row j of a.
+    mat32 t = transpose(a);
+    EXPECT_EQ(t, mat32(tvec<2, int>(1, 4), tvec<2, int>(2, 5), tvec<2, int>(3, 6)));
+    EXPECT_EQ(transpose(t), a);
+    EXPECT_EQ(transpose(mat23(0)), mat32(0));
+}
+
+// ==================== 3x2 (3 columns, 2 rows) ====================
+TEST(Mat, ThreeByTwo)
+{
+    using mat32 = tmat<3, 2, int>; // 3 columns, 2 rows
+    using mat23 = tmat<2, 3, int>;
+    mat32 a(tvec<2, int>(1, 2), tvec<2, int>(3, 4), tvec<2, int>(5, 6));
+
+    static_assert(mat32::cols() == 3);
+    static_assert(mat32::rows() == 2);
+    static_assert(mat32::size() == 3);
+    static_assert(sizeof(mat32) == 6 * sizeof(int));
+    static_assert(std::is_same_v<mat32::col_type, tvec<2, int>>);
+    static_assert(std::is_same_v<mat32::row_type, tvec<3, int>>);
+    static_assert(std::is_same_v<mat32::transpose_type, mat23>);
+    static_assert(std::is_same_v<mat3x2<int>, mat32>);
+    static_assert(std::is_trivially_copyable_v<mat32>);
+
+    EXPECT_EQ(a(0, 0), 1);
+    EXPECT_EQ(a(1, 0), 2);
+    EXPECT_EQ(a(0, 1), 3);
+    EXPECT_EQ(a(1, 1), 4);
+    EXPECT_EQ(a(0, 2), 5);
+    EXPECT_EQ(a(1, 2), 6);
+    EXPECT_EQ(a[2][1], a(1, 2));
+    a[2][1] = 60;
+    EXPECT_EQ(a(1, 2), 60);
+    a(1, 2) = 6;
+    EXPECT_EQ(a.to_array(), (std::array<int, 6>{1, 2, 3, 4, 5, 6}));
+    EXPECT_EQ(a.data()[5], 6);
+    EXPECT_EQ(a.data() + 2, a[1].data());
+
+    EXPECT_EQ(mat32(1, 2, 3, 4, 5, 6), a);
+    EXPECT_EQ(mat32(1.0, 2.0, 3.0, 4.0, 5.0, 6.0), a);
+    EXPECT_EQ(mat32(tvec<2, float>(1, 2), tvec<2, double>(3, 4), tvec<2, int>(5, 6)), a);
+    mat32 diagonal(2);
+    EXPECT_EQ(diagonal(0, 0), 2);
+    EXPECT_EQ(diagonal(1, 1), 2);
+    EXPECT_EQ(diagonal(0, 1), 0);
+    EXPECT_EQ(diagonal(1, 0), 0);
+    EXPECT_EQ(diagonal(0, 2), 0); // the third column is zero
+    EXPECT_EQ(diagonal(1, 2), 0);
+    mat2<int> m22(1, 2, 3, 4);
+    EXPECT_EQ(mat32(m22), mat32(1, 2, 3, 4, 0, 0)); // the extra column is zero
+    mat3<int> m33(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    EXPECT_EQ(mat32(m33), mat32(tvec<2, int>(1, 2), tvec<2, int>(4, 5), tvec<2, int>(7, 8)));
+    tmat<4, 4, int> m44(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    EXPECT_EQ(mat32(m44), mat32(tvec<2, int>(1, 2), tvec<2, int>(5, 6), tvec<2, int>(9, 10)));
+
+    EXPECT_TRUE(a == a);
+    EXPECT_TRUE(a != mat32(0));
+    mat32 c(a);
+    c -= a;
+    EXPECT_EQ(c, mat32(0));
+    c = a;
+    c *= 3;
+    EXPECT_EQ(c, a + a + a);
+    c = a;
+    EXPECT_EQ(c++, a);
+    EXPECT_EQ(c, a + 1);
+    c = a;
+    EXPECT_EQ(--c, a - 1);
+    EXPECT_EQ(a / 3, mat32(0, 0, 1, 1, 1, 2));
+    EXPECT_TRUE(a.nearly_eq(a));
+    EXPECT_FALSE(a.nearly_eq(mat32(0)));
+
+    // Products: (3x2) * (3x3) = 3x2 and (3x2) * (2x3) = 2x2.
+    mat3<int> id(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    EXPECT_EQ(a * id, a);
+    EXPECT_EQ(a * id, mat_product_reference(a, id));
+    mat23 b(tvec<3, int>(1, 2, 3), tvec<3, int>(4, 5, 6));
+    EXPECT_EQ(a * b, mat_product_reference(a, b));
+    EXPECT_EQ((a * tvec<3, int>(1, 2, 3)), (tvec<2, int>(1 * 1 + 3 * 2 + 5 * 3, 2 * 1 + 4 * 2 + 6 * 3)));
+    EXPECT_EQ((tvec<2, int>(1, 2) * a), (tvec<3, int>(1 * 1 + 2 * 2, 1 * 3 + 2 * 4, 1 * 5 + 2 * 6)));
+    // (2x2) * (3x2) = 3x2
+    EXPECT_EQ(m22 * a, mat_product_reference(m22, a));
+    EXPECT_EQ(m22 * a, mat32(tvec<2, int>(7, 10), tvec<2, int>(15, 22), tvec<2, int>(23, 34)));
+
+    mat23 t = transpose(a);
+    EXPECT_EQ(t, mat23(tvec<3, int>(1, 3, 5), tvec<3, int>(2, 4, 6)));
+    EXPECT_EQ(transpose(t), a);
+}
+
 // ==================== Contiguous Element View ====================
 TEST(Mat, DataView)
 {
@@ -656,7 +950,7 @@ TEST(Mat, DataView)
     EXPECT_EQ(m.data() + 12, m[3].data());
     EXPECT_EQ(m.data()[0], 4);
     EXPECT_EQ(m.data()[1], 7);
-    EXPECT_EQ(m.data()[4], 0);  // row 0 of the second column
+    EXPECT_EQ(m.data()[4], 0); // row 0 of the second column
     EXPECT_EQ(m.data()[5], 1);
 
     // Writing through the view writes into the matrix.
@@ -713,12 +1007,73 @@ TEST(Mat, CompileConstraints)
     EXPECT_TRUE((EIRIN_TESTING_COMPILE_ADD_ASSIGN(m, mat2<double>(1, 2, 3, 4))));
 
     // inverse() is only available for shapes and scalar types that support it.
-    EXPECT_TRUE(has_inverse_v<mat2<float>>);
-    EXPECT_TRUE(has_inverse_v<mat2<fixed32>>);
-    EXPECT_FALSE(has_inverse_v<mat2<int>>);
+    EXPECT_TRUE(eirin::testing::can_inverse_v<mat2<float>>);
+    EXPECT_TRUE(eirin::testing::can_inverse_v<mat2<fixed32>>);
+    EXPECT_FALSE(eirin::testing::can_inverse_v<mat2<int>>);
     EXPECT_FALSE((EIRIN_TESTING_COMPILE_DIV_ASSIGN(m, n)));
-    EXPECT_TRUE(has_transpose_v<mat2<int>>);
-    EXPECT_TRUE(has_determinant_v<mat2<int>>);
+    EXPECT_TRUE(eirin::testing::can_transpose_v<mat2<int>>);
+    EXPECT_TRUE(eirin::testing::can_determinant_v<mat2<int>>);
+
+    // Product shape rules: the inner dimensions have to match, the result is
+    // (columns of the right hand side) x (rows of the left hand side).
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2<int>, mat2<int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat3<int>, mat3<int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat4<int>, mat4<int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2x3i, mat2<int>>));    // (2x3) * (2x2) = 2x3
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2x3i, mat3x2i>));      // (2x3) * (3x2) = 3x3
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat3x2i, mat3<int>>));    // (3x2) * (3x3) = 3x2
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat3x2i, mat2x3i>));      // (3x2) * (2x3) = 2x2
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2<int>, mat3x2i>));    // (2x2) * (3x2) = 3x2
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat3<int>, mat2x3i>));    // (3x3) * (2x3) = 2x3
+
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat2<int>, mat2x3i>));   // 2 != 3
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat3x2i, mat2<int>>));   // 3 != 2
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat2x3i, mat2x3i>));     // 2 != 3
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat3x2i, mat3x2i>));     // 3 != 2
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat2x3i, mat3<int>>));   // 2 != 3
+
+    // Matrix/vector products require the matching vector length, and the
+    // products the other way round give the other length.
+    using vec2i_t = tvec<2, int>;
+    using vec3i_t = tvec<3, int>;
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2x3i, tvec<2, int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<vec3i_t, mat2x3i>));
+    // Note: a longer vector is silently accepted, because the tvec constructors
+    // from a longer vector are not marked `explicit` (they are documented as
+    // explicit conversions), so a mat2x3 * vec3 drops the last component
+    // instead of failing to compile.  These two lines record the current
+    // behaviour until that is decided.
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat2x3i, tvec<3, int>>));
+    EXPECT_FALSE((eirin::testing::can_mul_v<vec2i_t, mat2x3i>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<mat3x2i, tvec<3, int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<vec2i_t, mat3x2i>));
+    EXPECT_FALSE((eirin::testing::can_mul_v<mat3x2i, tvec<2, int>>));
+    EXPECT_TRUE((eirin::testing::can_mul_v<vec3i_t, mat3x2i>));
+
+    // Non square shapes have no determinant/inverse.
+    EXPECT_FALSE(eirin::testing::can_determinant_v<mat2x3i>);
+    EXPECT_FALSE(eirin::testing::can_determinant_v<mat3x2i>);
+    EXPECT_FALSE(eirin::testing::can_inverse_v<mat2x3i>);
+    EXPECT_FALSE(eirin::testing::can_inverse_v<mat3x2i>);
+    EXPECT_TRUE(eirin::testing::can_transpose_v<mat2x3i>);
+    EXPECT_TRUE(eirin::testing::can_transpose_v<mat3x2i>);
+
+    // The expression wrappers from compile_check.hpp are the general form of the
+    // same checks (the type level probes above are used where only the types
+    // matter, for example for the product shape rules).
+    mat2x3i m23(0);
+    mat3x2i m32(0);
+    mat2<float> fm(1.f);
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_MUL(m, n));
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_MUL(m23, m32));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_MUL(m23, m23));
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_TRANSPOSE(m23));
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_INVERSE(fm));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_INVERSE(m));
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_DETERMINANT(m));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_DETERMINANT(m23));
+    EXPECT_TRUE(EIRIN_TESTING_COMPILE_EQUAL(m, n));
+    EXPECT_FALSE(EIRIN_TESTING_COMPILE_ADD(m, v));
 }
 
 // ==================== Constant Expressions ====================
@@ -747,6 +1102,29 @@ TEST(Mat, ConstexprApi)
     constexpr mat2<float> fInv = inverse(f);
     static_assert(fInv(0, 0) > 0.59f && fInv(0, 0) < 0.61f);
     static_assert(fInv(1, 1) > 0.39f && fInv(1, 1) < 0.41f);
+
+    // 3x3 and 4x4 use the same kernels and are constant expressions as well.
+    constexpr mat3<int> c(1, 2, 3, 0, 1, 4, 5, 6, 0); // det = 1
+    static_assert(determinant(c) == 1);
+    static_assert(transpose(c) == mat3<int>(1, 0, 5, 2, 1, 6, 3, 4, 0));
+    static_assert(c * mat3<int>(1, 0, 0, 0, 1, 0, 0, 0, 1) == c);
+    static_assert(c.to_array()[2] == 3);
+
+    constexpr tmat<4, 4, int> d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    static_assert(d(0, 0) == 1 && d(3, 3) == 16);
+    static_assert(transpose(d)(0, 3) == d(3, 0));
+    static_assert(d.to_array()[15] == 16);
+    static_assert(determinant(tmat<4, 4, int>(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)) == 1);
+
+    // The non square shapes are constant expressions for the operations they
+    // support (products, transpose, the element views).
+    constexpr mat2x3i e(tvec<3, int>(1, 2, 3), tvec<3, int>(4, 5, 6));
+    constexpr mat3x2i g(tvec<2, int>(1, 2), tvec<2, int>(3, 4), tvec<2, int>(5, 6));
+    static_assert(transpose(e)(1, 2) == e(2, 1));
+    static_assert(transpose(g)(2, 1) == g(1, 2));
+    static_assert((e * g)(0, 0) == 9);   // (2x3) * (3x2) = 3x3
+    static_assert((g * e)(0, 0) == 22);  // (3x2) * (2x3) = 2x2
+    static_assert(e.to_array()[5] == 6 && g.to_array()[5] == 6);
 }
 
 // ==================== Common Usage ====================
