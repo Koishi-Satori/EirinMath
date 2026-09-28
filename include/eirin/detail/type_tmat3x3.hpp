@@ -86,7 +86,7 @@ public:
         const X1& m00, const Y1& m10, const Z1& m20,
         const X2& m01, const Y2& m11, const Z2& m21,
         const X3& m02, const Y3& m12, const Z3& m22
-    ) : m_value(col_type{m00, m10, m20}, col_type{m01, m11, m21}, col_type{m02, m12, m22}) {};
+    ) : m_value{col_type{m00, m10, m20}, col_type{m01, m11, m21}, col_type{m02, m12, m22}} {};
 
     // clang-format on
 

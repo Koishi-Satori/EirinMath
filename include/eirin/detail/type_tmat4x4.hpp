@@ -90,11 +90,11 @@ public:
         const X2& m01, const Y2& m11, const Z2& m21, const W2& m31,
         const X3& m02, const Y3& m12, const Z3& m22, const W3& m32,
         const X4& m03, const Y4& m13, const Z4& m23, const W4& m33
-    ) : m_value(
+    ) : m_value{
         col_type{m00, m10, m20, m30},
         col_type{m01, m11, m21, m31},
         col_type{m02, m12, m22, m32},
-        col_type{m03, m13, m23, m33}) {};
+        col_type{m03, m13, m23, m33}} {};
 
     // clang-format on
 

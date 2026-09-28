@@ -5,11 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#if defined(__has_include)
-#    if __has_include(<stdfloat>)
-#        include <stdfloat>
-#    endif
-#endif
+#include "ext/stdfloat.hpp"
 #include "macro.hpp"
 #include "detail/type_tmat.hpp"
 #include "detail/type_tmat2x2.hpp"
