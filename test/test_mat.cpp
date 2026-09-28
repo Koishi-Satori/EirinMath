@@ -115,6 +115,30 @@ TEST(Mat, TypeTraits)
     static_assert(std::is_same_v<mat2fixed32, tmat<2, 2, fixed32>>);
     // fixed: `long` is 4 bytes on Windows (and wasm32), replace with int64_t
     static_assert(std::is_same_v<mat2fixed<int, std::int64_t, 16>, tmat<2, 2, fixed_num<int, std::int64_t, 16, false>>>);
+    static_assert(std::is_same_v<mat3<int>, tmat<3, 3, int>>);
+    static_assert(std::is_same_v<mat3x3<int>, tmat<3, 3, int>>);
+    static_assert(std::is_same_v<mat3i, tmat<3, 3, int>>);
+    static_assert(std::is_same_v<mat3x3u, tmat<3, 3, unsigned int>>);
+    static_assert(std::is_same_v<mat3i32, tmat<3, 3, std::int32_t>>);
+    static_assert(std::is_same_v<mat3u64, tmat<3, 3, std::uint64_t>>);
+    static_assert(std::is_same_v<mat3f, tmat<3, 3, float>>);
+    static_assert(std::is_same_v<mat3x3d, tmat<3, 3, double>>);
+    static_assert(std::is_same_v<mat3fixed32, tmat<3, 3, fixed32>>);
+    static_assert(std::is_same_v<mat3fixed<int, std::int64_t, 16>, tmat<3, 3, fixed_num<int, std::int64_t, 16, false>>>);
+    static_assert(std::is_same_v<mat3<int>::col_type, tvec<3, int>>);
+    static_assert(std::is_same_v<mat3<int>::transpose_type, tmat<3, 3, int>>);
+    static_assert(std::is_same_v<mat4<int>, tmat<4, 4, int>>);
+    static_assert(std::is_same_v<mat4x4<int>, tmat<4, 4, int>>);
+    static_assert(std::is_same_v<mat4i, tmat<4, 4, int>>);
+    static_assert(std::is_same_v<mat4x4u, tmat<4, 4, unsigned int>>);
+    static_assert(std::is_same_v<mat4i32, tmat<4, 4, std::int32_t>>);
+    static_assert(std::is_same_v<mat4u64, tmat<4, 4, std::uint64_t>>);
+    static_assert(std::is_same_v<mat4f, tmat<4, 4, float>>);
+    static_assert(std::is_same_v<mat4x4d, tmat<4, 4, double>>);
+    static_assert(std::is_same_v<mat4fixed32, tmat<4, 4, fixed32>>);
+    static_assert(std::is_same_v<mat4fixed<int, std::int64_t, 16>, tmat<4, 4, fixed_num<int, std::int64_t, 16, false>>>);
+    static_assert(std::is_same_v<mat4<int>::col_type, tvec<4, int>>);
+    static_assert(std::is_same_v<mat4<int>::transpose_type, tmat<4, 4, int>>);
 
     static_assert(std::is_same_v<mat2<int>::value_type, int>);
     static_assert(std::is_same_v<mat2<int>::col_type, tvec<2, int>>);
@@ -146,6 +170,12 @@ TEST(Mat, TypeTraits)
     EXPECT_EQ(mat2<int>::size(), 2u);
     EXPECT_EQ(mat2<int>::rows(), 2u);
     EXPECT_EQ(mat2<int>::cols(), 2u);
+    EXPECT_EQ(mat3<int>::size(), 3u);
+    EXPECT_EQ(mat3<int>::rows(), 3u);
+    EXPECT_EQ(mat3<int>::cols(), 3u);
+    EXPECT_EQ(mat4<int>::size(), 4u);
+    EXPECT_EQ(mat4<int>::rows(), 4u);
+    EXPECT_EQ(mat4<int>::cols(), 4u);
 }
 
 // ==================== Element Access ====================
@@ -366,6 +396,296 @@ TEST(Mat, Inverse)
     // Fixed point inverse is only accurate to the fixed point precision.
     mat2<fixed32> fa(4_f32, 7_f32, 2_f32, 6_f32);
     EXPECT_TRUE(mat_nearly_eq(fa * inverse(fa), mat2<fixed32>(1_f32, 0_f32, 0_f32, 1_f32), 0.01_f32));
+}
+
+// ==================== 3x3 ====================
+TEST(Mat, ThreeByThree)
+{
+    using mat3 = tmat<3, 3, int>;
+
+    // Columns (1, 2, 3), (0, 1, 4), (5, 6, 0): det = 1, so the inverse is the
+    // cofactor matrix and stays exact for integers, floats and fixed point.
+    mat3 a(tvec<3, int>(1, 2, 3), tvec<3, int>(0, 1, 4), tvec<3, int>(5, 6, 0));
+    mat3 b(tvec<3, int>(2, 1, 0), tvec<3, int>(0, 3, 1), tvec<3, int>(1, 0, 4));
+    mat3 identity(1, 0, 0, 0, 1, 0, 0, 0, 1);
+
+    static_assert(mat3::size() == 3);
+    static_assert(mat3::rows() == 3);
+    static_assert(mat3::cols() == 3);
+    static_assert(sizeof(mat3) == 9 * sizeof(int));
+    static_assert(std::is_trivially_copyable_v<mat3>);
+
+    EXPECT_EQ(a(0, 0), 1);
+    EXPECT_EQ(a(1, 0), 2);
+    EXPECT_EQ(a(0, 2), 5);
+    EXPECT_EQ(a[2], (tvec<3, int>(5, 6, 0)));
+    EXPECT_EQ(determinant(a), 1);
+
+    // Comparison, increment and compound assignment.
+    EXPECT_TRUE(a == a);
+    EXPECT_TRUE(a != b);
+    EXPECT_FALSE(a == b);
+    mat3 c(a);
+    EXPECT_EQ(++c, a + 1);
+    c = a;
+    EXPECT_EQ(c++, a);
+    EXPECT_EQ(c, a + 1);
+    c = a;
+    EXPECT_EQ(--c, a - 1);
+    c = a;
+    c *= b;
+    EXPECT_EQ(c, a * b);
+    c = a;
+    c -= a;
+    EXPECT_EQ(c, mat3(0)); // diagonal scalar construct
+    EXPECT_TRUE(a.nearly_eq(a));
+    EXPECT_FALSE(a.nearly_eq(b));
+
+    // Products: the matrix/matrix product must agree with the row by column
+    // definition, and the matrix/vector products follow it.
+    mat3 by_definition;
+    for(std::size_t col = 0; col < 3; ++col)
+    {
+        for(std::size_t row = 0; row < 3; ++row)
+        {
+            int sum = 0;
+            for(std::size_t k = 0; k < 3; ++k)
+                sum += a[k][row] * b[col][k];
+            by_definition[col][row] = sum;
+        }
+    }
+    EXPECT_EQ(a * b, by_definition);
+    EXPECT_EQ(a * identity, a);
+    EXPECT_EQ(identity * a, a);
+    // a * v uses the rows of a, v * a uses its columns.
+    EXPECT_EQ((a * tvec<3, int>(1, 2, 3)), (tvec<3, int>(16, 22, 11)));
+    EXPECT_EQ((tvec<3, int>(1, 2, 3) * a), (tvec<3, int>(14, 14, 17)));
+    EXPECT_EQ(a / 2, mat3(0, 1, 1, 0, 0, 2, 2, 3, 0));
+    // Scalar on the left divides element wise; skip the zero entries (a[1][0]
+    // and a[2][2] are zero and integer division by zero would trap).
+    mat3 nz(1, 2, 3, 1, 1, 4, 5, 6, 7);
+    EXPECT_EQ(100 / nz, mat3(100, 50, 33, 100, 100, 25, 20, 16, 14));
+
+    // transpose
+    mat3 t = transpose(a);
+    EXPECT_EQ(t(0, 1), a(1, 0));
+    EXPECT_EQ(t(2, 0), a(0, 2));
+    EXPECT_EQ(transpose(t), a);
+    EXPECT_EQ(determinant(t), determinant(a));
+
+    // inverse() needs a fractional scalar type; the entries of this example are
+    // plain integers, so float and fixed point stay exact.
+    tmat<3, 3, float> fa(1.f, 2.f, 3.f, 0.f, 1.f, 4.f, 5.f, 6.f, 0.f);
+    EXPECT_FLOAT_EQ(determinant(fa), 1.f);
+    tmat<3, 3, float> fb = inverse(fa);
+    EXPECT_FLOAT_EQ(fb[0][0], -24.f);
+    EXPECT_FLOAT_EQ(fb[0][1], 18.f);
+    EXPECT_FLOAT_EQ(fb[0][2], 5.f);
+    EXPECT_FLOAT_EQ(fb[1][0], 20.f);
+    EXPECT_FLOAT_EQ(fb[1][1], -15.f);
+    EXPECT_FLOAT_EQ(fb[1][2], -4.f);
+    EXPECT_FLOAT_EQ(fb[2][0], -5.f);
+    EXPECT_FLOAT_EQ(fb[2][1], 4.f);
+    EXPECT_FLOAT_EQ(fb[2][2], 1.f);
+    // Row i of the inverse is the cross product of the other two columns.
+    EXPECT_EQ((tvec<3, float>(fb[0][0], fb[1][0], fb[2][0])), fa[1].cross(fa[2]));
+    tmat<3, 3, float> fIdentity(1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f);
+    EXPECT_EQ(fa * fb, fIdentity);
+    EXPECT_EQ(fb * fa, fIdentity);
+    EXPECT_EQ(fa / fa, fIdentity);
+
+    tmat<3, 3, fixed32> f(1_f32, 2_f32, 3_f32, 0_f32, 1_f32, 4_f32, 5_f32, 6_f32, 0_f32);
+    EXPECT_EQ(determinant(f), 1_f32);
+    EXPECT_EQ(inverse(f)[0][0], -24_f32);
+    EXPECT_EQ(inverse(f)[1][1], -15_f32);
+    EXPECT_EQ(transpose(f)(0, 2), f(2, 0));
+    EXPECT_EQ(f * inverse(f), (tmat<3, 3, fixed32>(1_f32, 0_f32, 0_f32, 0_f32, 1_f32, 0_f32, 0_f32, 0_f32, 1_f32)));
+
+    // A 2x2 matrix is embedded into the top left corner, the remaining diagonal
+    // element is 1 and everything else is 0.
+    mat2<int> m22(1, 2, 3, 4);
+    EXPECT_EQ(mat3(m22), mat3(1, 2, 0, 3, 4, 0, 0, 0, 1));
+    EXPECT_EQ((tmat<3, 3, float>(m22)), (tmat<3, 3, float>(1.f, 2.f, 0.f, 3.f, 4.f, 0.f, 0.f, 0.f, 1.f)));
+    // and the reverse conversion takes the top left corner back.
+    EXPECT_EQ(mat2<int>(mat3(m22)), m22);
+}
+
+// ==================== 4x4 ====================
+TEST(Mat, FourByFour)
+{
+    using mat4 = tmat<4, 4, float>;
+
+    // Column major: columns (4, 7, 2, 6), (0, 1, 4, 3), (5, 6, 0, 1), (2, 1, 3, 8).
+    mat4 a(tvec<4, float>(4, 7, 2, 6), tvec<4, float>(0, 1, 4, 3), tvec<4, float>(5, 6, 0, 1), tvec<4, float>(2, 1, 3, 8));
+    mat4 identity(1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+
+    static_assert(mat4::size() == 4);
+    static_assert(mat4::rows() == 4);
+    static_assert(mat4::cols() == 4);
+    static_assert(sizeof(mat4) == 16 * sizeof(float));
+    static_assert(std::is_trivially_copyable_v<mat4>);
+
+    // Construction and access: 16 scalars are column major, and m[c][r] is the
+    // same element as m(r, c).
+    mat4 byScalars(1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f, 10.f, 11.f, 12.f, 13.f, 14.f, 15.f, 16.f);
+    EXPECT_FLOAT_EQ(byScalars(0, 0), 1.f);
+    EXPECT_FLOAT_EQ(byScalars(3, 0), 4.f);
+    EXPECT_FLOAT_EQ(byScalars(0, 3), 13.f);
+    EXPECT_FLOAT_EQ(byScalars[2][3], 12.f);
+    EXPECT_EQ(a[3], (tvec<4, float>(2, 1, 3, 8)));
+    EXPECT_EQ(a(2, 1), a[1][2]);
+    mat4 diagonal(2.f);
+    EXPECT_FLOAT_EQ(diagonal(0, 0), 2.f);
+    EXPECT_FLOAT_EQ(diagonal(1, 1), 2.f);
+    EXPECT_FLOAT_EQ(diagonal(0, 1), 0.f);
+    EXPECT_FLOAT_EQ(diagonal(3, 2), 0.f);
+#ifdef EIRIN_HAS_CXX_FEATURE_MULTIDIM_SUBSCRIPT
+    EXPECT_FLOAT_EQ((a[1, 2]), a[2][1]);
+#endif
+
+    // Arithmetic, comparison and increments.
+    mat4 sum = a + identity;
+    EXPECT_FLOAT_EQ(sum(0, 0), a(0, 0) + 1.f);
+    EXPECT_FLOAT_EQ(sum(1, 1), a(1, 1) + 1.f);
+    EXPECT_FLOAT_EQ(sum(0, 1), a(0, 1)); // the identity only touches the diagonal
+    EXPECT_EQ(a - a, mat4(0.f));
+    EXPECT_EQ(-(-a), a);
+    // Note: the scalar type has to match the element type, `a * 2` would deduce
+    // conflicting types for the element type (float and int).
+    EXPECT_EQ(a * 2.f, a + a);
+    EXPECT_EQ(2.f * a, a + a);
+    EXPECT_EQ(a / 2.f, a * 0.5f);
+    EXPECT_TRUE(a == a);
+    EXPECT_FALSE(a == identity);
+    EXPECT_TRUE(a != identity);
+    mat4 c(a);
+    EXPECT_EQ(++c, a + 1.f);
+    c = a;
+    EXPECT_EQ(c--, a);
+    EXPECT_EQ(c, a - 1.f);
+    c = a;
+    c *= 2.f;
+    EXPECT_EQ(c, a + a);
+    EXPECT_TRUE(a.nearly_eq(a));
+    EXPECT_FALSE(a.nearly_eq(identity));
+
+    // Products.
+    mat4 b(tvec<4, float>(1, 0, 2, 1), tvec<4, float>(3, 1, 0, 2), tvec<4, float>(0, 2, 1, 0), tvec<4, float>(4, 1, 1, 3));
+    mat4 byDefinition;
+    for(std::size_t col = 0; col < 4; ++col)
+    {
+        for(std::size_t row = 0; row < 4; ++row)
+        {
+            float sum = 0.f;
+            for(std::size_t k = 0; k < 4; ++k)
+                sum += a[k][row] * b[col][k];
+            byDefinition[col][row] = sum;
+        }
+    }
+    EXPECT_EQ(a * b, byDefinition);
+    EXPECT_EQ(a * identity, a);
+    EXPECT_EQ(a * b * identity, byDefinition);
+
+    // transpose
+    mat4 t = transpose(a);
+    for(std::size_t col = 0; col < 4; ++col)
+    {
+        for(std::size_t row = 0; row < 4; ++row)
+            EXPECT_FLOAT_EQ(t[col][row], a[row][col]);
+    }
+    EXPECT_EQ(transpose(t), a);
+    EXPECT_EQ(determinant(t), determinant(a));
+    EXPECT_NEAR(determinant(a), 341.f, 1e-3f);
+
+    // inverse
+    mat4 inv = inverse(a);
+    mat4 product = a * inv;
+    for(std::size_t col = 0; col < 4; ++col)
+    {
+        for(std::size_t row = 0; row < 4; ++row)
+            EXPECT_NEAR(product[col][row], col == row ? 1.f : 0.f, 1e-5);
+    }
+    EXPECT_NEAR(determinant(inv), 1.f / 341.f, 1e-7f);
+
+    // a 3x3 or 2x2 matrix is embedded into the top left corner, the remaining
+    // diagonal elements are 1 and everything else is 0.
+    tmat<3, 3, float> m33(1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f);
+    mat4 from33(m33);
+    EXPECT_FLOAT_EQ(from33[2][2], 9.f);
+    EXPECT_FLOAT_EQ(from33[0][3], 0.f);
+    EXPECT_FLOAT_EQ(from33[3][3], 1.f);
+    EXPECT_FLOAT_EQ(from33[3][0], 0.f);
+    tmat<2, 2, float> m22(1.f, 2.f, 3.f, 4.f);
+    mat4 from22(m22);
+    EXPECT_FLOAT_EQ(from22[1][1], 4.f);
+    EXPECT_FLOAT_EQ(from22[2][2], 1.f);
+    EXPECT_FLOAT_EQ(from22[3][3], 1.f);
+    EXPECT_FLOAT_EQ(from22[2][0], 0.f);
+
+    // Fixed point: same kernels, only accurate to the fixed point precision.
+    tmat<4, 4, fixed32> f(4_f32, 7_f32, 2_f32, 6_f32, 0_f32, 1_f32, 4_f32, 3_f32, 5_f32, 6_f32, 0_f32, 1_f32, 2_f32, 1_f32, 3_f32, 8_f32);
+    tmat<4, 4, fixed32> fIdentity(1_f32, 0_f32, 0_f32, 0_f32, 0_f32, 1_f32, 0_f32, 0_f32, 0_f32, 0_f32, 1_f32, 0_f32, 0_f32, 0_f32, 0_f32, 1_f32);
+    EXPECT_EQ(determinant(f), 341_f32);
+    tmat<4, 4, fixed32> fProduct = f * inverse(f);
+    for(std::size_t col = 0; col < 4; ++col)
+    {
+        for(std::size_t row = 0; row < 4; ++row)
+            EXPECT_LT(abs(fProduct[col][row] - fIdentity[col][row]), 0.01_f32);
+    }
+    EXPECT_EQ(transpose(f)(1, 2), f(2, 1));
+}
+
+// ==================== Contiguous Element View ====================
+TEST(Mat, DataView)
+{
+    // Column major: the elements of a column are contiguous (asserted for the
+    // vectors) and the columns are an array, so the whole matrix is contiguous.
+    static_assert(sizeof(mat2<int>) == 4 * sizeof(int));
+    static_assert(sizeof(mat3<int>) == 9 * sizeof(int));
+    static_assert(sizeof(mat4<int>) == 16 * sizeof(int));
+    static_assert(sizeof(mat4<float>) == 64);
+    static_assert(std::is_same_v<decltype(std::declval<mat4<int>&>().data()), int*>);
+    static_assert(std::is_same_v<decltype(std::declval<const mat4<int>&>().data()), const int*>);
+
+    mat4<int> m(tvec<4, int>(4, 7, 2, 6), tvec<4, int>(0, 1, 4, 3), tvec<4, int>(5, 6, 0, 1), tvec<4, int>(2, 1, 3, 8));
+
+    // The view starts at the first column and advances column by column.
+    EXPECT_EQ(m.data(), m[0].data());
+    EXPECT_EQ(m.data() + 4, m[1].data());
+    EXPECT_EQ(m.data() + 8, m[2].data());
+    EXPECT_EQ(m.data() + 12, m[3].data());
+    EXPECT_EQ(m.data()[0], 4);
+    EXPECT_EQ(m.data()[1], 7);
+    EXPECT_EQ(m.data()[4], 0);  // row 0 of the second column
+    EXPECT_EQ(m.data()[5], 1);
+
+    // Writing through the view writes into the matrix.
+    m.data()[1] = 70;
+    EXPECT_EQ(m(1, 0), 70);
+    m(1, 1) = 10;
+    EXPECT_EQ(m.data()[5], 10);
+
+    const mat4<int> cm(m);
+    EXPECT_EQ(cm.data()[1], 70);
+    EXPECT_EQ(cm.data()[5], 10);
+
+    // The strictly conforming copy is column major for every shape.
+    EXPECT_EQ(mat2<int>(1, 2, 3, 4).to_array(), (std::array<int, 4>{1, 2, 3, 4}));
+    EXPECT_EQ(mat3<int>(1, 2, 3, 0, 1, 4, 5, 6, 0).to_array(), (std::array<int, 9>{1, 2, 3, 0, 1, 4, 5, 6, 0}));
+    auto a = m.to_array();
+    EXPECT_EQ(a[0], 4);
+    EXPECT_EQ(a[1], 70);
+    EXPECT_EQ(a[4], 0);
+    EXPECT_EQ(a[15], 8);
+    EXPECT_EQ((tmat<2, 2, fixed32>(4_f32, 7_f32, 2_f32, 6_f32).to_array()[3]), 6_f32);
+
+    // Constant expressions: the first element through the view, or any element
+    // through the copy.
+    constexpr mat3<int> kMat(1, 2, 3, 0, 1, 4, 5, 6, 0);
+    static_assert(kMat.data()[0] == 1);
+    static_assert(kMat.to_array()[2] == 3);
+    static_assert(kMat.to_array()[3] == 0);
+    static_assert(kMat.to_array()[8] == 0);
 }
 
 // ==================== Compile Time Constraints ====================

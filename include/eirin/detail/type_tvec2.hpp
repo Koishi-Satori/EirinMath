@@ -5,6 +5,8 @@
 
 #include <limits>
 #include <cassert>
+#include <array>
+#include <bit>
 #include "type_tvec.hpp"
 #include "type_tvec3.hpp"
 #include "type_tvec4.hpp"
@@ -52,6 +54,23 @@ struct tvec<2, T> : public tvec_base<2, T, tvec<2, T>>
     template <typename A>
     EIRIN_ALWAYS_INLINE constexpr tvec(tvec<4, A> _xyzw)
         : x(static_cast<T>(_xyzw.x)), y(static_cast<T>(_xyzw.y)){};
+
+    /// Contiguous view of the components, for SIMD loads and API interop.
+    constexpr inline T* data() noexcept
+    {
+        return &x;
+    }
+
+    /// Contiguous view of the components, for SIMD loads and API interop.
+    constexpr inline const T* data() const noexcept
+    {
+        return &x;
+    }
+
+    constexpr inline std::array<T, 2> to_array() const noexcept
+    {
+        return std::bit_cast<std::array<T, 2>>(*this);
+    }
 
     tvec& operator=(const tvec& other) noexcept = default;
 

@@ -922,6 +922,55 @@ TEST(Vec, GLSLBehavior)
 #endif
 }
 
+// ==================== Contiguous Component View ====================
+TEST(Vec, DataView)
+{
+    // The component view relies on "same type members, declaration order, no
+    // padding", so the layout is asserted instead of assumed.
+    static_assert(sizeof(vec2i) == 2 * sizeof(int));
+    static_assert(sizeof(vec3i) == 3 * sizeof(int));
+    static_assert(sizeof(vec4i) == 4 * sizeof(int));
+    static_assert(sizeof(vec4f) == 4 * sizeof(float));
+    static_assert(offsetof(vec2i, y) == 1 * sizeof(int));
+    static_assert(offsetof(vec3i, y) == 1 * sizeof(int));
+    static_assert(offsetof(vec3i, z) == 2 * sizeof(int));
+    static_assert(offsetof(vec4i, y) == 1 * sizeof(int));
+    static_assert(offsetof(vec4i, z) == 2 * sizeof(int));
+    static_assert(offsetof(vec4i, w) == 3 * sizeof(int));
+    static_assert(std::is_trivially_copyable_v<vec4i>);
+    static_assert(std::is_standard_layout_v<vec4i>);
+    static_assert(std::is_same_v<decltype(std::declval<vec4i&>().data()), int*>);
+    static_assert(std::is_same_v<decltype(std::declval<const vec4i&>().data()), const int*>);
+
+    // Reading through the view, and writing back through it.
+    vec4i v(1, 2, 3, 4);
+    EXPECT_EQ(v.data()[0], 1);
+    EXPECT_EQ(v.data()[1], 2);
+    EXPECT_EQ(v.data()[2], 3);
+    EXPECT_EQ(v.data()[3], 4);
+    v.data()[2] = 30;
+    EXPECT_EQ(v.z, 30);
+    v.w = 40;
+    EXPECT_EQ(v.data()[3], 40);
+
+    const vec4i cv(1, 2, 3, 4);
+    EXPECT_EQ(cv.data()[1], 2);
+    EXPECT_EQ(cv.data()[3], 4);
+
+    // The copy is strictly conforming (std::bit_cast) and covers all lengths.
+    EXPECT_EQ(v.to_array(), (std::array<int, 4>{1, 2, 30, 40}));
+    EXPECT_EQ(vec2i(1, 2).to_array(), (std::array<int, 2>{1, 2}));
+    EXPECT_EQ(vec3i(1, 2, 3).to_array()[2], 3);
+    EXPECT_EQ(vec3<fixed32>(1_f32, 2_f32, 3_f32).to_array()[1], 2_f32);
+
+    // Member access is the way to use the components in constant expressions;
+    // the view can be indexed from a constant expression as a copy.
+    constexpr vec3i kVec(1, 2, 3);
+    static_assert(kVec.x == 1 && kVec.z == 3);
+    static_assert(kVec.data()[0] == 1);
+    static_assert(kVec.to_array()[2] == 3);
+}
+
 // ==================== Common usage Test ====================
 TEST(Vec, CommonUsage)
 {

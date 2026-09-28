@@ -39,10 +39,15 @@ namespace detail
         inline constexpr static size_type size = Matrix::size();
         inline constexpr static size_type cols = Matrix::cols();
         inline constexpr static size_type rows = Matrix::rows();
+
+        inline constexpr static bool is_square_matrix = (cols == rows);
     };
 
     template <std::size_t C, std::size_t R>
     concept matrix_shape = C > 0 && C <= 4 && R > 0 && R <= 4;
+
+    template <std::size_t C, std::size_t R>
+    concept square_matrix = C == R;
 
     template <typename size_type, size_type N>
     [[nodiscard]]
@@ -64,6 +69,9 @@ namespace detail
 
 template <typename T>
 concept matrix_type = detail::is_matrix_type_v<T>;
+
+template <typename Matrix>
+concept square_matrix = detail::matrix_trait<Matrix>::is_square_matrix;
 
 template <std::size_t C, std::size_t R, typename T>
 requires detail::matrix_shape<C, R>

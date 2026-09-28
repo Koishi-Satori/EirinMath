@@ -114,6 +114,19 @@
 #    define EIRIN_VEC_SWIZZLE_CHAIN_AS_LVALUE EIRIN_DISABLE
 #endif
 
+// Feature: SIMD matrix kernels.
+// When enabled (and the target has SIMD support, see the EIRIN_PLATFORM_SIMD_*
+// macros in macro.hpp) the matrix kernels select SIMD implementations through
+// detail::matrix_kernel_selector instead of the scalar reference kernels.
+//
+// The switch is only read through preprocessor conditionals, so every
+// translation unit of a program has to agree on its value; a runtime CPU probe
+// may only choose between paths *inside* a kernel, never whether a kernel
+// specialization exists.
+#ifndef EIRIN_MATRIX_ENABLE_SIMD
+#    define EIRIN_MATRIX_ENABLE_SIMD EIRIN_DISABLE
+#endif
+
 #define EIRIN_MATH_HAS_INCLUDE_CONFIG
 
 #endif

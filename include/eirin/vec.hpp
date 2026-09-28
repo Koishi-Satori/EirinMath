@@ -14,6 +14,7 @@
 #include "detail/type_tvec2.hpp"
 #include "detail/type_tvec3.hpp"
 #include "detail/type_tvec4.hpp"
+#include "detail/vector_func.hpp"
 #include "detail/int128.hpp"
 
 namespace eirin
