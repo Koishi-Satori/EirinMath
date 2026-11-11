@@ -35,7 +35,7 @@ message(STATUS "EirinMath: Google Benchmark from FetchContent (v1.9.4)")
 # ---------------------------------------------------------------------------
 function(eirin_add_benchmark target)
     add_executable(${target} ${ARGN})
-    target_link_libraries(${target} PRIVATE eirin::math benchmark::benchmark)
+    target_link_libraries(${target} PRIVATE EirinMath::math benchmark::benchmark)
     target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     eirin_enable_warnings(${target})
 

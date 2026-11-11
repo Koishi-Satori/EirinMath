@@ -36,7 +36,7 @@ message(STATUS "EirinMath: GoogleTest from ${_eirin_gtest_source}")
 set(EIRIN_TEST_SOURCES main.cpp test_io.cpp test_sat_arith.cpp test_vec.cpp)
 
 add_executable(eirin_fixed.test ${EIRIN_TEST_SOURCES})
-target_link_libraries(eirin_fixed.test PRIVATE eirin::math GTest::gtest)
+target_link_libraries(eirin_fixed.test PRIVATE EirinMath::math GTest::gtest)
 eirin_enable_warnings_as_errors(eirin_fixed.test)
 
 if(eirin_dev_test)

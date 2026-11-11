@@ -394,7 +394,7 @@ find_package(EirinMath 1.5 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE EirinMath::math)
 ```
 
-`EirinMath::math` is the exported header-only target (the package is compatible within the same major version). When vendoring the project with `add_subdirectory`, the in-tree aliases `EirinMath::math` and `eirin::math` are available.
+`EirinMath::math` is the exported header-only target (the package is compatible within the same major version). When vendoring the project with `add_subdirectory`, the same `EirinMath::math` alias is available.
 
 Useful CMake options (all boolean, passed as `-D<name>=ON` or `-D<name>=OFF`):
 

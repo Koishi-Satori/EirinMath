@@ -46,7 +46,7 @@ The install step also generates a CMake package configuration, so that other CMa
     find_package(EirinMath 1.5 CONFIG REQUIRED)
     target_link_libraries(my_target PRIVATE EirinMath::math)
 
-The library target is exported as ``EirinMath::math`` (the package version is compatible within the same major version). When the library is vendored with ``add_subdirectory``, the in-tree aliases ``EirinMath::math`` and ``eirin::math`` are available.
+The library target is exported as ``EirinMath::math`` (the package version is compatible within the same major version). When the library is vendored with ``add_subdirectory``, the same ``EirinMath::math`` alias is available.
 
 The examples use the Ninja generator, as the CI does. With a multi-config generator, pass ``--config Release`` to ``cmake --build``/``cmake --install`` and ``-C Release`` to ``ctest`` instead.
 

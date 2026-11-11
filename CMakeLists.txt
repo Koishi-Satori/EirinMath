@@ -49,9 +49,9 @@ endfunction()
 # The header-only library target
 # ---------------------------------------------------------------------------
 add_library(eirin_math INTERFACE)
-add_library(eirin::math ALIAS eirin_math)
-# The exported package target is EirinMath::math; provide the same name in the
-# build tree so both add_subdirectory and find_package consumers can use it.
+# The installed package exports the target as EirinMath::math (see
+# EXPORT_NAME below); the alias makes the same name usable from the build
+# tree, e.g. when the library is vendored with add_subdirectory.
 add_library(EirinMath::math ALIAS eirin_math)
 set_target_properties(eirin_math PROPERTIES EXPORT_NAME math)
 
