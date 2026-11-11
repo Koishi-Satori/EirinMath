@@ -2,6 +2,9 @@
 #define EIRIN_MATH_ERROR_HPP
 
 #include <stdexcept>
+#ifdef EIRIN_NO_EXCEPTIONS
+#    include <exception>
+#endif
 
 namespace eirin
 {
@@ -44,7 +47,7 @@ namespace detail
 // marked as `noexcept`.
 #ifdef EIRIN_MATH_DOMAIN_SILENT
 #    define EIRIN_MATH_DOMAIN_ERROR(msg, ret) return (ret)
-#    define EIRIN_MATH_TRY_NOEXCEPT noexcept
+#    define EIRIN_MATH_TRY_NOEXCEPT           noexcept
 #else
 #    define EIRIN_MATH_DOMAIN_ERROR(msg, ret) EIRIN_THROW_EXCEPTION(std::domain_error, msg)
 #    define EIRIN_MATH_TRY_NOEXCEPT
