@@ -6,10 +6,10 @@
 /* Accelerated matrix kernels.
  *
  * This header is included from matrix_func.hpp only when the platform reports
- * SIMD support (EIRIN_PLATFORM_HAS_SIMD) and EIRIN_MATRIX_ENABLE_SIMD is
- * enabled, so whether a specialization below exists is decided purely by
- * macros.  A runtime CPU probe (see ext/simd_math.hpp) may pick a path inside a
- * kernel, but it must never decide whether the specialization itself exists.
+ * SIMD is enabled through EIRIN_SIMD_ENABLE and EIRIN_MATRIX_ENABLE_SIMD, so
+ * whether a specialization below exists is decided purely by macros. A runtime
+ * CPU probe (see ext/simd_math.hpp) may pick a path inside a kernel, but it must
+ * never decide whether the specialization itself exists.
  *
  * A kernel is added in two steps:
  *   1. specialize detail::matrix_kernel_selector<C, R, T> in matrix_func.hpp to

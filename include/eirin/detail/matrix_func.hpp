@@ -37,7 +37,7 @@ namespace detail
               { using type = matrix_simd_kernel<float, arch_avx2, 8>; };
          2. add the matching `compute_*(..., matrix_simd_kernel<float, arch_avx2, 8>)`
             specializations in matrix_func_simd.hpp (which is only compiled when
-            both EIRIN_PLATFORM_HAS_SIMD and EIRIN_MATRIX_ENABLE_SIMD are set).
+            both EIRIN_SIMD_ENABLE and EIRIN_MATRIX_ENABLE_SIMD are set).
 
        Contract: a SIMD kernel must be numerically identical to the scalar
        kernel of the same shape - bit identical for fixed point (same widening,
@@ -117,7 +117,7 @@ EIRIN_MATH_FUNC_API T determinant(const tmat<C, R, T>& mat) noexcept
 #include "matrix_func_impl.hpp"
 
 // include SIMD eval struct implementations
-#if defined(EIRIN_PLATFORM_HAS_SIMD) && (EIRIN_MATRIX_ENABLE_SIMD == EIRIN_ENABLE)
+#if (EIRIN_SIMD_ENABLE == EIRIN_ENABLE) && (EIRIN_MATRIX_ENABLE_SIMD == EIRIN_ENABLE)
 #    include "matrix_func_simd.hpp"
 #endif
 

@@ -9,8 +9,8 @@ namespace eirin
 {
 namespace detail
 {
-    /* Instruction set levels, mirroring the EIRIN_PLATFORM_SIMD_* macros of
-       macro.hpp.  A tag states which instructions a kernel may use; whether
+    /* Instruction set levels, mirroring the EIRIN_PLATFORM_SIMD_HAS_* macros of
+       macro.hpp. A tag states which instructions a kernel may use; whether
        they are available at run time is a separate question and is answered
        inside the kernel (see ext/simd_math.hpp), never by the existence of a
        specialization. */
@@ -24,6 +24,12 @@ namespace detail
     {};
 
     struct arch_avx2
+    {};
+
+    struct arch_avx512f
+    {};
+
+    struct arch_avx512dq
     {};
 
     struct arch_neon
