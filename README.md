@@ -387,6 +387,15 @@ cmake --install build --prefix /path/to/prefix    # install headers
 
 The examples use the Ninja generator (as the CI does). With a multi-config generator, pass `--config Release` to `cmake --build`/`cmake --install` and `-C Release` to `ctest` instead.
 
+The install step also generates a CMake package configuration, so other CMake projects can use the installed library:
+
+```cmake
+find_package(EirinMath 1.5 CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE EirinMath::math)
+```
+
+`EirinMath::math` is the exported header-only target (the package is compatible within the same major version). When vendoring the project with `add_subdirectory`, the in-tree aliases `EirinMath::math` and `eirin::math` are available.
+
 Useful CMake options (all boolean, passed as `-D<name>=ON` or `-D<name>=OFF`):
 
 | Option | Default | Description |

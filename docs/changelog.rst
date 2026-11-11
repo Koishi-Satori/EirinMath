@@ -7,6 +7,7 @@ Unreleased
 ----------
 
 - Migrate the build system to CMake.  The install step copies the headers into the GNUInstallDirs include directory, Google Benchmark is obtained through FetchContent, and GoogleTest prefers a system installation before falling back to FetchContent (controlled by ``eirin_prefer_system_gtest``).
+- Install a CMake package configuration so consumers can use ``find_package(EirinMath)`` and link ``EirinMath::math``.
 
 v1.1.3
 --------

@@ -144,9 +144,27 @@ jobs:
             run: |
               cmake --install build --prefix "$RUNNER_TEMP/eirin-install"
               test -f "$RUNNER_TEMP/eirin-install/include/eirin/eirin.hpp"
+              test -n "$(find "$RUNNER_TEMP/eirin-install" -name EirinMathConfig.cmake -print -quit)"
+
+              # The headers can be included directly...
               printf '#include <eirin/fixed.hpp>\nint main() { return eirin::fixed32(1.5).internal_value() == 98304 ? 0 : 1; }\n' > "$RUNNER_TEMP/consumer.cpp"
               g++-14 -std=c++20 -I"$RUNNER_TEMP/eirin-install/include" "$RUNNER_TEMP/consumer.cpp" -o "$RUNNER_TEMP/consumer"
               "$RUNNER_TEMP/consumer"
+
+              # ...and the installed package can be consumed with find_package.
+              mkdir -p "$RUNNER_TEMP/consumer-cmake"
+              cat > "$RUNNER_TEMP/consumer-cmake/CMakeLists.txt" <<'EOF'
+              cmake_minimum_required(VERSION 3.24)
+              project(consumer LANGUAGES CXX)
+              find_package(EirinMath 1.5 CONFIG REQUIRED)
+              add_executable(consumer main.cpp)
+              target_link_libraries(consumer PRIVATE EirinMath::math)
+              EOF
+              cp "$RUNNER_TEMP/consumer.cpp" "$RUNNER_TEMP/consumer-cmake/main.cpp"
+              cmake -S "$RUNNER_TEMP/consumer-cmake" -B "$RUNNER_TEMP/consumer-cmake/build" -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/eirin-install"
+              cmake --build "$RUNNER_TEMP/consumer-cmake/build"
+              "$RUNNER_TEMP/consumer-cmake/build/consumer"
 
     Emscripten:
         runs-on: ubuntu-24.04
