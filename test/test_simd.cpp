@@ -15,6 +15,17 @@
 #    include <random>
 #endif
 
+namespace
+{
+template <typename T, typename = void>
+struct has_native_abi : std::false_type
+{};
+
+template <typename T>
+struct has_native_abi<T, std::void_t<eirin::simd_abi::native_abi_t<T>>> : std::true_type
+{};
+} // namespace
+
 TEST(SimdConfig, IsaMacrosAreBoolean)
 {
     static_assert(EIRIN_PLATFORM_SIMD_HAS_SSE == EIRIN_TRUE || EIRIN_PLATFORM_SIMD_HAS_SSE == EIRIN_FALSE);
@@ -96,6 +107,43 @@ TEST(SimdAbi, OtherArchitectureExtractors)
     static_assert(abi_size_v<float, abi_wasm_simd128> == 4);
     static_assert(abi_size_v<std::int64_t, abi_wasm_simd128> == 2);
     static_assert(abi_alignment_v<float, abi_wasm_simd128> == 16);
+#endif
+}
+
+TEST(SimdAbi, NativeSelection)
+{
+    using namespace eirin::simd_abi;
+
+    static_assert(has_native_abi<float>::value);
+    static_assert(has_native_abi<std::int64_t>::value);
+    static_assert(!has_native_abi<eirin::fixed32>::value);
+
+#if EIRIN_SIMD_ENABLE == EIRIN_DISABLE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_scalar>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_scalar>);
+#elif defined(EIRIN_ARCH_X86)
+#    if EIRIN_PLATFORM_SIMD_HAS_AVX512F == EIRIN_TRUE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_avx512_512>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_avx512_512>);
+#    elif EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI == EIRIN_TRUE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_avx2_256>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_avx2_256>);
+#    elif EIRIN_PLATFORM_SIMD_HAS_FULL_SSE_ABI == EIRIN_TRUE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_sse2_128>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_sse2_128>);
+#    else
+    static_assert(std::is_same_v<native_abi_t<float>, abi_scalar>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_scalar>);
+#    endif
+#elif EIRIN_PLATFORM_SIMD_HAS_NEON == EIRIN_TRUE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_neon_128>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_neon_128>);
+#elif EIRIN_PLATFORM_SIMD_HAS_WASM_SIMD128 == EIRIN_TRUE
+    static_assert(std::is_same_v<native_abi_t<float>, abi_wasm_simd128>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_wasm_simd128>);
+#else
+    static_assert(std::is_same_v<native_abi_t<float>, abi_scalar>);
+    static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_scalar>);
 #endif
 }
 

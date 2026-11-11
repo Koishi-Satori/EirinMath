@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <type_traits>
 #include "../../macro.hpp"
 
 namespace eirin::simd_abi
@@ -42,6 +44,66 @@ constexpr inline bool platform_has_avx_abi = EIRIN_PLATFORM_SIMD_HAS_AVX_ABI;
 constexpr inline bool platform_has_full_avx_abi = EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI;
 constexpr inline bool platform_has_avx512_abi = EIRIN_PLATFORM_SIMD_HAS_AVX512_ABI;
 constexpr inline bool platform_has_full_avx512_abi = EIRIN_PLATFORM_SIMD_HAS_FULL_AVX512_ABI;
+
+constexpr inline bool platform_support_neon_float =
+#if defined __GCC_IEC_559
+    __GCC_IEC_559 == 0;
+#elif defined __FAST_MATH__
+    true;
+#else
+    false;
+#endif
+
+template <typename T>
+constexpr std::size_t vectorized_sizeof()
+{
+    // if constexpr // TODO: maybe we need a type_traits to check if T is a valid type for vectorization...
+
+    if constexpr(sizeof(T) <= 8)
+    {
+        // X86:
+        if constexpr(platform_has_avx512bw)
+            return 64;
+        if constexpr(platform_has_avx512f && sizeof(T) >= 4)
+            return 64;
+        if constexpr(platform_has_avx2)
+            return 32;
+        if constexpr(platform_has_avx && std::is_floating_point_v<T>)
+            return 32;
+        if constexpr(platform_has_sse2)
+            return 16;
+        if constexpr(platform_has_sse && std::is_same_v<T, float>)
+            return 16;
+        /* The following is too much trouble because of mixed MMX and x87 code.
+	 * While nothing here explicitly calls MMX instructions of registers,
+	 * they are still emitted but no EMMS cleanup is done.
+	 * if constexpr (platform_has_mmx && sizeof(T) <= 4 && std::is_integral_v<T>)
+	 *  return 8;
+	 */
+
+        // PowerPC:
+        // if constexpr (platform_has_power8vec
+        // 	      || (platform_has_power_vmx && (sizeof(T) < 8))
+        // 	      || (platform_has_power_vsx && std::is_floating_point_v<T>) )
+        //   return 16;
+
+        // ARM:
+        if constexpr(platform_has_neon_a64 || (platform_has_neon_a32 && !std::is_same_v<T, double>))
+            return 16;
+        if constexpr(platform_has_neon && sizeof(T) < 8
+                     // Only allow fp if the user allows non-ICE559 fp (e.g.
+                     // via -ffast-math). ARMv7 NEON fp is not conforming to
+                     // IEC559.
+                     && (platform_support_neon_float || !std::is_floating_point_v<T>))
+            return 16;
+
+        // WebAssembly SIMD:
+        if constexpr(EIRIN_PLATFORM_SIMD_HAS_WASM_SIMD128 == EIRIN_TRUE)
+            return 16;
+    }
+    return sizeof(T);
+}
+
 } // namespace eirin::simd_abi
 
 #endif

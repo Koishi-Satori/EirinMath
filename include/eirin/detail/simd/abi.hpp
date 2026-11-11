@@ -39,6 +39,18 @@ struct abi_neon_128;
 
 struct abi_wasm_simd128;
 
+template <typename T>
+struct native_abi_selector;
+
+template <typename T>
+using native_abi_t = typename native_abi_selector<T>::type;
+
+template <typename T, std::size_t N>
+struct fixed_abi_selector;
+
+template <typename T, std::size_t N>
+using fixed_abi_t = typename fixed_abi_selector<T, N>::type;
+
 namespace detail
 {
     template <typename T, bool IsArithmetic = std::is_arithmetic_v<T>>
@@ -229,6 +241,7 @@ namespace detail
     struct neon_abi_traits : native_abi_traits<T, abi_neon_128, typename neon_native_type<T>::type, typename neon_native_type<T>::type, 128, true>
     {};
 #endif
+
 } // namespace detail
 
 template <typename T, typename ABI>
@@ -268,6 +281,11 @@ struct abi_neon_128
 
 struct abi_wasm_simd128
 {};
+
+template <typename T, std::size_t N>
+struct fixed_abi_selector
+{
+};
 
 template <typename T>
 struct abi_traits<T, abi_scalar>
@@ -353,6 +371,66 @@ inline constexpr std::size_t abi_size_v = abi_traits<T, ABI>::size;
 
 template <typename T, typename ABI>
 inline constexpr std::size_t abi_alignment_v = abi_traits<T, ABI>::alignment;
+
+namespace detail
+{
+    template <typename T>
+    constexpr auto determine_native_abi()
+    {
+        using lane_type = std::remove_cv_t<T>;
+        static_assert(is_simd_lane_v<lane_type>, "native ABI deduction requires a supported SIMD lane type.");
+
+        if constexpr(EIRIN_SIMD_ENABLE == EIRIN_DISABLE)
+        {
+            return static_cast<abi_scalar*>(nullptr);
+        }
+#if defined(EIRIN_ARCH_X86)
+        else
+        {
+            constexpr std::size_t bytes = vectorized_sizeof<lane_type>();
+
+            if constexpr(bytes >= 64 && abi_traits<lane_type, abi_avx512_512>::is_valid)
+                return static_cast<abi_avx512_512*>(nullptr);
+            else if constexpr(bytes >= 32 && abi_traits<lane_type, abi_avx2_256>::is_valid)
+                return static_cast<abi_avx2_256*>(nullptr);
+            else if constexpr(bytes >= 16 && abi_traits<lane_type, abi_sse2_128>::is_valid)
+                return static_cast<abi_sse2_128*>(nullptr);
+            else
+                return static_cast<abi_scalar*>(nullptr);
+        }
+#elif EIRIN_PLATFORM_SIMD_HAS_NEON == EIRIN_TRUE
+        else if constexpr(abi_traits<lane_type, abi_neon_128>::is_valid)
+        {
+            return static_cast<abi_neon_128*>(nullptr);
+        }
+        else
+        {
+            return static_cast<abi_scalar*>(nullptr);
+        }
+#elif EIRIN_PLATFORM_SIMD_HAS_WASM_SIMD128 == EIRIN_TRUE
+        else if constexpr(abi_traits<lane_type, abi_wasm_simd128>::is_valid)
+        {
+            return static_cast<abi_wasm_simd128*>(nullptr);
+        }
+        else
+        {
+            return static_cast<abi_scalar*>(nullptr);
+        }
+#else
+        else
+        {
+            return static_cast<abi_scalar*>(nullptr);
+        }
+#endif
+    }
+} // namespace detail
+
+template <typename T>
+requires detail::is_simd_lane_v<T>
+struct native_abi_selector<T>
+{
+    using type = std::remove_pointer_t<decltype(detail::determine_native_abi<T>())>;
+};
 } // namespace eirin::simd_abi
 
 #endif
