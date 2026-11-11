@@ -6,7 +6,7 @@ Changelog since the version v1.0.0
 v1.1.3
 --------
 
-- Add ``add_headerfils`` to xmake.lua for correctly install library with xmake.
+- Fix header installation so the library can be installed correctly.
 
 **Full Changelog**: https://github.com/Koishi-Satori/EirinFixed/compare/v1.1.2...v1.1.3
 
@@ -39,7 +39,7 @@ v1.0.2
 
 - add specialization for ``std::numeric_limits`` for ``eirin::fixed_point``.
 - add functions ``eirin::max_value()`` and ``eirin::min_value()``.
-- add xmake options.
+- add build options.
 - add documentation.
 - replace `std::is_signed` specialization for int128_t in Boost with ``eirin::detail::is_signed``.
 - fix recruit inline.

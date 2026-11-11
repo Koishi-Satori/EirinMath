@@ -2,7 +2,7 @@
 
 - Other language: [中文](README.zh-CN.md)
 
-A flexible, high-performance and header-only C++ fixed point number mathematics library, provides fixed point template class, high precision mathematical operations and basic input and output functions. You can run the benchmarks ```fixed.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double. 
+A flexible, high-performance and header-only C++ fixed point number mathematics library, provides fixed point template class, high precision mathematical operations and basic input and output functions. You can run the benchmarks ```eirin_fixed.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double. 
 
 *EirinMath* also provides a pre-defined 32bit-width fixed point, with 16bit precision(```fixed32```), and 64bit-width fixed point, with 32bit precision(```fixed64```).
 The fixed points require same calculation result in different platforms, devices, operator systems and compilers, and this library fulfills this requirement.
@@ -372,11 +372,46 @@ struct make_signed<my_uint, true>
   yielded least significant first; `test/main.cpp` contains working examples
   for both 64-bit and 16-bit word types.
 
+## Building and Testing
+
+Requires **CMake >= 3.24** and a C++20 compiler. The library is header-only; the install step copies the headers into the GNUInstallDirs include directory (`<prefix>/include/eirin/...`).
+
+From the repository root:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure        # run unit tests
+cmake --install build --prefix /path/to/prefix    # install headers
+```
+
+Useful CMake options (all boolean, passed as `-D<name>=ON` or `-D<name>=OFF`):
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `eirin_build_tests` | `ON` | build unit tests |
+| `eirin_build_benchmarks` | `ON` | build the fixed-number and double benchmarks |
+| `eirin_build_advanced_benchmark` | `OFF` | build the advanced benchmarks (perf/accuracy) |
+| `eirin_dev_test` | `OFF` | enable development test includes (SIMD tests) |
+| `eirin_prefer_system_gtest` | `ON` | use a system-installed GoogleTest if found; otherwise FetchContent downloads GoogleTest v1.14.0 (set to `OFF` to force FetchContent) |
+
+Google Benchmark is always obtained through FetchContent.
+
+For Emscripten/WASM builds:
+
+```sh
+emcmake cmake -S . -B build-wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-wasm
+node build-wasm/bin/<name>.js
+```
+
+The benchmark executables are `eirin_fixed.benchmark`, `eirin_fixed.tvec.benchmark`, `eirin_fixed.sat_arith.benchmark` and `double.benchmark` (written to `build/bin` on Unix single-config builds).
+
 ## Supported Compilers
 
 Requires at least **C++20**.
 
-- Build System: xmake >= v2.2.2
+- Build System: CMake >= 3.24
 - Compilers:
     - Any C++ compiler that supports **C++20**.
     - Clang >= 10
