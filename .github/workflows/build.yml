@@ -52,24 +52,12 @@ jobs:
           - uses: actions/checkout@v4
 
           # The image already provides CMake, Ninja and the compilers; only
-          # GoogleTest is missing.  Keep this best-effort: when the Ubuntu
-          # mirrors are unreachable, CMake falls back to FetchContent.
+          # GoogleTest is missing.  The script installs it when the Ubuntu
+          # mirrors are reachable and otherwise lets CMake fall back to
+          # FetchContent.
           - name: Install system GoogleTest
             id: gtest
-            run: |
-              ok=0
-              if timeout 300 sudo apt-get install -y --no-install-recommends -o Acquire::Retries=2 libgtest-dev; then
-                ok=1
-              elif timeout 180 sudo apt-get update -o Acquire::Retries=2 &&
-                   timeout 300 sudo apt-get install -y --no-install-recommends libgtest-dev; then
-                ok=1
-              fi
-              if [ "$ok" = 1 ]; then
-                echo "system_gtest=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "::warning::libgtest-dev is unavailable; CMake will use the FetchContent GoogleTest"
-                echo "system_gtest=false" >> "$GITHUB_OUTPUT"
-              fi
+            run: bash .github/install-gtest.sh
 
           - name: Configure
             run: |
@@ -114,24 +102,12 @@ jobs:
           - uses: actions/checkout@v4
 
           # The image already provides CMake, Ninja and the compilers; only
-          # GoogleTest is missing.  Keep this best-effort: when the Ubuntu
-          # mirrors are unreachable, CMake falls back to FetchContent.
+          # GoogleTest is missing.  The script installs it when the Ubuntu
+          # mirrors are reachable and otherwise lets CMake fall back to
+          # FetchContent.
           - name: Install system GoogleTest
             id: gtest
-            run: |
-              ok=0
-              if timeout 300 sudo apt-get install -y --no-install-recommends -o Acquire::Retries=2 libgtest-dev; then
-                ok=1
-              elif timeout 180 sudo apt-get update -o Acquire::Retries=2 &&
-                   timeout 300 sudo apt-get install -y --no-install-recommends libgtest-dev; then
-                ok=1
-              fi
-              if [ "$ok" = 1 ]; then
-                echo "system_gtest=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "::warning::libgtest-dev is unavailable; CMake will use the FetchContent GoogleTest"
-                echo "system_gtest=false" >> "$GITHUB_OUTPUT"
-              fi
+            run: bash .github/install-gtest.sh
 
           - name: Configure
             run: |
