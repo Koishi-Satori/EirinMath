@@ -40,9 +40,13 @@ target_link_libraries(eirin_fixed.test PRIVATE eirin::math GTest::gtest)
 eirin_enable_warnings_as_errors(eirin_fixed.test)
 
 if(eirin_dev_test)
-    target_compile_definitions(eirin_fixed.test PRIVATE EIRIN_DEV_TEST_MODE)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+    # The development tests include the AVX2 SIMD helpers, which are only
+    # available for x86 GCC/Clang builds.
+    if(NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+        target_compile_definitions(eirin_fixed.test PRIVATE EIRIN_DEV_TEST_MODE)
         target_compile_options(eirin_fixed.test PRIVATE -mavx -mavx2 -msse)
+    else()
+        message(STATUS "EirinMath: eirin_dev_test is only supported on x86 GCC/Clang; ignoring it")
     endif()
 endif()
 

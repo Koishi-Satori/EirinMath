@@ -49,18 +49,39 @@ jobs:
         name: Linux Clang ${{ matrix.clang }}
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build clang-${{ matrix.clang }} libgtest-dev
-
           - uses: actions/checkout@v4
 
+          # The image already provides CMake, Ninja and the compilers; only
+          # GoogleTest is missing.  Keep this best-effort: when the Ubuntu
+          # mirrors are unreachable, CMake falls back to FetchContent.
+          - name: Install system GoogleTest
+            id: gtest
+            run: |
+              ok=0
+              if timeout 300 sudo apt-get install -y --no-install-recommends -o Acquire::Retries=2 libgtest-dev; then
+                ok=1
+              elif timeout 180 sudo apt-get update -o Acquire::Retries=2 &&
+                   timeout 300 sudo apt-get install -y --no-install-recommends libgtest-dev; then
+                ok=1
+              fi
+              if [ "$ok" = 1 ]; then
+                echo "system_gtest=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "::warning::libgtest-dev is unavailable; CMake will use the FetchContent GoogleTest"
+                echo "system_gtest=false" >> "$GITHUB_OUTPUT"
+              fi
+
           - name: Configure
-            run: >
-              cmake -S . -B build -G Ninja
-              -DCMAKE_BUILD_TYPE=Release
-              -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }}
+            run: |
+              set -o pipefail
+              cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
+                2>&1 | tee "$RUNNER_TEMP/configure.log"
+
+          - name: Verify system GoogleTest
+            if: steps.gtest.outputs.system_gtest == 'true'
+            run: grep -q "GoogleTest from system" "$RUNNER_TEMP/configure.log"
 
           - name: Build
             run: cmake --build build --verbose
@@ -90,18 +111,39 @@ jobs:
         name: Linux GCC ${{ matrix.gcc }}
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }} libgtest-dev
-
           - uses: actions/checkout@v4
 
+          # The image already provides CMake, Ninja and the compilers; only
+          # GoogleTest is missing.  Keep this best-effort: when the Ubuntu
+          # mirrors are unreachable, CMake falls back to FetchContent.
+          - name: Install system GoogleTest
+            id: gtest
+            run: |
+              ok=0
+              if timeout 300 sudo apt-get install -y --no-install-recommends -o Acquire::Retries=2 libgtest-dev; then
+                ok=1
+              elif timeout 180 sudo apt-get update -o Acquire::Retries=2 &&
+                   timeout 300 sudo apt-get install -y --no-install-recommends libgtest-dev; then
+                ok=1
+              fi
+              if [ "$ok" = 1 ]; then
+                echo "system_gtest=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "::warning::libgtest-dev is unavailable; CMake will use the FetchContent GoogleTest"
+                echo "system_gtest=false" >> "$GITHUB_OUTPUT"
+              fi
+
           - name: Configure
-            run: >
-              cmake -S . -B build -G Ninja
-              -DCMAKE_BUILD_TYPE=Release
-              -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }}
+            run: |
+              set -o pipefail
+              cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} \
+                2>&1 | tee "$RUNNER_TEMP/configure.log"
+
+          - name: Verify system GoogleTest
+            if: steps.gtest.outputs.system_gtest == 'true'
+            run: grep -q "GoogleTest from system" "$RUNNER_TEMP/configure.log"
 
           - name: Build
             run: cmake --build build --verbose
@@ -136,11 +178,6 @@ jobs:
         name: Emscripten
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build
-
           - uses: actions/checkout@v4
           - uses: mymindstorm/setup-emsdk@v14
             with:

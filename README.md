@@ -379,11 +379,13 @@ Requires **CMake >= 3.24** and a C++20 compiler. The library is header-only; the
 From the repository root:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure        # run unit tests
 cmake --install build --prefix /path/to/prefix    # install headers
 ```
+
+The examples use the Ninja generator (as the CI does). With a multi-config generator, pass `--config Release` to `cmake --build`/`cmake --install` and `-C Release` to `ctest` instead.
 
 Useful CMake options (all boolean, passed as `-D<name>=ON` or `-D<name>=OFF`):
 

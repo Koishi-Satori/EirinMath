@@ -29,7 +29,7 @@ From the repository root, configure, build and run the unit tests:
 
 .. code-block:: sh
 
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
     cmake --build build
     ctest --test-dir build --output-on-failure
 
@@ -38,6 +38,8 @@ Install the headers into a prefix:
 .. code-block:: sh
 
     cmake --install build --prefix /path/to/prefix
+
+The examples use the Ninja generator, as the CI does. With a multi-config generator, pass ``--config Release`` to ``cmake --build``/``cmake --install`` and ``-C Release`` to ``ctest`` instead.
 
 The following CMake options are available. All of them are boolean and are passed with ``-D<name>=ON`` or ``-D<name>=OFF``:
 

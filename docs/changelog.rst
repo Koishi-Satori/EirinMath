@@ -3,6 +3,11 @@ Changelog
 
 Changelog since the version v1.0.0
 
+Unreleased
+----------
+
+- Migrate the build system to CMake.  The install step copies the headers into the GNUInstallDirs include directory, Google Benchmark is obtained through FetchContent, and GoogleTest prefers a system installation before falling back to FetchContent (controlled by ``eirin_prefer_system_gtest``).
+
 v1.1.3
 --------
 
