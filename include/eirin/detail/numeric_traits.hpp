@@ -17,7 +17,7 @@ template <typename T>
 struct __any_int_traits
 {
 private:
-    static consteval bool __eval_signed() noexcept
+    static constexpr bool __eval_signed() noexcept
     {
         if constexpr(is_signed_v<T>)
         {
@@ -37,7 +37,7 @@ private:
         }
     }
 
-    static consteval int __eval_digits() noexcept
+    static constexpr int __eval_digits() noexcept
     {
         if constexpr(std::numeric_limits<T>::is_specialized)
         {
@@ -54,13 +54,13 @@ private:
     }
 
     // 2^digits - 1 without ever forming 2^digits: max = (2^(digits-1)-1) + 2^(digits-1).
-    static consteval T __eval_max_impl() noexcept
+    static constexpr T __eval_max_impl() noexcept
     {
         constexpr T half = static_cast<T>(1) << (__eval_digits() - 1);
         return half - static_cast<T>(1) + half;
     }
 
-    static consteval T __eval_max() noexcept
+    static constexpr T __eval_max() noexcept
     {
         if constexpr(std::numeric_limits<T>::is_specialized)
         {
@@ -72,7 +72,7 @@ private:
         }
     }
 
-    static consteval T __eval_min() noexcept
+    static constexpr T __eval_min() noexcept
     {
         if constexpr(std::numeric_limits<T>::is_specialized)
         {
