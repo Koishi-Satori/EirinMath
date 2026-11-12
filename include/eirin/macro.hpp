@@ -32,6 +32,41 @@
 #    define EIRIN_ALWAYS_INLINE inline
 #endif
 
+#ifndef EIRIN_SIMD_MARK_ARTIFICIAL_ENABLE
+#    define EIRIN_SIMD_MARK_ARTIFICIAL_ENABLE EIRIN_ENABLE
+#endif
+
+#if EIRIN_SIMD_MARK_ARTIFICIAL_ENABLE == EIRIN_ENABLE
+#    if defined(__has_attribute)
+#        if __has_attribute(artificial)
+#            define EIRIN_ATTRIBUTE_ARTIFICIAL __attribute__((artificial))
+#        endif
+#    endif
+#    ifndef EIRIN_ATTRIBUTE_ARTIFICIAL
+#        define EIRIN_ATTRIBUTE_ARTIFICIAL
+#    endif
+#    define EIRIN_SIMD_INTRINSIC_DECLARE EIRIN_ALWAYS_INLINE EIRIN_ATTRIBUTE_ARTIFICIAL
+#endif
+#ifndef EIRIN_SIMD_INTRINSIC_DECLARE
+#    define EIRIN_SIMD_INTRINSIC_DECLARE EIRIN_ALWAYS_INLINE
+#endif
+
+#if defined(__has_builtin)
+#    if __has_builtin(__builtin_constant_p)
+#        define EIRIN_HAS_BUILTIN_CONSTANT_P EIRIN_TRUE
+#    endif
+#elif defined(__GNUC__) || defined(__clang__)
+#    define EIRIN_HAS_BUILTIN_CONSTANT_P EIRIN_TRUE
+#endif
+#ifndef EIRIN_HAS_BUILTIN_CONSTANT_P
+#    define EIRIN_HAS_BUILTIN_CONSTANT_P EIRIN_FALSE
+#endif
+#if EIRIN_HAS_BUILTIN_CONSTANT_P == EIRIN_TRUE
+#    define EIRIN_IS_CONSTANT_P(x) __builtin_constant_p(x)
+#else
+#    define EIRIN_IS_CONSTANT_P(x) false
+#endif
+
 #if defined(__cplusplus) && __cplusplus >= 202302L && defined(__cpp_consteval) && __cpp_consteval >= 202211L
 #    define EIRIN_IF_CONSTEVAL if consteval
 #else
@@ -112,7 +147,7 @@
 #endif
 
 #if defined(__SSE__) || defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || \
-    defined(_M_X64) || defined(_M_AMD64) || defined(_M_AVX) || defined(_M_AVX2) || \
+    defined(_M_X64) || defined(_M_AMD64) || defined(_M_AVX) || defined(_M_AVX2) ||       \
     (defined(_M_IX86_FP) && (_M_IX86_FP >= 1))
 #    define EIRIN_PLATFORM_SIMD_HAS_SSE EIRIN_TRUE
 #else
@@ -120,7 +155,7 @@
 #endif
 
 #if defined(__SSE2__) || defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || \
-    defined(_M_X64) || defined(_M_AMD64) || defined(_M_AVX) || defined(_M_AVX2) || \
+    defined(_M_X64) || defined(_M_AMD64) || defined(_M_AVX) || defined(_M_AVX2) ||        \
     (defined(_M_IX86_FP) && (_M_IX86_FP >= 2))
 #    define EIRIN_PLATFORM_SIMD_HAS_SSE2 EIRIN_TRUE
 #else
@@ -252,36 +287,36 @@
 #endif
 
 #if EIRIN_PLATFORM_SIMD_HAS_SSE
-#define EIRIN_PLATFORM_SIMD_HAS_SSE_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_SSE_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_SSE_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_SSE_ABI EIRIN_FALSE
 #endif
 #if EIRIN_PLATFORM_SIMD_HAS_SSE2
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_SSE_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_SSE_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_SSE_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_SSE_ABI EIRIN_FALSE
 #endif
 
 #if EIRIN_PLATFORM_SIMD_HAS_AVX
-#define EIRIN_PLATFORM_SIMD_HAS_AVX_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_AVX_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_AVX_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_AVX_ABI EIRIN_FALSE
 #endif
 #if EIRIN_PLATFORM_SIMD_HAS_AVX2
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX_ABI EIRIN_FALSE
 #endif
 
 #if EIRIN_PLATFORM_SIMD_HAS_AVX512F
-#define EIRIN_PLATFORM_SIMD_HAS_AVX512_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_AVX512_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_AVX512_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_AVX512_ABI EIRIN_FALSE
 #endif
 #if EIRIN_PLATFORM_SIMD_HAS_AVX512BW
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX512_ABI EIRIN_TRUE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX512_ABI EIRIN_TRUE
 #else
-#define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX512_ABI EIRIN_FALSE
+#    define EIRIN_PLATFORM_SIMD_HAS_FULL_AVX512_ABI EIRIN_FALSE
 #endif
 
 // Global SIMD feature gatekeeper. It is enabled by default when the target exposes at
@@ -290,7 +325,7 @@
 #    if defined(EIRIN_MATH_NO_SIMD)
 #        define EIRIN_SIMD_ENABLE EIRIN_DISABLE
 #    elif EIRIN_PLATFORM_SIMD_HAS_SSE == EIRIN_TRUE || \
-        EIRIN_PLATFORM_SIMD_HAS_NEON == EIRIN_TRUE || \
+        EIRIN_PLATFORM_SIMD_HAS_NEON == EIRIN_TRUE ||  \
         EIRIN_PLATFORM_SIMD_HAS_WASM_SIMD128 == EIRIN_TRUE
 #        define EIRIN_SIMD_ENABLE EIRIN_ENABLE
 #    else
@@ -318,7 +353,7 @@
 #endif
 
 #if defined(__cpp_multidimensional_subscript) && __cpp_multidimensional_subscript >= 202110L
-#define EIRIN_HAS_CXX_FEATURE_MULTIDIM_SUBSCRIPT
+#    define EIRIN_HAS_CXX_FEATURE_MULTIDIM_SUBSCRIPT
 #endif
 
 // must include this, as config header.

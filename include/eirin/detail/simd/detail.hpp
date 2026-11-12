@@ -9,6 +9,24 @@
 
 namespace eirin::simd_abi
 {
+struct abi_scalar;
+
+template <std::size_t N>
+struct abi_fixed;
+
+struct abi_sse2_128;
+
+struct abi_avx2_256;
+
+struct abi_avx512_512;
+
+struct abi_neon_128;
+
+struct abi_wasm_simd128;
+
+template <typename T, typename ABI>
+struct abi_traits;
+
 constexpr inline bool platform_has_mmx = EIRIN_PLATFORM_SIMD_HAS_MMX;
 constexpr inline bool platform_has_sse = EIRIN_PLATFORM_SIMD_HAS_SSE;
 constexpr inline bool platform_has_sse2 = EIRIN_PLATFORM_SIMD_HAS_SSE2;
@@ -104,6 +122,74 @@ constexpr std::size_t vectorized_sizeof()
     return sizeof(T);
 }
 
+template <typename T, typename ABI, std::size_t Capacity>
+inline constexpr bool abi_fits =
+    abi_traits<T, ABI>::is_valid &&
+    abi_traits<T, ABI>::size > 0 &&
+    abi_traits<T, ABI>::size <= Capacity;
+
+template <typename...>
+struct abi_list
+{
+    template <typename, std::size_t>
+    static constexpr bool has_valid_abi = false;
+    template <typename, std::size_t>
+    using first_valid_abi = void;
+    template <typename, std::size_t>
+    using best_abi = void;
+};
+
+template <typename ABI, typename... RestABI>
+struct abi_list<ABI, RestABI...>
+{
+    template <typename T, std::size_t N>
+    static constexpr bool has_valid_abi = abi_traits<T, ABI>::is_valid || abi_list<RestABI...>::template has_valid_abi<T, N>;
+
+    template <typename T, std::size_t N>
+    using first_valid_abi = std::conditional_t<abi_traits<T, ABI>::is_valid, ABI, typename abi_list<RestABI...>::template first_valid_abi<T, N>>;
+
+    /**
+     * @brief Determine the best SIMD ABI for a given [T * N] vector..
+     *
+     * @tparam T vector element type
+     * @tparam N vector element count
+     * @return constexpr auto a reference indicated best of the valid ABI.
+     */
+    template <typename T, std::size_t N>
+    static constexpr auto determine_best_abi()
+    {
+        static_assert(N >= 1, "N must be at least 1.");
+        if constexpr(N == 1)
+        {
+            return static_cast<abi_scalar*>(nullptr);
+        }
+        else
+        {
+            if constexpr(abi_fits<T, ABI, N>)
+            {
+                return static_cast<ABI*>(nullptr);
+            }
+            else
+            {
+                return abi_list<RestABI...>::template determine_best_abi<T, N>();
+            }
+        }
+    }
+
+    template <typename T, std::size_t N>
+    using best_abi = std::remove_pointer_t<decltype(determine_best_abi<T, N>())>;
+};
+
+using all_native_abis =
+    abi_list<
+#if EIRIN_SIMD_ENABLE == EIRIN_TRUE
+        abi_avx512_512,
+        abi_avx2_256,
+        abi_sse2_128,
+        abi_neon_128,
+        abi_wasm_simd128,
+#endif
+        abi_scalar>;
 } // namespace eirin::simd_abi
 
 #endif

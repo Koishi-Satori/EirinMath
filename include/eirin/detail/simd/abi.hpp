@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <concepts>
 #include "../../macro.hpp"
 #include "detail.hpp"
 
@@ -48,8 +49,26 @@ using native_abi_t = typename native_abi_selector<T>::type;
 template <typename T, std::size_t N>
 struct fixed_abi_selector;
 
+template <typename T, typename... ABIs>
+struct simd_sequence;
+
+// Completed by detail/simd/fixed_size.hpp, which selects the concrete ABI chunks.
 template <typename T, std::size_t N>
 using fixed_abi_t = typename fixed_abi_selector<T, N>::type;
+
+template <typename T>
+struct is_fixed_size_abi : std::false_type
+{};
+
+template <std::size_t N>
+struct is_fixed_size_abi<abi_fixed<N>> : std::true_type
+{};
+
+template <typename T>
+inline constexpr bool is_fixed_size_abi_v = is_fixed_size_abi<T>::value;
+
+template <typename T>
+concept is_fixed_abi = is_fixed_size_abi_v<T>;
 
 namespace detail
 {

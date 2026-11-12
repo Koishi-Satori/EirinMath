@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <eirin/fixed.hpp>
 #include <eirin/detail/simd/abi.hpp>
+#include <eirin/detail/simd/fixed_size.hpp>
 #include <eirin/macro.hpp>
 
 #include <array>
@@ -145,6 +146,36 @@ TEST(SimdAbi, NativeSelection)
     static_assert(std::is_same_v<native_abi_t<float>, abi_scalar>);
     static_assert(std::is_same_v<native_abi_t<std::int64_t>, abi_scalar>);
 #endif
+}
+
+TEST(SimdAbi, FixedStorage)
+{
+    using namespace eirin::simd_abi;
+
+    using selected = fixed_abi_t<float, 5>;
+    using storage = fixed_storage<const float, 5>;
+
+    static_assert(fixed_abi_t<float, 3>::capacity() == 4);
+    static_assert(fixed_abi_t<float, 9>::capacity() == 16);
+    static_assert(std::is_same_v<typename selected::value_type, float>);
+    static_assert(selected::capacity() == 8);
+
+    static_assert(std::is_same_v<typename storage::value_type, float>);
+    static_assert(std::is_same_v<typename storage::storage_type, selected>);
+    static_assert(std::is_base_of_v<selected, storage>);
+    static_assert(storage::logical_size == 5);
+    static_assert(storage::capacity == 8);
+    static_assert(storage::padding_size == 3);
+    static_assert(storage::size() == 5);
+    static_assert(storage::storage_size() == 8);
+    static_assert(storage::chunk_count >= 1);
+    static_assert(storage::chunk_count <= storage::capacity);
+    static_assert(std::is_trivially_copyable_v<storage>);
+    static_assert(sizeof(storage) >= storage::capacity * sizeof(float));
+
+    fixed_storage<int, 1> scalar(42);
+    EXPECT_EQ(scalar.at<0>(), 42);
+    EXPECT_EQ(scalar.storage().capacity(), 1);
 }
 
 #if defined(EIRIN_DEV_TEST_MODE) && EIRIN_PLATFORM_SIMD_HAS_AVX2 == EIRIN_TRUE && \
