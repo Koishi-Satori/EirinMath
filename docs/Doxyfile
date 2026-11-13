@@ -1,5 +1,5 @@
-PROJECT_NAME = EirinFixed
-PROJECT_BRIEF = "EirinFixed: A C++ library for fixed-point arithmetic"
+PROJECT_NAME = EirinMath
+PROJECT_BRIEF = "EirinMath: A C++ library for fixed-point arithmetic"
 PROJECT_NUMBER = 1.0.1
 DOXYFILE_ENCODING = UTF-8
 INPUT = ../include/eirin

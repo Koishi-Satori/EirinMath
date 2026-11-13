@@ -2,11 +2,15 @@
 
 - Other language: [中文](README.zh-CN.md)
 
-A flexible, high-performance and header-only C++ fixed point number mathematics library, provides fixed point template class, high precision mathematical operations and basic input and output functions. You can run the benchmarks ```eirin_fixed.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double. 
+*EirinMath* is a header-only C++20 high-performance arithmetic library for configurable precision fixed-point number template, high-precision-deterministic fixed-point mathematics, GLSL-style vectors, column-major matrices, and portable SIMD-ready kernels.
 
-*EirinMath* also provides a pre-defined 32bit-width fixed point, with 16bit precision(```fixed32```), and 64bit-width fixed point, with 32bit precision(```fixed64```).
+You can run the benchmarks ```eirin_math.benchmark``` and ```double.benchmark``` to test for performance differences between the fixed types and the C++ double, and run the optional ```eirin_math.perf``` to test the precision of the fixed-point arithmetic operations and mathematics functions.
+
+*EirinMath* provides a fixed point template class ```fixed_num<T, I, f, r>``` , a pre-defined 32bit-width fixed point, with 16bit precision(```fixed32```), and 64bit-width fixed point, with 32bit precision(```fixed64```).
 The fixed points require same calculation result in different platforms, devices, operator systems and compilers, and this library fulfills this requirement.
-Notice that the fixed64 uses some int128 compiler extension as its IntermediateType, and some compiler might not support it. The ```__msvc_int128.hpp``` in MSVC provides ```std::_Signed128``` and ```std::_Unsigned128```, Clang and GCC in Linux provide ```__int128```.
+Notice that the fixed64 uses some int128 compiler extension as its IntermediateType, and some compiler will fallthrough to a builtin int128 implementation. The ```__msvc_int128.hpp``` in MSVC provides builtin int128 (due to the multiplication of ```std::_Signed128``` and ```std::_Unsigned128``` has performance issue. I have started an optimization merge request, and it has already been merged), Clang and GCC in Linux provide ```__int128```.
+
+An implementation of C++26 style saturating arithmetic functions is in [numeric.hpp](include/eirin/numeric.hpp), which accepts both fixed-point number, integral numbers and all the user-defined types satisfied ```eirin::detail::is_integral_v```.
 
 As an extra function, *EirinMath* provides the vector class `tvec<T, N>`, and its partial specialization versions in `vec.hpp`. *EirinMath* allows you to use swizzle operators like GLSL, but with function call `()`, e.g.
 
@@ -17,7 +21,19 @@ v.xyz() += 1_f32;
 vi.xyzw() = eirin::ivec4{1, 2, 3, 4} + v.xyxy();
 ```
 
+The matrix library provides `tmat<C, R, T>` and common aliases for square and
+rectangular matrices. Matrices are column-major: `m[i]` is a column and
+`m(row, column)` addresses one element. Component-wise arithmetic, scalar
+arithmetic, algebraic matrix multiplication, matrix/vector products,
+transposition, determinants, and inverses are supported where the shape and
+element type are valid. Determinant and inverse are restricted to square
+matrices with fractional scalar types. The current matrix implementation uses
+the scalar compute kernel; SIMD matrix kernels are scaffolded but not yet
+implemented.
+
 ## Fixed point library
+
+- The fixed-point numbers referred to in the library and the full text are all Q-format fixed-point numbers, represented based on binary fractional bits.
 
 ### Create Fixed Point
 
@@ -269,6 +285,110 @@ a += b;                       // a becomes (4, 6)
 - `dot` – dot product
 - `cross` – cross product (only for 2/3‑component vectors, because vector cross products are only defines on 3 or 7 dim.)
 
+## Matrix Library
+
+Matrices are provided by `tmat<C, R, T>` in `mat.hpp`, where `C` is the number
+of columns and `R` is the number of rows. Common aliases include `mat2`,
+`mat3`, `mat4`, and the rectangular `mat2x3` and `mat3x2`.
+
+Storage and indexing are column-major:
+
+```c++
+#include <eirin/mat.hpp>
+
+using namespace eirin;
+
+mat3<int> m(
+    tvec<3, int>(1, 2, 3), // column 0
+    tvec<3, int>(4, 5, 6), // column 1
+    tvec<3, int>(7, 8, 9)  // column 2
+);
+
+auto col0 = m[0];       // (1, 2, 3)
+int value = m(2, 0);    // row 2, column 0 == 7
+```
+
+The matrix API includes:
+
+- identity and zero construction, component conversion, and matrix embedding;
+- component-wise `+`, `-`, scalar `+`, `-`, `*`, `/`;
+- algebraic matrix multiplication, matrix/vector multiplication, and valid
+  rectangular products;
+- `transpose` for all supported shapes;
+- `determinant` and `inverse` for square matrices; inverse requires a
+  fractional scalar type and is undefined for singular matrices;
+- `data()` and `to_array()` views in column-major contiguous order.
+
+Unlike `tvec` component-wise `*`, `mat * mat` is algebraic matrix
+multiplication. Aliases are available for integer, floating-point, fixed-point,
+and, where supported, 128-bit element types.
+
+The current `matrix_kernel_selector` resolves to the scalar kernel.
+`matrix_func_simd.hpp` is intentionally only a specialization scaffold, and
+there is not yet a matrix benchmark. No SIMD or relative-performance claim is
+made for the matrix library until those kernels and benchmarks are implemented.
+
+## Accuracy and Performance Snapshot
+
+The repository includes Google Benchmark suites for fixed-point arithmetic,
+mathematical functions, saturating arithmetic, and `tvec`. The values below are
+representative measurements, not performance guarantees. They were measured on
+an AMD Ryzen 7 9700X with GCC 14.2, a Release build (`-O3 -DNDEBUG`), and Google
+Benchmark. Performance values are medians of three runs; input ranges come from
+`benchmark/bench_perf.cpp`.
+
+Accuracy is evaluated against `double` using the quantized fixed-point input.
+Samples whose exact result is outside the representable fixed-point range are
+excluded. ULP is measured relative to the fixed-point precision.
+
+| Function | Type | Max absolute error | Max relative error | Max ULP error |
+| --- | --- | ---: | ---: | ---: |
+| `sin` | `fixed32` | 1.09e-4 | 7.13e-1 | 7.13 |
+| `sin` | `fixed64` | 2.02e-8 | 1.03e-5 | 86.7 |
+| `sqrt` | `fixed32` | 1.53e-5 | 1.80e-4 | 1.00 |
+| `sqrt` | `fixed64` | 2.33e-10 | 1.85e-8 | 1.00 |
+| `exp` | `fixed32` | 1.09e-4 | 3.32e-1 | 7.16 |
+| `exp` | `fixed64` | 9.94e-5 | 6.53e-6 | 4.27e5 |
+
+The large `exp(fixed64)` ULP value occurs on large-magnitude outputs; its
+relative error remains approximately `1e-6`. These results are intended to make
+the precision/performance trade-off visible rather than promise uniform ULP
+bounds. Relative error near a root of `sin` can also become large because the
+reference value approaches zero; absolute error and ULP are more informative in
+that region.
+
+Representative single-input microbenchmarks:
+
+| Function | `fixed32` | `fixed64` | `double` |
+| --- | ---: | ---: | ---: |
+| `sin` | 4.65 ns | 4.98 ns | 5.95 ns |
+| `sqrt` | 23.3 ns | 3.92 ns | 2.70 ns |
+| `exp` | 4.59 ns | 6.31 ns | 2.04 ns |
+
+Existing `fixed64` vector microbenchmarks on the same machine measured
+approximately:
+
+| Operation | `vec2<fixed64>` | `vec3<fixed64>` | `vec4<fixed64>` |
+| --- | ---: | ---: | ---: |
+| addition | 0.185 ns | 0.375 ns | 0.457 ns |
+| dot product | 0.737 ns | 1.10 ns | — |
+| cross product | 0.735 ns | 2.39 ns | — |
+
+To reproduce the measurements, configure the advanced benchmarks and run the
+executables:
+
+```sh
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -Deirin_build_advanced_benchmark=ON
+cmake --build build
+./build/bin/eirin_math.perf
+./build/bin/eirin_math.tvec.benchmark
+```
+
+`eirin_math.perf` also writes aggregate accuracy data to
+`accuracy_report.csv`.
+
 ### Saturating Arithmetic
 
 Since before C++26, the saturating arithmetic is not provided by the C++ Standard Library, *EirinMath* provides an implementation that is accurate, data-independent, as high-performance as possible, and as branch-free as possible.
@@ -404,6 +524,9 @@ Useful CMake options (all boolean, passed as `-D<name>=ON` or `-D<name>=OFF`):
 | `eirin_build_benchmarks` | `ON` | build the fixed-number and double benchmarks |
 | `eirin_build_advanced_benchmark` | `OFF` | build the advanced benchmarks (perf/accuracy) |
 | `eirin_dev_test` | `OFF` | enable development test includes (SIMD tests) |
+| `eirin_test_simd_scalar` | `ON` | build scalar SIMD-framework tests |
+| `eirin_test_simd_avx2` | `OFF` | build and run the AVX2 backend tests |
+| `eirin_test_simd_avx512` | `OFF` | build and run the AVX-512 backend tests |
 | `eirin_prefer_system_gtest` | `ON` | use a system-installed GoogleTest if found; otherwise FetchContent downloads GoogleTest v1.14.0 (set to `OFF` to force FetchContent) |
 
 Google Benchmark is always obtained through FetchContent.
@@ -416,7 +539,7 @@ cmake --build build-wasm
 node build-wasm/bin/<name>.js
 ```
 
-The benchmark executables are `eirin_fixed.benchmark`, `eirin_fixed.tvec.benchmark`, `eirin_fixed.sat_arith.benchmark` and `double.benchmark` (written to `build/bin` on Unix single-config builds).
+The benchmark executables are `eirin_math.benchmark`, `eirin_math.tvec.benchmark`, `eirin_math.sat_arith.benchmark` and `double.benchmark` (written to `build/bin` on Unix single-config builds).
 
 ## Supported Compilers
 

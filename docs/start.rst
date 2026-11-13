@@ -18,12 +18,12 @@ Integrate into Your Project
 A. Copy into Your Project
 -------------------------
 
-The core library of EirinFixed is a header-only library, you can copy the ``include`` directory into your project, and include the header file in your code.
+The core library of EirinMath is a header-only library, you can copy the ``include`` directory into your project, and include the header file in your code.
 
 B. Build and Install with CMake
 -------------------------------
 
-EirinFixed is built with `CMake <https://cmake.org/>`_ (>= 3.24). Because the library is header-only, building produces no library artifact; the ``install`` step copies the headers into ``<prefix>/include/eirin/...`` (the GNUInstallDirs include directory of the chosen prefix).
+EirinMath is built with `CMake <https://cmake.org/>`_ (>= 3.24). Because the library is header-only, building produces no library artifact; the ``install`` step copies the headers into ``<prefix>/include/eirin/...`` (the GNUInstallDirs include directory of the chosen prefix).
 
 From the repository root, configure, build and run the unit tests:
 
@@ -68,4 +68,4 @@ For Emscripten/WASM builds, configure with ``emcmake`` and Ninja. Tests and benc
     cmake --build build-wasm
     node build-wasm/bin/<name>.js
 
-The benchmark executables are ``eirin_fixed.benchmark``, ``eirin_fixed.tvec.benchmark``, ``eirin_fixed.sat_arith.benchmark`` and ``double.benchmark``. On Unix single-config builds they are written to ``build/bin``.
+The benchmark executables are ``eirin_math.benchmark``, ``eirin_math.tvec.benchmark``, ``eirin_math.sat_arith.benchmark`` and ``double.benchmark``. On Unix single-config builds they are written to ``build/bin``.

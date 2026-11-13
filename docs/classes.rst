@@ -2,4 +2,4 @@ Classes and Functions
 ==================================================
 
 .. autodoxygenindex::
-   :project: EirinFixed
+   :project: EirinMath

@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'EirinFixed'
+project = 'EirinMath'
 copyright = '2025, KKoishi_'
 author = 'KKoishi_'
 
@@ -13,9 +13,9 @@ author = 'KKoishi_'
 extensions = [ "breathe" ]
 
 breathe_projects = {}
-breathe_default_project = "EirinFixed"
+breathe_default_project = "EirinMath"
 breathe_projects_source = {
-    "EirinFixed": ( "../include/eirin", ["fixed.hpp", "math.hpp", "macro.hpp", "io/parse.hpp"] )
+    "EirinMath": ( "../include/eirin", ["fixed.hpp", "math.hpp", "macro.hpp", "io/parse.hpp"] )
 }
 
 templates_path = ['_templates']
@@ -32,4 +32,4 @@ read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
 if read_the_docs_build:
     subprocess.call('doxygen', shell=True)
-    breathe_projects["EirinFixed"] = "xml"
+    breathe_projects["EirinMath"] = "xml"

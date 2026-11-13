@@ -4,7 +4,7 @@ Fixed Point Number IO
 Standard Stream I/O
 -----------------
 
-EirinFixed provides a simple interface for input and output of fixed point numbers using standard C++ streams.
+EirinMath provides a simple interface for input and output of fixed point numbers using standard C++ streams.
 You can use the standard input and output streams to read and write fixed point numbers.
 For example, you can use the following code to read a fixed point number from standard input and print it to standard output:
 
