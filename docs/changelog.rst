@@ -3,10 +3,16 @@ Changelog
 
 Changelog since the version v1.0.0
 
+Unreleased
+----------
+
+- Migrate the build system to CMake.  The install step copies the headers into the GNUInstallDirs include directory, Google Benchmark is obtained through FetchContent, and GoogleTest prefers a system installation before falling back to FetchContent (controlled by ``eirin_prefer_system_gtest``).
+- Install a CMake package configuration so consumers can use ``find_package(EirinMath)`` and link ``EirinMath::math``.
+
 v1.1.3
 --------
 
-- Add ``add_headerfils`` to xmake.lua for correctly install library with xmake.
+- Fix header installation so the library can be installed correctly.
 
 **Full Changelog**: https://github.com/Koishi-Satori/EirinFixed/compare/v1.1.2...v1.1.3
 
@@ -39,7 +45,7 @@ v1.0.2
 
 - add specialization for ``std::numeric_limits`` for ``eirin::fixed_point``.
 - add functions ``eirin::max_value()`` and ``eirin::min_value()``.
-- add xmake options.
+- add build options.
 - add documentation.
 - replace `std::is_signed` specialization for int128_t in Boost with ``eirin::detail::is_signed``.
 - fix recruit inline.

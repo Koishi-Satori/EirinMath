@@ -13,43 +13,35 @@ jobs:
           - uses: ilammy/msvc-dev-cmd@v1
             with:
               arch: amd64
-          - uses: xmake-io/github-action-setup-xmake@v1
-            with:
-              xmake-version: v3.0.0
-              actions-cache-folder: '.xmake-cache'
-              actions-cache-key: "windows-2022"
-              package-cache: true
-              package-cache-key: "windows-2022"
-              build-cache: true
-              build-cache-key: "windows-2022-release"
 
+          # Windows has no usable system GoogleTest, so use the FetchContent copy.
           - name: Configure
-            run: |
-              xmake config --yes -m release --toolchain=msvc
+            run: >
+              cmake -S . -B build -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -Deirin_prefer_system_gtest=OFF
 
           - name: Build
-            run: |
-              xmake build --verbose --diagnosis --all
+            run: cmake --build build --verbose
 
           - name: Test
-            run: xmake test --verbose
+            run: ctest --test-dir build --output-on-failure
 
           - name: Benchmark
-            run: xmake run --verbose eirin_fixed.benchmark
+            run: ./build/bin/eirin_fixed.benchmark.exe
 
           - name: Benchmark (Vec Library)
-            run: xmake run --verbose eirin_fixed.tvec.benchmark
+            run: ./build/bin/eirin_fixed.tvec.benchmark.exe
 
           - name: Benchmark (Saturating Arithmetic)
-            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
-          
+            run: ./build/bin/eirin_fixed.sat_arith.benchmark.exe
+
           - name: Benchmark (For Compare)
-            run: xmake run --verbose double.benchmark
+            run: ./build/bin/double.benchmark.exe
 
     Clang:
         runs-on: ubuntu-24.04
 
-        # TODO: Use libc++ for Clang 15. Use both on newer versions.
         strategy:
           matrix:
             clang: [18]
@@ -57,44 +49,45 @@ jobs:
         name: Linux Clang ${{ matrix.clang }}
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build clang-${{ matrix.clang }} clang++-${{ matrix.clang }}
-
           - uses: actions/checkout@v4
-          - uses: xmake-io/github-action-setup-xmake@v1
-            with:
-              xmake-version: v3.0.0
-              actions-cache-folder: '.xmake-cache'
-              actions-cache-key: "linux-clang"
-              package-cache: true
-              package-cache-key: "linux-clang"
-              build-cache: true
-              build-cache-key: "linux-clang"
+
+          # The image already provides CMake, Ninja and the compilers; only
+          # GoogleTest is missing.  The script installs it when the Ubuntu
+          # mirrors are reachable and otherwise lets CMake fall back to
+          # FetchContent.
+          - name: Install system GoogleTest
+            id: gtest
+            run: bash .github/install-gtest.sh
 
           - name: Configure
             run: |
-              xmake config --yes -m release --toolchain=clang-${{ matrix.clang }}
+              set -o pipefail
+              cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
+                2>&1 | tee "$RUNNER_TEMP/configure.log"
+
+          - name: Verify system GoogleTest
+            if: steps.gtest.outputs.system_gtest == 'true'
+            run: grep -q "GoogleTest from system" "$RUNNER_TEMP/configure.log"
 
           - name: Build
-            run: |
-              xmake build --verbose --diagnosis --all
+            run: cmake --build build --verbose
 
           - name: Test
-            run: xmake test --verbose
+            run: ctest --test-dir build --output-on-failure
 
           - name: Benchmark
-            run: xmake run --verbose eirin_fixed.benchmark
+            run: ./build/bin/eirin_fixed.benchmark
 
           - name: Benchmark (Vec Library)
-            run: xmake run --verbose eirin_fixed.tvec.benchmark
+            run: ./build/bin/eirin_fixed.tvec.benchmark
 
           - name: Benchmark (Saturating Arithmetic)
-            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
-          
+            run: ./build/bin/eirin_fixed.sat_arith.benchmark
+
           - name: Benchmark (For Compare)
-            run: xmake run --verbose double.benchmark
+            run: ./build/bin/double.benchmark
 
     GCC:
         runs-on: ubuntu-24.04
@@ -106,44 +99,72 @@ jobs:
         name: Linux GCC ${{ matrix.gcc }}
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }}
-
           - uses: actions/checkout@v4
-          - uses: xmake-io/github-action-setup-xmake@v1
-            with:
-              xmake-version: v3.0.0
-              actions-cache-folder: '.xmake-cache'
-              actions-cache-key: "linux-gcc"
-              package-cache: true
-              package-cache-key: "linux-gcc"
-              build-cache: true
-              build-cache-key: "linux-gcc"
+
+          # The image already provides CMake, Ninja and the compilers; only
+          # GoogleTest is missing.  The script installs it when the Ubuntu
+          # mirrors are reachable and otherwise lets CMake fall back to
+          # FetchContent.
+          - name: Install system GoogleTest
+            id: gtest
+            run: bash .github/install-gtest.sh
 
           - name: Configure
             run: |
-              xmake config --yes -m release --toolchain=gcc-${{ matrix.gcc }}
+              set -o pipefail
+              cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} \
+                2>&1 | tee "$RUNNER_TEMP/configure.log"
+
+          - name: Verify system GoogleTest
+            if: steps.gtest.outputs.system_gtest == 'true'
+            run: grep -q "GoogleTest from system" "$RUNNER_TEMP/configure.log"
 
           - name: Build
-            run: |
-              xmake build --verbose --diagnosis --all
+            run: cmake --build build --verbose
 
           - name: Test
-            run: xmake test --verbose
+            run: ctest --test-dir build --output-on-failure
 
           - name: Benchmark
-            run: xmake run --verbose eirin_fixed.benchmark
+            run: ./build/bin/eirin_fixed.benchmark
 
           - name: Benchmark (Vec Library)
-            run: xmake run --verbose eirin_fixed.tvec.benchmark
+            run: ./build/bin/eirin_fixed.tvec.benchmark
 
           - name: Benchmark (Saturating Arithmetic)
-            run: xmake run --verbose eirin_fixed.sat_arith.benchmark
-          
+            run: ./build/bin/eirin_fixed.sat_arith.benchmark
+
           - name: Benchmark (For Compare)
-            run: xmake run --verbose double.benchmark
+            run: ./build/bin/double.benchmark
+
+          - name: Install (header-only)
+            if: matrix.gcc == 14
+            run: |
+              cmake --install build --prefix "$RUNNER_TEMP/eirin-install"
+              test -f "$RUNNER_TEMP/eirin-install/include/eirin/eirin.hpp"
+              test -n "$(find "$RUNNER_TEMP/eirin-install" -name EirinMathConfig.cmake -print -quit)"
+
+              # The headers can be included directly...
+              printf '#include <eirin/fixed.hpp>\nint main() { return eirin::fixed32(1.5).internal_value() == 98304 ? 0 : 1; }\n' > "$RUNNER_TEMP/consumer.cpp"
+              g++-14 -std=c++20 -I"$RUNNER_TEMP/eirin-install/include" "$RUNNER_TEMP/consumer.cpp" -o "$RUNNER_TEMP/consumer"
+              "$RUNNER_TEMP/consumer"
+
+              # ...and the installed package can be consumed with find_package.
+              mkdir -p "$RUNNER_TEMP/consumer-cmake"
+              cat > "$RUNNER_TEMP/consumer-cmake/CMakeLists.txt" <<'EOF'
+              cmake_minimum_required(VERSION 3.24)
+              project(consumer LANGUAGES CXX)
+              find_package(EirinMath 1.5 CONFIG REQUIRED)
+              add_executable(consumer main.cpp)
+              target_link_libraries(consumer PRIVATE EirinMath::math)
+              EOF
+              cp "$RUNNER_TEMP/consumer.cpp" "$RUNNER_TEMP/consumer-cmake/main.cpp"
+              cmake -S "$RUNNER_TEMP/consumer-cmake" -B "$RUNNER_TEMP/consumer-cmake/build" -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/eirin-install"
+              cmake --build "$RUNNER_TEMP/consumer-cmake/build"
+              "$RUNNER_TEMP/consumer-cmake/build/consumer"
 
     Emscripten:
         runs-on: ubuntu-24.04
@@ -151,46 +172,33 @@ jobs:
         name: Emscripten
 
         steps:
-          - name: Install Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y cmake ninja-build
-
           - uses: actions/checkout@v4
-          - uses: xmake-io/github-action-setup-xmake@v1
-            with:
-              xmake-version: v3.0.0
-              actions-cache-folder: '.xmake-cache'
-              actions-cache-key: "wasm"
-              package-cache: true
-              package-cache-key: "wasm"
-              build-cache: true
-              build-cache-key: "wasm"
-
-          - name: Setup emsdk
-            uses: mymindstorm/setup-emsdk@v14
+          - uses: mymindstorm/setup-emsdk@v14
             with:
               actions-cache-folder: emsdk-cache
 
+          # The host GoogleTest is not usable for the wasm32 target, so use the
+          # FetchContent copy.
           - name: Configure
-            run: |
-              xmake config --yes -m release -p wasm
+            run: >
+              emcmake cmake -S . -B build -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -Deirin_prefer_system_gtest=OFF
 
           - name: Build
-            run: |
-              xmake build --verbose --diagnosis --all
+            run: cmake --build build --verbose
 
           - name: Test
-            run: node build/wasm/wasm32/release/eirin_fixed.test.js
+            run: node build/bin/eirin_fixed.test.js
 
           - name: Benchmark
-            run: node build/wasm/wasm32/release/eirin_fixed.benchmark.js
+            run: node build/bin/eirin_fixed.benchmark.js
 
           - name: Benchmark (Vec Library)
-            run: node build/wasm/wasm32/release/eirin_fixed.tvec.benchmark.js
+            run: node build/bin/eirin_fixed.tvec.benchmark.js
 
           - name: Benchmark (Saturating Arithmetic)
-            run: node build/wasm/wasm32/release/eirin_fixed.sat_arith.benchmark.js
-          
+            run: node build/bin/eirin_fixed.sat_arith.benchmark.js
+
           - name: Benchmark (For Compare)
-            run: node build/wasm/wasm32/release/double.benchmark.js
+            run: node build/bin/double.benchmark.js

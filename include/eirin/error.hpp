@@ -1,6 +1,7 @@
 #ifndef EIRIN_MATH_ERROR_HPP
 #define EIRIN_MATH_ERROR_HPP
 
+#include <exception>
 #include <stdexcept>
 #ifdef EIRIN_NO_EXCEPTIONS
 #    include <exception>
