@@ -35,16 +35,16 @@ message(STATUS "EirinMath: GoogleTest from ${_eirin_gtest_source}")
 # ---------------------------------------------------------------------------
 set(EIRIN_TEST_SOURCES main.cpp test_io.cpp test_sat_arith.cpp test_vec.cpp)
 
-add_executable(eirin_fixed.test ${EIRIN_TEST_SOURCES})
-target_link_libraries(eirin_fixed.test PRIVATE EirinMath::math GTest::gtest)
-eirin_enable_warnings_as_errors(eirin_fixed.test)
+add_executable(eirin_math.test ${EIRIN_TEST_SOURCES})
+target_link_libraries(eirin_math.test PRIVATE EirinMath::math GTest::gtest)
+eirin_enable_warnings_as_errors(eirin_math.test)
 
 if (eirin_dev_test)
     # The development tests include the AVX2 SIMD helpers, which are only
     # available for x86 GCC/Clang builds.
     if (NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
-        target_compile_definitions(eirin_fixed.test PRIVATE EIRIN_DEV_TEST_MODE)
-        target_compile_options(eirin_fixed.test PRIVATE -mavx -mavx2 -msse)
+        target_compile_definitions(eirin_math.test PRIVATE EIRIN_DEV_TEST_MODE)
+        target_compile_options(eirin_math.test PRIVATE -mavx -mavx2 -msse)
     else ()
         message(STATUS "EirinMath: eirin_dev_test is only supported on x86 GCC/Clang; ignoring it")
     endif ()
@@ -156,17 +156,17 @@ endif ()
 
 if (EMSCRIPTEN)
     # Match the previous WASM configuration: no C++ exceptions.
-    target_compile_options(eirin_fixed.test PRIVATE -fno-exceptions)
-    target_compile_definitions(eirin_fixed.test PRIVATE EIRIN_NO_EXCEPTIONS)
-    target_link_options(eirin_fixed.test PRIVATE -sEXIT_RUNTIME=1)
-    set_target_properties(eirin_fixed.test PROPERTIES SUFFIX ".js")
+    target_compile_options(eirin_math.test PRIVATE -fno-exceptions)
+    target_compile_definitions(eirin_math.test PRIVATE EIRIN_NO_EXCEPTIONS)
+    target_link_options(eirin_math.test PRIVATE -sEXIT_RUNTIME=1)
+    set_target_properties(eirin_math.test PROPERTIES SUFFIX ".js")
 endif ()
 
 if (EMSCRIPTEN)
     add_test(
-            NAME test_eirin_fixed
-            COMMAND node $<TARGET_FILE:eirin_fixed.test>
+            NAME test_eirin_math
+            COMMAND node $<TARGET_FILE:eirin_math.test>
     )
 else ()
-    add_test(NAME test_eirin_fixed COMMAND eirin_fixed.test)
+    add_test(NAME test_eirin_math COMMAND eirin_math.test)
 endif ()

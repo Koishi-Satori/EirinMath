@@ -25,7 +25,7 @@ fi
 SPHINX_OPT="-b html"
 SPHINX_SOURCE_DIR="./"
 SPHINX_BUILD_DIR="./_build"
-SPHINX_BREATHE_OPT="-Dbreathe_projects.EirinFixed=./xml"
+SPHINX_BREATHE_OPT="-Dbreathe_projects.EirinMath=./xml"
 
 echo "Build sphinx documentation..."
 

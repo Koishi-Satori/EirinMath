@@ -20,21 +20,25 @@ jobs:
               cmake -S . -B build -G Ninja
               -DCMAKE_BUILD_TYPE=Release
               -Deirin_prefer_system_gtest=OFF
+              -Deirin_test_simd_avx2=ON
 
           - name: Build
             run: cmake --build build --verbose
 
-          - name: Test
-            run: ctest --test-dir build --output-on-failure
+          - name: Test (non-SIMD)
+            run: ctest --test-dir build -LE simd --output-on-failure
+
+          - name: Test (SIMD)
+            run: ctest --test-dir build -L simd --output-on-failure
 
           - name: Benchmark
-            run: ./build/bin/eirin_fixed.benchmark.exe
+            run: ./build/bin/eirin_math.benchmark.exe
 
           - name: Benchmark (Vec Library)
-            run: ./build/bin/eirin_fixed.tvec.benchmark.exe
+            run: ./build/bin/eirin_math.tvec.benchmark.exe
 
           - name: Benchmark (Saturating Arithmetic)
-            run: ./build/bin/eirin_fixed.sat_arith.benchmark.exe
+            run: ./build/bin/eirin_math.sat_arith.benchmark.exe
 
           - name: Benchmark (For Compare)
             run: ./build/bin/double.benchmark.exe
@@ -65,6 +69,7 @@ jobs:
               cmake -S . -B build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
+                -Deirin_test_simd_avx2=ON \
                 2>&1 | tee "$RUNNER_TEMP/configure.log"
 
           - name: Verify system GoogleTest
@@ -74,17 +79,20 @@ jobs:
           - name: Build
             run: cmake --build build --verbose
 
-          - name: Test
-            run: ctest --test-dir build --output-on-failure
+          - name: Test (non-SIMD)
+            run: ctest --test-dir build -LE simd --output-on-failure
+
+          - name: Test (SIMD)
+            run: ctest --test-dir build -L simd --output-on-failure
 
           - name: Benchmark
-            run: ./build/bin/eirin_fixed.benchmark
+            run: ./build/bin/eirin_math.benchmark
 
           - name: Benchmark (Vec Library)
-            run: ./build/bin/eirin_fixed.tvec.benchmark
+            run: ./build/bin/eirin_math.tvec.benchmark
 
           - name: Benchmark (Saturating Arithmetic)
-            run: ./build/bin/eirin_fixed.sat_arith.benchmark
+            run: ./build/bin/eirin_math.sat_arith.benchmark
 
           - name: Benchmark (For Compare)
             run: ./build/bin/double.benchmark
@@ -115,6 +123,7 @@ jobs:
               cmake -S . -B build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} \
+                -Deirin_test_simd_avx2=ON \
                 2>&1 | tee "$RUNNER_TEMP/configure.log"
 
           - name: Verify system GoogleTest
@@ -124,17 +133,20 @@ jobs:
           - name: Build
             run: cmake --build build --verbose
 
-          - name: Test
-            run: ctest --test-dir build --output-on-failure
+          - name: Test (non-SIMD)
+            run: ctest --test-dir build -LE simd --output-on-failure
+
+          - name: Test (SIMD)
+            run: ctest --test-dir build -L simd --output-on-failure
 
           - name: Benchmark
-            run: ./build/bin/eirin_fixed.benchmark
+            run: ./build/bin/eirin_math.benchmark
 
           - name: Benchmark (Vec Library)
-            run: ./build/bin/eirin_fixed.tvec.benchmark
+            run: ./build/bin/eirin_math.tvec.benchmark
 
           - name: Benchmark (Saturating Arithmetic)
-            run: ./build/bin/eirin_fixed.sat_arith.benchmark
+            run: ./build/bin/eirin_math.sat_arith.benchmark
 
           - name: Benchmark (For Compare)
             run: ./build/bin/double.benchmark
@@ -189,16 +201,16 @@ jobs:
             run: cmake --build build --verbose
 
           - name: Test
-            run: node build/bin/eirin_fixed.test.js
+            run: ctest --test-dir build --output-on-failure
 
           - name: Benchmark
-            run: node build/bin/eirin_fixed.benchmark.js
+            run: node build/bin/eirin_math.benchmark.js
 
           - name: Benchmark (Vec Library)
-            run: node build/bin/eirin_fixed.tvec.benchmark.js
+            run: node build/bin/eirin_math.tvec.benchmark.js
 
           - name: Benchmark (Saturating Arithmetic)
-            run: node build/bin/eirin_fixed.sat_arith.benchmark.js
+            run: node build/bin/eirin_math.sat_arith.benchmark.js
 
           - name: Benchmark (For Compare)
             run: node build/bin/double.benchmark.js
