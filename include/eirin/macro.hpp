@@ -51,6 +51,17 @@
 #    define EIRIN_SIMD_INTRINSIC_DECLARE EIRIN_ALWAYS_INLINE
 #endif
 
+#if EIRIN_SIMD_MARK_ARTIFICIAL_ENABLE == EIRIN_ENABLE
+#    if defined(__has_attribute)
+#        if __has_attribute(__may_alias__)
+#            define EIRIN_HAS_ATTRIBUTE_GNU_MAY_ALIAS EIRIN_TRUE
+#        endif
+#    endif
+#endif
+#ifndef EIRIN_HAS_ATTRIBUTE_GNU_MAY_ALIAS
+#    define EIRIN_HAS_ATTRIBUTE_GNU_MAY_ALIAS EIRIN_FALSE
+#endif
+
 #if defined(__has_builtin)
 #    if __has_builtin(__builtin_constant_p)
 #        define EIRIN_HAS_BUILTIN_CONSTANT_P EIRIN_TRUE

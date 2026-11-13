@@ -190,6 +190,11 @@ using all_native_abis =
         abi_wasm_simd128,
 #endif
         abi_scalar>;
+
+#if EIRIN_HAS_ATTRIBUTE_GNU_MAY_ALIAS == EIRIN_TRUE
+template <typename T>
+using may_alias [[__gnu__::__may_alias__]] = T;
+#endif
 } // namespace eirin::simd_abi
 
 #endif

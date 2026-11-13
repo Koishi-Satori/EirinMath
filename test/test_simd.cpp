@@ -5,6 +5,7 @@
 #include <eirin/macro.hpp>
 
 #include <array>
+#include <cstring>
 #include <type_traits>
 
 #if defined(EIRIN_DEV_TEST_MODE) && EIRIN_PLATFORM_SIMD_HAS_AVX2 == EIRIN_TRUE && \
@@ -25,7 +26,67 @@ struct has_native_abi : std::false_type
 template <typename T>
 struct has_native_abi<T, std::void_t<eirin::simd_abi::native_abi_t<T>>> : std::true_type
 {};
+
+template <typename T, std::size_t N>
+void expect_storage_round_trip()
+{
+    using storage = eirin::simd_abi::fixed_storage<T, N>;
+
+    std::array<T, N> input{};
+    for(std::size_t i = 0; i < N; ++i)
+        input[i] = static_cast<T>(i + 1);
+
+    const auto loaded = storage::load(input.data());
+
+    std::array<T, N + 4> output;
+    output.fill(static_cast<T>(99));
+    loaded.store(output.data() + 2);
+
+    EXPECT_EQ(output[0], static_cast<T>(99));
+    EXPECT_EQ(output[1], static_cast<T>(99));
+    for(std::size_t i = 0; i < N; ++i)
+        EXPECT_EQ(output[i + 2], input[i]) << "lane " << i;
+    for(std::size_t i = N + 2; i < output.size(); ++i)
+        EXPECT_EQ(output[i], static_cast<T>(99)) << "tail lane " << i;
+
+    std::array<T, storage::capacity> padded{};
+    static_assert(sizeof(loaded) == sizeof(padded));
+    std::memcpy(padded.data(), &loaded, sizeof(padded));
+    for(std::size_t i = N; i < padded.size(); ++i)
+        EXPECT_EQ(padded[i], T{}) << "padding lane " << i;
+}
 } // namespace
+
+#if defined(EIRIN_SIMD_TEST_EXPECT_AVX2)
+static_assert(EIRIN_PLATFORM_SIMD_HAS_AVX2 == EIRIN_TRUE);
+static_assert(EIRIN_PLATFORM_SIMD_HAS_AVX512F == EIRIN_FALSE);
+static_assert(eirin::simd::simd_backend<eirin::simd_abi::abi_avx2_256>::is_implemented);
+
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<float, 5>::first_abi,
+              eirin::simd_abi::abi_avx2_256>);
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<float, 9>::first_abi,
+              eirin::simd_abi::abi_avx2_256>);
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<double, 5>::first_abi,
+              eirin::simd_abi::abi_avx2_256>);
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<std::int64_t, 9>::first_abi,
+              eirin::simd_abi::abi_avx2_256>);
+
+static_assert(eirin::simd_abi::fixed_abi_t<float, 5>::size() == 1);
+static_assert(eirin::simd_abi::fixed_abi_t<float, 9>::size() == 2);
+static_assert(eirin::simd_abi::fixed_abi_t<double, 5>::size() == 2);
+static_assert(eirin::simd_abi::fixed_abi_t<std::int64_t, 9>::size() == 4);
+
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<float, 3>::first_abi,
+              eirin::simd_abi::abi_sse2_128>);
+static_assert(std::is_same_v<
+              typename eirin::simd_abi::fixed_abi_t<float, 2>::first_abi,
+              eirin::simd_abi::abi_scalar>);
+#endif
 
 TEST(SimdConfig, IsaMacrosAreBoolean)
 {
@@ -176,6 +237,23 @@ TEST(SimdAbi, FixedStorage)
     fixed_storage<int, 1> scalar(42);
     EXPECT_EQ(scalar.at<0>(), 42);
     EXPECT_EQ(scalar.storage().capacity(), 1);
+
+    std::array<float, 5> input{1.f, 2.f, 3.f, 4.f, 5.f};
+    const auto loaded = fixed_storage<float, 5>::load(input.data());
+    std::array<float, 5> output{};
+    loaded.store(output.data());
+    EXPECT_EQ(output, input);
+}
+
+TEST(SimdStorage, RoundTripAndTailSafety)
+{
+    expect_storage_round_trip<int, 1>();
+    expect_storage_round_trip<float, 2>();
+    expect_storage_round_trip<float, 3>();
+    expect_storage_round_trip<float, 5>();
+    expect_storage_round_trip<float, 9>();
+    expect_storage_round_trip<double, 5>();
+    expect_storage_round_trip<std::int64_t, 9>();
 }
 
 #if defined(EIRIN_DEV_TEST_MODE) && EIRIN_PLATFORM_SIMD_HAS_AVX2 == EIRIN_TRUE && \

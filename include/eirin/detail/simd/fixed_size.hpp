@@ -6,9 +6,12 @@
 #include <cstddef>
 #include <type_traits>
 #include <bit>
+#include <array>
+#include <cstring>
 #include "abi.hpp"
 #include "../../macro.hpp"
 #include "detail.hpp"
+#include "backend.hpp"
 
 namespace eirin::simd_abi
 {
@@ -82,6 +85,16 @@ namespace detail
                 return EIRIN_IS_CONSTANT_P(first);
         }
     };
+
+    template <typename Sequence, std::size_t Index>
+    struct chunk_abi;
+
+    template <std::size_t Index, typename T, typename... ABIs>
+    struct chunk_abi<simd_sequence<T, ABIs...>, Index> : detail::abi_at<Index, ABIs...>
+    {};
+
+    template <typename Sequence, std::size_t Index>
+    using chunk_abi_t = typename chunk_abi<Sequence, Index>::type;
 } // namespace detail
 
 template <typename T, typename ABI, typename... ABIs>
@@ -129,7 +142,7 @@ struct simd_sequence<T, ABI, ABIs...> : detail::simd_sequence_storage<typename a
         : base{static_cast<U&&>(a)} {};
 
     template <std::size_t N>
-    EIRIN_SIMD_INTRINSIC_DECLARE constexpr auto& at()
+    EIRIN_SIMD_INTRINSIC_DECLARE constexpr auto& at() noexcept
     {
         if constexpr(N == 0)
             return first;
@@ -138,7 +151,7 @@ struct simd_sequence<T, ABI, ABIs...> : detail::simd_sequence_storage<typename a
     }
 
     template <std::size_t N>
-    EIRIN_SIMD_INTRINSIC_DECLARE constexpr const auto& at() const
+    EIRIN_SIMD_INTRINSIC_DECLARE constexpr const auto& at() const noexcept
     {
         if constexpr(N == 0)
             return first;
@@ -166,6 +179,12 @@ struct fixed_storage : fixed_abi_t<std::remove_cv_t<T>, N>
     using value_type = std::remove_cv_t<T>;
     using abi_type = abi_fixed<N>;
     using storage_type = fixed_abi_t<value_type, N>;
+
+    template <std::size_t Index>
+    using chunk_abi = detail::chunk_abi_t<storage_type, Index>;
+
+    template <std::size_t Index>
+    using chunk_member = typename abi_traits<value_type, chunk_abi<Index>>::member_type;
 
     static constexpr std::size_t logical_size = N;
     static constexpr std::size_t capacity = std::bit_ceil(N);
@@ -203,6 +222,61 @@ struct fixed_storage : fixed_abi_t<std::remove_cv_t<T>, N>
     EIRIN_SIMD_INTRINSIC_DECLARE constexpr const storage_type& storage() const noexcept
     {
         return *this;
+    }
+
+    template <std::size_t I, std::size_t Offset>
+    void load_chunks(const std::array<value_type, capacity>& padded)
+    {
+        using abi = chunk_abi<I>;
+        using backend = ::eirin::simd::simd_backend<abi>;
+
+        static_assert(abi_valid_v<value_type, abi>);
+        static_assert(backend::is_implemented);
+
+        constexpr std::size_t lanes = abi_size_v<T, abi>;
+        static_assert(Offset + lanes <= capacity);
+
+        this->template at<I>() = backend::load(padded.data() + Offset);
+        if constexpr(I + 1 < chunk_count)
+            load_chunks<I + 1, Offset + lanes>(padded);
+    }
+
+    template <std::size_t I, std::size_t Offset>
+    void store_chunks(std::array<value_type, capacity>& padded) const noexcept
+    {
+        static_assert(I < chunk_count);
+
+        using abi = chunk_abi<I>;
+        using backend = ::eirin::simd::simd_backend<abi>;
+
+        static_assert(abi_valid_v<value_type, abi>);
+        static_assert(backend::is_implemented);
+
+        constexpr std::size_t lanes = abi_size_v<value_type, abi>;
+        static_assert(Offset + lanes <= capacity);
+
+        backend::store(padded.data() + Offset, this->template at<I>());
+
+        if constexpr(I + 1 < chunk_count)
+            store_chunks<I + 1, Offset + lanes>(padded);
+    }
+
+    static fixed_storage load(const value_type* source) noexcept
+    {
+        std::array<value_type, capacity> padded{};
+        std::memcpy(padded.data(), source, logical_size * sizeof(value_type));
+
+        fixed_storage result{};
+        result.template load_chunks<0, 0>(padded);
+        return result;
+    }
+
+    void store(value_type* destination) const noexcept
+    {
+        std::array<value_type, capacity> padded{};
+        store_chunks<0, 0>(padded);
+
+        std::memcpy(destination, padded.data(), logical_size * sizeof(value_type));
     }
 };
 } // namespace eirin::simd_abi

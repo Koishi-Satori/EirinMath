@@ -5,6 +5,8 @@ project(EirinMath VERSION 1.5.2 LANGUAGES CXX)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # ---------------------------------------------------------------------------
 # Build options
 # ---------------------------------------------------------------------------
@@ -12,6 +14,9 @@ option(eirin_build_tests "Build unit tests" ON)
 option(eirin_build_benchmarks "Build fixed number and double benchmarks" ON)
 option(eirin_build_advanced_benchmark "Build advanced fixed number benchmarks" OFF)
 option(eirin_dev_test "Enable the development test include" OFF)
+option(eirin_test_simd_scalar "Build and run scalar SIMD tests" ON)
+option(eirin_test_simd_avx2 "Build and run AVX2 SIMD tests" OFF)
+option(eirin_test_simd_avx512 "Build and run AVX-512 SIMD tests" OFF)
 option(
     eirin_prefer_system_gtest
     "Prefer a system-installed GoogleTest; fall back to FetchContent (v1.14.0) when it is not found"

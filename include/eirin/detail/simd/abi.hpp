@@ -72,6 +72,20 @@ concept is_fixed_abi = is_fixed_size_abi_v<T>;
 
 namespace detail
 {
+    template <std::size_t Index, typename... ABIs>
+    struct abi_at;
+
+    template <typename ABI, typename... Rest>
+    struct abi_at<0, ABI, Rest...>
+    {
+        using type = ABI;
+    };
+
+    template <std::size_t Index, typename ABI, typename... Rest>
+    requires(Index > 0)
+    struct abi_at<Index, ABI, Rest...> : abi_at<Index - 1, Rest...>
+    {};
+
     template <typename T, bool IsArithmetic = std::is_arithmetic_v<T>>
     struct is_simd_lane : std::false_type
     {};
