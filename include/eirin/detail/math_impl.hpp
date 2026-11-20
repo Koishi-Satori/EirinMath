@@ -330,7 +330,7 @@ namespace detail
         {
             if(k > static_cast<I>(fixed::digits_int) + 2)
                 return fixed::from_internal_value(__any_int_traits<T>::max);
-            if constexpr(detail::is_signed_v<I>)
+            if constexpr(traits::is_signed_v<I>)
             {
                 if(k < -static_cast<I>(f) - 3)
                     return fixed(0);
@@ -338,7 +338,7 @@ namespace detail
         }
         else if constexpr(os == overflow_strategy::MODWRAP)
         {
-            if constexpr(detail::is_signed_v<I>)
+            if constexpr(traits::is_signed_v<I>)
             {
                 if(k < -static_cast<I>(f) - 3)
                     return fixed(0);
@@ -361,7 +361,7 @@ namespace detail
                 ++k;
                 r_2w -= ln2_2w;
             }
-            if constexpr(detail::is_signed_v<I>)
+            if constexpr(traits::is_signed_v<I>)
             {
                 while(r_2w < 0)
                 {
@@ -383,7 +383,7 @@ namespace detail
                 ++k;
                 r_work -= ln2_best;
             }
-            if constexpr(detail::is_signed_v<I>)
+            if constexpr(traits::is_signed_v<I>)
             {
                 while(r_work < 0)
                 {
@@ -480,7 +480,7 @@ namespace detail
     template <typename T, typename I, unsigned int f, bool r>
     EIRIN_ALWAYS_INLINE constexpr pow_ln_hi_lo<T, I, f, r> log_inline(fixed_num<T, I, f, r> b) noexcept
     {
-        using J = typename make_signed<I>::type;
+        using J = typename traits::make_signed<I>::type;
         constexpr auto sc = pow_scales<T, I, f>{};
         constexpr unsigned int bf = sc.bf;
         constexpr unsigned int C = sc.C;
@@ -602,7 +602,7 @@ namespace detail
     EIRIN_ALWAYS_INLINE constexpr fixed_num<T, I, f, r> exp_inline(I x_raw, I lo_raw) noexcept
     {
         using fixed = fixed_num<T, I, f, r>;
-        using J = typename make_signed<I>::type;
+        using J = typename traits::make_signed<I>::type;
         constexpr auto sc = pow_scales<T, I, f>{};
         constexpr unsigned int bf = sc.bf;
         constexpr unsigned int C = sc.C;
@@ -630,7 +630,7 @@ namespace detail
         // saturation for out-of-range exponents
         if(k > static_cast<J>(digits_int) + 2)
             return fixed::from_internal_value(__any_int_traits<T>::max);
-        if constexpr(detail::is_signed_v<J>)
+        if constexpr(traits::is_signed_v<J>)
         {
             if(k < -static_cast<J>(f) - 3)
                 return fixed(0);
@@ -651,7 +651,7 @@ namespace detail
                 ++k;
                 r_2w -= ln2_2w;
             }
-            if constexpr(detail::is_signed_v<J>)
+            if constexpr(traits::is_signed_v<J>)
             {
                 while(r_2w < 0)
                 {
@@ -671,7 +671,7 @@ namespace detail
                 ++k;
                 r_work -= ln2_best;
             }
-            if constexpr(detail::is_signed_v<J>)
+            if constexpr(traits::is_signed_v<J>)
             {
                 while(r_work < 0)
                 {
@@ -768,7 +768,7 @@ namespace detail
             //                                                                                                              "0x1.0928ae4258eb8bcp-6"
             // find msb, because x is in [0, 1], the msb must <= fraction.
             // this might be ugly, but we can use msb to directly switch.
-            const auto bw = detail::bit_width(static_cast<detail::make_unsigned_t<T>>(x.internal_value()));
+            const auto bw = detail::bit_width(static_cast<traits::make_unsigned_t<T>>(x.internal_value()));
             switch(bw)
             {
             case f - 4:
@@ -828,7 +828,7 @@ namespace detail
         }
         else
         {
-            using UI = detail::make_unsigned_t<T>;
+            using UI = traits::make_unsigned_t<T>;
             // we noticed that the range border value can be represented in a * 2^(f-k) pattern.
             // so we can also use some trick to optimize performance.
             const UI ux = static_cast<UI>(x.internal_value());
@@ -988,7 +988,7 @@ namespace detail
     {
         if(N <= 0)
             return 0;
-        const int nb = static_cast<int>(detail::bit_width(static_cast<detail::make_unsigned_t<I>>(N)));
+        const int nb = static_cast<int>(detail::bit_width(static_cast<traits::make_unsigned_t<I>>(N)));
         I m = static_cast<I>(1) << (2 * ((nb - 1) / 2));
         I s = 0;
         I R = N;
@@ -1058,7 +1058,7 @@ namespace detail
     template <typename T, typename I, unsigned int f, bool r>
     EIRIN_ALWAYS_INLINE constexpr I cbrt_frexp(fixed_num<T, I, f, r> x, int& e) noexcept
     {
-        using U = detail::make_unsigned_t<T>;
+        using U = traits::make_unsigned_t<T>;
         constexpr unsigned int F = cbrt_frexp_scales<T, I, f>::fraction;
         auto X = x.internal_value();
         if(X == 0)

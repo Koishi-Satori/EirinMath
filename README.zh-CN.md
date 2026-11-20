@@ -11,7 +11,7 @@
 本库可以满足定点数的主要需求：保证在不同平台、设备、操作系统和编译器上都能得到一致的计算结果。
 此外，`fixed64` 会使用编译器扩展提供的128位整数作为中间计算类型，而在某些没有int128拓展的编译器会回退到库中内建的int128实现。MSVC上现在默认提供内建的int128实现（MSVC原先的128位乘法存在性能问题，维护者发起的优化PR已经被合入MSVC-STL。），但当设置了`EIRIN_USE_EXT_BUILTIN_INT128 == EIRIN_FALSE`时会强制使用`__msvc_int128.hpp`提供的`std::Signed128`和`std::Unsigned128`；GCC和Clang上则默认直接使用`__int128`。
 
-C++26 风格的饱和算术实现在 [numeric.hpp](include/eirin/numeric.hpp) 中，支持定点数、整数，以及所有满足 `eirin::detail::is_integral_v` 的用户自定义整数类型。
+C++26 风格的饱和算术实现在 [numeric.hpp](include/eirin/numeric.hpp) 中，支持定点数、整数，以及所有满足 `eirin::traits::is_integral_v` 的用户自定义整数类型。
 
 作为额外功能，*EirinMath* 还提供了向量类 `tvec<T, N>` 及其在 `vec.hpp` 中的部分特化。它支持类似 GLSL 的 swizzle，但使用函数调用语法 `()`，例如：
 
@@ -381,9 +381,14 @@ res = eirin::saturating_cast(INT64_MAX);   // INT32_MAX
 
 要让自定义类型 `my_int` 使用 `saturating_*`，需要特化：
 
-- `eirin::detail::is_integral<my_int>`：启用饱和算术重载的开关；
-- `eirin::detail::is_signed<my_int>` 或 `eirin::detail::is_unsigned<my_int>`：两者必须恰好有一个为 `true`，用于判断溢出方向；
+- `eirin::traits::is_integral<my_int>`：启用饱和算术重载的开关；
+- `eirin::traits::is_signed<my_int>` 或 `eirin::traits::is_unsigned<my_int>`：两者必须恰好有一个为 `true`，用于判断溢出方向；
 - `std::numeric_limits<my_int>`：提供 `digits`、`min()`、`max()` 和 `lowest()`，作为饱和边界。
+
+对于整数算术之外的自定义标量行为，还可以特化：
+
+- `eirin::traits::is_fractional_scalar<my_scalar>`：让自定义标量类型可用于矩阵 `inverse` 等需要小数类型的 API；
+- `eirin::traits::element_compute_epsilon<my_scalar>`：为逐元素 nearly 比较提供 epsilon。
 
 ```c++
 namespace eirin::detail
@@ -420,7 +425,7 @@ public:
 
 还有两个可选 traits：
 
-- `eirin::detail::make_unsigned<my_int>`，以及无符号类型对应的 `make_signed`，用于启用 `saturating_*` 的无分支溢出路径；当该类型用作 `fixed_num` 存储类型时，这个 trait 是必需的。没有对应无符号类型时，饱和助手会检测到并回退到通用路径。
+- `eirin::traits::make_unsigned<my_int>`，以及无符号类型对应的 `make_signed`，用于启用 `saturating_*` 的无分支溢出路径；当该类型用作 `fixed_num` 存储类型时，这个 trait 是必需的。没有对应无符号类型时，饱和助手会检测到并回退到通用路径。
 
 ```c++
 namespace eirin::detail
@@ -439,7 +444,7 @@ struct make_signed<my_uint, true>
 } // namespace eirin::detail
 ```
 
-- `eirin::int_sequence_generator<my_int, Word>` 可以让 `detail::bit_width` 以及 `fixed_num::bit_width()` 按 word 拆分大整数，避免使用较慢的通用循环。继承 `eirin::detail::__int_sequence_generator_base`，设置 `is_specialized = true`，并提供返回迭代器的 `constexpr begin()` / `end()`；迭代器需要支持 `operator*`、`operator++` 和 `operator!=`。word 按最低有效位在前输出；`test/main.cpp` 中有 64 位和 16 位 word 类型的完整示例。
+- `eirin::traits::int_sequence_generator<my_int, Word>` 可以让 `detail::bit_width` 以及 `fixed_num::bit_width()` 按 word 拆分大整数，避免使用较慢的通用循环。继承 `eirin::detail::__int_sequence_generator_base`，设置 `is_specialized = true`，并提供返回迭代器的 `constexpr begin()` / `end()`；迭代器需要支持 `operator*`、`operator++` 和 `operator!=`。word 按最低有效位在前输出；`test/main.cpp` 中有 64 位和 16 位 word 类型的完整示例。
 
 ## 构建与测试
 

@@ -13,7 +13,7 @@ namespace eirin::detail
     concept __has_enough_bits_imul = sizeof(I) >= sizeof(T) * 2;
 
     template <typename T>
-    concept __saturating_arithmetic_type = detail::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>;
+    concept __saturating_arithmetic_type = traits::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>;
 
     /**
      * @brief Detect overflow of `x + y` in the storage type `T`.
@@ -30,10 +30,10 @@ namespace eirin::detail
     template <typename T, typename I>
     EIRIN_MATH_SMALL_FUNC_API bool __add_overflow(T x, T y, T* z) noexcept
     {
-        if constexpr(detail::is_signed_v<T> && has_make_unsigned_v<T>)
+        if constexpr(traits::is_signed_v<T> && has_make_unsigned_v<T>)
         {
             // use unsigned version to check.
-            using u_type = detail::make_unsigned_t<T>;
+            using u_type = traits::make_unsigned_t<T>;
             u_type res = static_cast<u_type>(x) + static_cast<u_type>(y);
             *z = static_cast<T>(res);
             constexpr u_type sign_bit = static_cast<u_type>(1) << (std::numeric_limits<u_type>::is_specialized ? std::numeric_limits<u_type>::digits - 1 : sizeof(T) * 8 - 1);
@@ -50,11 +50,11 @@ namespace eirin::detail
     template <typename T, typename I>
     EIRIN_MATH_SMALL_FUNC_API bool __sub_overflow(T x, T y, T* z) noexcept
     {
-        if constexpr(detail::is_signed_v<T> && has_make_unsigned_v<T>)
+        if constexpr(traits::is_signed_v<T> && has_make_unsigned_v<T>)
         {
             // use unsigned version to check.
             // neg - pos can neg overflow, pos - neg can pos overflow
-            using u_type = detail::make_unsigned_t<T>;
+            using u_type = traits::make_unsigned_t<T>;
             u_type res = static_cast<u_type>(x) - static_cast<u_type>(y);
             *z = static_cast<T>(res);
             constexpr u_type sign_bit = static_cast<u_type>(1) << (std::numeric_limits<u_type>::is_specialized ? std::numeric_limits<u_type>::digits - 1 : sizeof(T) * 8 - 1);
@@ -147,9 +147,9 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __builtin_add_overflow_fallback(_Tp x, _Tp y, _Tp* z) noexcept
     {
-        if constexpr(detail::is_signed_v<_Tp>)
+        if constexpr(traits::is_signed_v<_Tp>)
         {
-            using u_type = detail::make_unsigned_t<_Tp>;
+            using u_type = traits::make_unsigned_t<_Tp>;
             u_type ux = static_cast<u_type>(x);
             u_type uy = static_cast<u_type>(y);
             u_type sum = static_cast<u_type>(ux + uy);
@@ -170,9 +170,9 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __builtin_sub_overflow_fallback(_Tp x, _Tp y, _Tp* z) noexcept
     {
-        if constexpr(detail::is_signed_v<_Tp>)
+        if constexpr(traits::is_signed_v<_Tp>)
         {
-            using u_type = detail::make_unsigned_t<_Tp>;
+            using u_type = traits::make_unsigned_t<_Tp>;
             u_type ux = static_cast<u_type>(x);
             u_type uy = static_cast<u_type>(y);
             u_type sub = static_cast<u_type>(ux - uy);
@@ -193,9 +193,9 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __builtin_mul_overflow_fallback(_Tp x, _Tp y, _Tp* z) noexcept
     {
-        if constexpr(detail::is_signed_v<_Tp>)
+        if constexpr(traits::is_signed_v<_Tp>)
         {
-            using u_type = detail::make_unsigned_t<_Tp>;
+            using u_type = traits::make_unsigned_t<_Tp>;
             u_type ux = x < 0 ? u_type(0) - static_cast<u_type>(x) : static_cast<u_type>(x);
             u_type uy = y < 0 ? u_type(0) - static_cast<u_type>(y) : static_cast<u_type>(y);
             bool neg = (x < 0) != (y < 0);
@@ -218,7 +218,7 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __builtin_div_overflow_fallback(_Tp x, _Tp y, _Tp* z) noexcept
     {
-        if constexpr(detail::is_signed_v<_Tp>)
+        if constexpr(traits::is_signed_v<_Tp>)
         {
             constexpr _Tp min = detail::__any_int_traits<_Tp>::min;
             bool overflowed = x == min && y == -1;
@@ -382,7 +382,7 @@ namespace eirin::detail
     requires detail::__saturating_arithmetic_type<_Tp>
     EIRIN_MATH_SMALL_FUNC_API bool __integral_div_overflow(_Tp x, _Tp y, _Tp* z) noexcept
     {
-        if constexpr(detail::is_signed_v<_Tp>)
+        if constexpr(traits::is_signed_v<_Tp>)
         {
             constexpr _Tp min = detail::__any_int_traits<_Tp>::min;
             bool overflowed = x == min && y == -1;

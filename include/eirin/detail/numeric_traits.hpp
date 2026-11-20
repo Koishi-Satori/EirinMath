@@ -19,11 +19,11 @@ struct __any_int_traits
 private:
     static constexpr bool __eval_signed() noexcept
     {
-        if constexpr(is_signed_v<T>)
+        if constexpr(traits::is_signed_v<T>)
         {
             return true;
         }
-        else if constexpr(is_unsigned_v<T>)
+        else if constexpr(traits::is_unsigned_v<T>)
         {
             return false;
         }

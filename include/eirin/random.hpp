@@ -18,7 +18,7 @@ namespace eirin
 namespace detail
 {
     template <typename T, T state, T multiplier, T increment, T mix_multiplier, T xor_multiplier>
-    concept pcg_params_check = is_unsigned_v<T> && multiplier != T{0} && increment != T{0} && mix_multiplier != T{0} && xor_multiplier != T{0};
+    concept pcg_params_check = traits::is_unsigned_v<T> && multiplier != T{0} && increment != T{0} && mix_multiplier != T{0} && xor_multiplier != T{0};
 
     /**
      * @brief The mixing kernel of the Stellaris CNoiseRandom-style generator, operating

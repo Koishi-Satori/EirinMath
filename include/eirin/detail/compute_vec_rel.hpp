@@ -5,23 +5,13 @@
 
 #include "../macro.hpp"
 #include "../fixed.hpp"
+#include "../traits.hpp"
 #include <cstdlib>
 
 namespace eirin
 {
 namespace detail
 {
-    // the following is a helper struct to compute the epsilon value for compute_nearly_equal.
-    // for those who want to override the epsilon value, they can specialize this struct for their own type.
-    template <typename T>
-    struct compute_epsilon
-    {
-        EIRIN_ALWAYS_INLINE constexpr static T eval()
-        {
-            return T{1e-6};
-        }
-    };
-
     template <typename T, bool isFloat>
     struct compute_equal
     {
@@ -40,7 +30,7 @@ namespace detail
             if constexpr(std::numeric_limits<T>::is_iec559)
             {
                 using std::abs;
-                return abs(a - b) <= compute_epsilon<T>::eval();
+                return abs(a - b) <= traits::element_compute_epsilon<T>::eval();
             }
             else
             {
@@ -50,7 +40,7 @@ namespace detail
     };
 
     // template <typename T, typename I, unsigned int f, bool r>
-    // struct compute_epsilon<fixed_num<T, I, f, r>>
+    // struct element_compute_epsilon<fixed_num<T, I, f, r>>
     // {
     //     EIRIN_ALWAYS_INLINE constexpr static fixed_num<T, I, f, r> eval()
     //     {
@@ -66,7 +56,7 @@ namespace detail
     //     EIRIN_ALWAYS_INLINE constexpr static bool eval(fixed a, fixed b)
     //     {
     //         using std::abs;
-    //         return abs(a - b) <= compute_epsilon<fixed>::eval();
+    //         return abs(a - b) <= traits::element_compute_epsilon<fixed>::eval();
     //     }
     // };
 } // namespace detail

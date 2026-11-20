@@ -227,7 +227,7 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>& exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    using U = detail::make_unsigned_t<T>;
+    using U = traits::make_unsigned_t<T>;
 
     auto X = x.internal_value();
     if(X == 0)
@@ -264,7 +264,7 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, fixed_num<T, I, f, r>* exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    using U = detail::make_unsigned_t<T>;
+    using U = traits::make_unsigned_t<T>;
 
     if(exponent == nullptr)
         return x;
@@ -303,7 +303,7 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto& exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    using U = detail::make_unsigned_t<T>;
+    using U = traits::make_unsigned_t<T>;
 
     auto X = x.internal_value();
     if(X == 0)
@@ -340,7 +340,7 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_SMALL_FUNC_API fixed_num<T, I, f, r> frexp(fixed_num<T, I, f, r> x, detail::integral auto* exponent) noexcept
 {
     using fixed = fixed_num<T, I, f, r>;
-    using U = detail::make_unsigned_t<T>;
+    using U = traits::make_unsigned_t<T>;
 
     if(exponent == nullptr)
         return x;
@@ -609,7 +609,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> asin(fixed_num<T, I, f, r> fp) EIRIN_M
         // near-1 branch
         if constexpr(f <= 32)
         {
-            using U = detail::make_unsigned_t<T>;
+            using U = traits::make_unsigned_t<T>;
             const auto A = static_cast<U>(a.internal_value());
             const U D = (static_cast<U>(1) << f) - A; // (1 - a)·2^f
             const auto z = fixed::from_internal_value(static_cast<T>(detail::pow_rshift(static_cast<T>(D), 1u)));
@@ -898,7 +898,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> log2(fixed_num<T, I, f, r> fp) EIRIN_M
         // the storage range, so reuse the raw-intermediate ln machinery of pow.
         const auto ln = detail::log_inline(fp);
         constexpr auto sc = detail::pow_scales<T, I, f>{};
-        using J = typename detail::make_signed<I>::type;
+        using J = typename traits::make_signed<I>::type;
         const J hi = static_cast<J>(ln.hi);
         const J lo = static_cast<J>(ln.lo);
         // ln(b) at f bits: hi at 2^L, lo at 2^S. `if constexpr` instead of a
@@ -1063,7 +1063,7 @@ template <typename T, typename I, unsigned int f, bool r>
 EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num<T, I, f, r> e) EIRIN_MATH_TRY_NOEXCEPT
 {
     using fixed = fixed_num<T, I, f, r>;
-    using UI = typename detail::make_signed<I>::type;
+    using UI = typename traits::make_signed<I>::type;
 
     // special cases
     if(b == fixed(0))
@@ -1076,7 +1076,7 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> pow(fixed_num<T, I, f, r> b, fixed_num
         return b;
 
     bool sign_neg = false;
-    if constexpr(detail::is_signed_v<I>)
+    if constexpr(traits::is_signed_v<I>)
     {
         if(b < fixed(0))
         {

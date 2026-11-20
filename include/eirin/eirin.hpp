@@ -5,6 +5,7 @@
 
 #include "macro.hpp"
 #include "ext/config.hpp"
+#include "traits.hpp"
 #include "fixed.hpp"
 #include "numeric.hpp"
 #include "math.hpp"

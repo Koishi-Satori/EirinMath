@@ -10,7 +10,7 @@ You can run the benchmarks ```eirin_math.benchmark``` and ```double.benchmark```
 The fixed points require same calculation result in different platforms, devices, operator systems and compilers, and this library fulfills this requirement.
 Notice that the fixed64 uses some int128 compiler extension as its IntermediateType, and some compiler will fallthrough to a builtin int128 implementation. The ```__msvc_int128.hpp``` in MSVC provides builtin int128 (due to the multiplication of ```std::_Signed128``` and ```std::_Unsigned128``` has performance issue. I have started an optimization merge request, and it has already been merged), Clang and GCC in Linux provide ```__int128```.
 
-An implementation of C++26 style saturating arithmetic functions is in [numeric.hpp](include/eirin/numeric.hpp), which accepts both fixed-point number, integral numbers and all the user-defined types satisfied ```eirin::detail::is_integral_v```.
+An implementation of C++26 style saturating arithmetic functions is in [numeric.hpp](include/eirin/numeric.hpp), which accepts both fixed-point number, integral numbers and all the user-defined types satisfied ```eirin::traits::is_integral_v```.
 
 As an extra function, *EirinMath* provides the vector class `tvec<T, N>`, and its partial specialization versions in `vec.hpp`. *EirinMath* allows you to use swizzle operators like GLSL, but with function call `()`, e.g.
 
@@ -416,12 +416,19 @@ implementation you can copy from.
 
 To use a custom type `my_int` with the `saturating_*` functions, specialize:
 
-- `eirin::detail::is_integral<my_int>` — the opt-in switch that enables the
+- `eirin::traits::is_integral<my_int>` — the opt-in switch that enables the
   saturating overloads;
-- `eirin::detail::is_signed<my_int>` or `eirin::detail::is_unsigned<my_int>` —
+- `eirin::traits::is_signed<my_int>` or `eirin::traits::is_unsigned<my_int>` —
   exactly one of them must report `true` so overflow direction is known;
 - `std::numeric_limits<my_int>` — provides `digits` and `min()`/`max()`/
   `lowest()`, which are the saturation bounds.
+
+For custom scalar behavior outside integer arithmetic, specialize:
+
+- `eirin::traits::is_fractional_scalar<my_scalar>` to allow a user-defined
+  scalar type in APIs that require a fractional type, such as matrix inverse;
+- `eirin::traits::element_compute_epsilon<my_scalar>` to provide the epsilon
+  used by element-wise nearly comparisons.
 
 ```c++
 namespace eirin::detail
@@ -460,7 +467,7 @@ rely on (`+ - * / %`, shifts, unary minus, comparisons and conversions), all
 
 Two more traits are optional:
 
-- `eirin::detail::make_unsigned<my_int>` (and `make_signed` for the unsigned
+- `eirin::traits::make_unsigned<my_int>` (and `make_signed` for the unsigned
   counterpart) enables the branchless overflow path in `saturating_*`, and is
   required when the type is used as `fixed_num` storage. When no unsigned
   counterpart exists, the saturating helpers detect that and fall back to the
@@ -483,7 +490,7 @@ struct make_signed<my_uint, true>
 } // namespace eirin::detail
 ```
 
-- `eirin::int_sequence_generator<my_int, Word>` lets `detail::bit_width` (and
+- `eirin::traits::int_sequence_generator<my_int, Word>` lets `detail::bit_width` (and
   therefore `fixed_num::bit_width()`) split a big integer into words instead of
   using the slower generic loop. Inherit
   `eirin::detail::__int_sequence_generator_base`, set

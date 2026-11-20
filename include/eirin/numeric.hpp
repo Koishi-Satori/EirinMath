@@ -34,7 +34,7 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
     type z;
     if(!detail::__add_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
         return T::from_internal_value(z);
-    if constexpr(detail::is_unsigned_v<type>)
+    if constexpr(traits::is_unsigned_v<type>)
         return T::from_internal_value(detail::__any_int_traits<type>::max);
     else if(x < T(0))
         return T::from_internal_value(detail::__any_int_traits<type>::min);
@@ -59,7 +59,7 @@ EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
     type z;
     if(!detail::__sub_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
         return T::from_internal_value(z);
-    if constexpr(detail::is_unsigned_v<type>)
+    if constexpr(traits::is_unsigned_v<type>)
         return T::from_internal_value(static_cast<type>(0));
     else if(x < T(0)) // neg - pos can neg overflow
         return T::from_internal_value(detail::__any_int_traits<type>::min);
@@ -88,7 +88,7 @@ EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
         x.internal_value(), y.internal_value()
     );
 
-    if constexpr(detail::is_unsigned_v<type>)
+    if constexpr(traits::is_unsigned_v<type>)
     {
         const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
         return T::from_internal_value(static_cast<type>(res > max_v ? max_v : res));
@@ -125,7 +125,7 @@ EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
     if constexpr(T::digits_int != 0)
     {
         constexpr type value_one = static_cast<type>(1) << fraction;
-        if constexpr(detail::is_signed_v<type>)
+        if constexpr(traits::is_signed_v<type>)
         {
             constexpr type neg_value_one = -value_one;
             if(yi >= value_one || yi <= neg_value_one)
@@ -141,7 +141,7 @@ EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
 
     const intermediate_type res = detail::__div_scaled<type, intermediate_type, rounding, fraction>(xi, yi);
 
-    if constexpr(detail::is_unsigned_v<type>)
+    if constexpr(traits::is_unsigned_v<type>)
     {
         const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
         return T::from_internal_value(static_cast<type>(res > max_v ? max_v : res));
@@ -185,7 +185,7 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
     constexpr res_type max_res = detail::__any_int_traits<res_type>::max;
     const auto xi = x.internal_value();
 
-    if constexpr(detail::is_signed_v<type> && !detail::is_signed_v<res_type>)
+    if constexpr(traits::is_signed_v<type> && !traits::is_signed_v<res_type>)
     {
         if(xi < 0)
             return T(0);
@@ -210,7 +210,7 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
             // Clamp the source value to the destination range before scaling
             // up, so the shifted value cannot overflow the work type.
             constexpr work_type high = static_cast<work_type>(max_res >> shift);
-            if constexpr(detail::is_signed_v<work_type> && detail::is_signed_v<res_type>)
+            if constexpr(traits::is_signed_v<work_type> && traits::is_signed_v<res_type>)
             {
                 constexpr work_type low = static_cast<work_type>(min_res >> shift);
                 scaled = xw < low ? low : (xw > high ? high : xw);
@@ -241,7 +241,7 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
     }
 
     constexpr work_type hi = static_cast<work_type>(max_res);
-    if constexpr(detail::is_signed_v<work_type> && detail::is_signed_v<res_type>)
+    if constexpr(traits::is_signed_v<work_type> && traits::is_signed_v<res_type>)
     {
         constexpr work_type lo = static_cast<work_type>(min_res);
         scaled = scaled < lo ? lo : (scaled > hi ? hi : scaled);
@@ -267,10 +267,10 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
     // we use this kind of code.
     // it will produce 2 `add` + 1 `cmovno` to prevent branches on both MSVC and Clang.
     // branchless will perform one extra `add` but not depend on data.
-    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
         constexpr auto shifts = detail::__any_int_traits<T>::digits;
-        T saturated = (static_cast<detail::make_unsigned_t<T>>(y) >> shifts) + detail::__any_int_traits<T>::max;
+        T saturated = (static_cast<traits::make_unsigned_t<T>>(y) >> shifts) + detail::__any_int_traits<T>::max;
         T z;
         bool overflowed = detail::__integral_add_overflow(x, y, std::addressof(z));
         return !overflowed ? z : saturated;
@@ -279,7 +279,7 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
     T z;
     if(!detail::__integral_add_overflow(x, y, std::addressof(z)))
         return z;
-    if constexpr(detail::is_unsigned_v<T>)
+    if constexpr(traits::is_unsigned_v<T>)
         return detail::__any_int_traits<T>::max;
     else if(x < 0)
         return detail::__any_int_traits<T>::min;
@@ -293,7 +293,7 @@ requires detail::__saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
 {
 #if defined(_MSC_VER) || defined(__clang__)
-    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
         T saturated = x >= y ? detail::__any_int_traits<T>::max : detail::__any_int_traits<T>::min;
         T z;
@@ -304,7 +304,7 @@ EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
     T z;
     if(!detail::__integral_sub_overflow(x, y, std::addressof(z)))
         return z;
-    if constexpr(detail::is_unsigned_v<T>)
+    if constexpr(traits::is_unsigned_v<T>)
         return detail::__any_int_traits<T>::min;
     else if(x < 0)
         return detail::__any_int_traits<T>::min;
@@ -318,7 +318,7 @@ requires detail::__saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
 {
 #if defined(_MSC_VER) || defined(__clang__)
-    if constexpr(detail::is_signed_v<T> && detail::has_make_unsigned_v<T>)
+    if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
         T saturated = (x < 0) ^ (y < 0) ? detail::__any_int_traits<T>::min : detail::__any_int_traits<T>::max;
         T z;
@@ -329,7 +329,7 @@ EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
     T z;
     if(!detail::__integral_mul_overflow(x, y, std::addressof(z)))
         return z;
-    if constexpr(detail::is_unsigned_v<T>)
+    if constexpr(traits::is_unsigned_v<T>)
         return detail::__any_int_traits<T>::max;
     else if((x < 0) ^ (y < 0))
         return detail::__any_int_traits<T>::min;
@@ -342,7 +342,7 @@ template <typename T>
 requires detail::__saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
 {
-    if constexpr(detail::is_unsigned_v<T>)
+    if constexpr(traits::is_unsigned_v<T>)
         return x / y;
     else if(x == detail::__any_int_traits<T>::min && y == -1)
         return detail::__any_int_traits<T>::max;
@@ -359,7 +359,7 @@ EIRIN_MATH_FUNC_API Res saturating_cast(T x) noexcept
     constexpr auto digits_in = detail::__any_int_traits<T>::digits;
     constexpr Res max_res = detail::__any_int_traits<Res>::max;
 
-    if constexpr(detail::is_signed_v<Res> && detail::is_signed_v<T>)
+    if constexpr(traits::is_signed_v<Res> && traits::is_signed_v<T>)
     {
         if constexpr(digits_res < digits_in)
         {
@@ -371,16 +371,16 @@ EIRIN_MATH_FUNC_API Res saturating_cast(T x) noexcept
                 return max_res;
         }
     }
-    else if constexpr(detail::is_signed_v<T>)
+    else if constexpr(traits::is_signed_v<T>)
     {
         if(x < 0)
             return 0;
-        else if(detail::make_unsigned_t<T>(x) > max_res)
+        else if(traits::make_unsigned_t<T>(x) > max_res)
             return max_res;
     }
     else
     {
-        if(x > detail::make_unsigned_t<Res>(max_res))
+        if(x > traits::make_unsigned_t<Res>(max_res))
             return max_res;
     }
     return static_cast<Res>(x);

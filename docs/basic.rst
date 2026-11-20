@@ -20,9 +20,9 @@ The ``eirin::fixed_point`` class has some constraints:
 - concept ``eirin::fixed_num_signness``: The Type and IntermediateType must have the same signness.
 
 The logic to check the signness is as follows:
-- Check if template struct ``eirin::detail::is_signed`` is defined.
-- If it is defined, check the ``eirin::detail::is_signed`` of the Type and IntermediateType.
-- If it is not defined, ``eirin::detail::is_signed`` will redirect to ``std::is_signed`` of the Type and IntermediateType.
+- Check if template struct ``eirin::traits::is_signed`` is defined.
+- If it is defined, check the ``eirin::traits::is_signed`` of the Type and IntermediateType.
+- If it is not defined, ``eirin::traits::is_signed`` will redirect to ``std::is_signed`` of the Type and IntermediateType.
 
 Pre-defined Types
 ------------------

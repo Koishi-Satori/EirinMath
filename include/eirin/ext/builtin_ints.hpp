@@ -704,7 +704,7 @@ private:
 } // namespace eirin::ext
 
 #if EIRIN_USE_EXT_BUILTIN_INT128 != EIRIN_ENABLE
-namespace eirin::detail
+namespace eirin::traits
 {
 template <>
 struct is_integral<eirin::ext::int128> : public std::true_type
@@ -739,7 +739,7 @@ struct make_unsigned<eirin::ext::uint128>
 {
     using type = eirin::ext::uint128;
 };
-} // namespace eirin::detail
+} // namespace eirin::traits
 
 #endif
 

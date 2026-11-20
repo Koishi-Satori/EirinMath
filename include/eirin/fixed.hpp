@@ -42,7 +42,7 @@ namespace detail
         {
             return std::numeric_limits<T>::digits;
         }
-        else if(is_signed_v<T>)
+        else if(traits::is_signed_v<T>)
         {
             return sizeof(T) * 8 - 1;
         }
@@ -53,7 +53,7 @@ namespace detail
     }
 
     template <typename T>
-    concept integral = is_integral_v<T>;
+    concept integral = traits::is_integral_v<T>;
 } // namespace detail
 
 // if the type is unsigned type, then the fraction <= bit width, else <= bit width - 1.
@@ -64,10 +64,10 @@ template <typename Type, typename IntermediateType>
 concept fixed_num_size = sizeof(IntermediateType) > sizeof(Type);
 
 template <typename Type, typename IntermediateType>
-concept fixed_num_signness = detail::is_signed_v<IntermediateType> == detail::is_signed_v<Type>;
+concept fixed_num_signness = traits::is_signed_v<IntermediateType> == traits::is_signed_v<Type>;
 
 template <typename Type, typename IntermediateType, unsigned int fraction>
-concept fixed_num_check = detail::is_integral_v<Type> && fixed_num_fraction<Type, fraction> && fixed_num_size<Type, IntermediateType> && fixed_num_signness<Type, IntermediateType>;
+concept fixed_num_check = traits::is_integral_v<Type> && fixed_num_fraction<Type, fraction> && fixed_num_size<Type, IntermediateType> && fixed_num_signness<Type, IntermediateType>;
 
 template <int scale>
 concept fixed_format_check_scale = requires {
@@ -238,19 +238,19 @@ public:
     {
         // for signed type, it should be 1 << (sizeof(Type) * 8 - 1)
         // for unsigned type, it should be 0.
-        if constexpr(detail::is_unsigned_v<Type>)
+        if constexpr(traits::is_unsigned_v<Type>)
             return 0;
         else
         {
             // fixed: ~result + (1 << fraction) may be overflowed.
-            using u_type = detail::make_unsigned_t<Type>;
+            using u_type = traits::make_unsigned_t<Type>;
             return static_cast<Type>(static_cast<u_type>(1) << (sizeof(Type) * 8 - 1));
         }
     }
 
     EIRIN_ALWAYS_INLINE friend constexpr bool signbit(const fixed_num& f) noexcept
     {
-        if constexpr(detail::is_signed_v<Type>)
+        if constexpr(traits::is_signed_v<Type>)
             return f.m_value & signbit_mask();
         else // unsigned value
             return false;
@@ -271,7 +271,7 @@ public:
         {
             // fixed: `~result + (1 << fraction)` overflowed signed Type for values
             // near the minimum (e.g. fixed64::min()), replaced with unsigned type.
-            using u_type = detail::make_unsigned_t<Type>;
+            using u_type = traits::make_unsigned_t<Type>;
             u_type u = static_cast<u_type>(~result);
             u += static_cast<u_type>(1) << fraction;
             result = static_cast<Type>(u);
@@ -292,7 +292,7 @@ public:
      * @tparam IgnoreSignBit should ignore the sign bit, default true. If false, the bit width will be the minimum bit width for two's complement representation.
      * @return lzcnt of the fixed-point number.
      * @note For a custom fixed-point storage type, provide a specialization of
-     *       `eirin::int_sequence_generator_traits`: it should produce a
+     *       `eirin::detail::int_sequence_generator_traits`: it should produce a
      *       begin/end iterator that yields every integral "word" of the
      *       storage type, so the bit width can be computed faster by applying
      *       `std::bit_width` to each word. Without such a specialization, the
@@ -301,7 +301,7 @@ public:
     template <bool IgnoreSignBit = true>
     EIRIN_ALWAYS_INLINE constexpr std::size_t bit_width() const noexcept
     {
-        using u_type = detail::make_unsigned_t<Type>;
+        using u_type = traits::make_unsigned_t<Type>;
         if constexpr(!IgnoreSignBit)
         {
             // actual bit width with sign bit(minimum bit width for two's complement representation)
@@ -579,7 +579,7 @@ public:
 
     constexpr inline fixed_num& operator++() noexcept
     {
-        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        if constexpr(traits::is_signed_v<Type> && digits == fraction)
         {
 #if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
             if(m_value < 0)
@@ -600,7 +600,7 @@ public:
     constexpr inline fixed_num operator++(int) noexcept
     {
         fixed_num temp = *this;
-        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        if constexpr(traits::is_signed_v<Type> && digits == fraction)
         {
 #if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
             if(m_value < 0)
@@ -620,7 +620,7 @@ public:
 
     constexpr inline fixed_num& operator--() noexcept
     {
-        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        if constexpr(traits::is_signed_v<Type> && digits == fraction)
         {
 #if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
             if(m_value < 0)
@@ -641,7 +641,7 @@ public:
     constexpr inline fixed_num operator--(int) noexcept
     {
         fixed_num temp = *this;
-        if constexpr(detail::is_signed_v<Type> && digits == fraction)
+        if constexpr(traits::is_signed_v<Type> && digits == fraction)
         {
 #if EIRIN_FIXED_NUM_SELF_INC_OVERFLOW == EIRIN_OVERFLOW_SAT
             if(m_value < 0)
@@ -1207,12 +1207,12 @@ namespace detail
     consteval std::size_t eval_integral_part_max_digits10() noexcept
     {
         using T = typename Fixed::value_type;
-        using U = detail::make_unsigned_t<T>;
+        using U = traits::make_unsigned_t<T>;
         // calculate the max integral part digits10 of the max value of Fixed.
         // we can use length = floor((bit_width - 1) * log10(2)) to calculate the max digits10 of the integral part.
         constexpr std::size_t bit_width = sizeof(T) * 8;
         constexpr std::size_t precision = Fixed::precision;
-        constexpr bool is_signed = detail::is_signed_v<T>;
+        constexpr bool is_signed = traits::is_signed_v<T>;
         // we need to calculate the max value if using std::numeric_limits::max
         // due to the fixed has precision bits, the max value of the integral part is not equal to std::numeric_limits::max.
         constexpr U max_unsigned = []() constexpr
@@ -1550,7 +1550,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
     }
 
     static constexpr bool is_specialized = true;
-    static constexpr bool is_signed = is_signed_v<T>;
+    static constexpr bool is_signed = eirin::traits::is_signed_v<T>;
     static constexpr bool is_integer = false;
     static constexpr bool is_exact = true;
     static constexpr bool has_infinity = false;
@@ -1571,7 +1571,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
 
     static constexpr bool is_iec559 = false;
     static constexpr bool is_bounded = true;
-    static constexpr bool is_modulo = is_unsigned_v<T>;
+    static constexpr bool is_modulo = eirin::traits::is_unsigned_v<T>;
 
 #if defined(EIRIN_ARCH_X86) || defined(EIRIN_ARCH_PNACL) || defined(EIRIN_ARCH_WASM)
     // Used to describe the if using the fixed point type as operator number might cause hardware traps, for example, divide by zero.

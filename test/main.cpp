@@ -87,7 +87,25 @@ struct test_ud_int
 
 static_assert(sizeof(test_ud_int) > sizeof(std::int64_t));
 
-namespace eirin::detail
+struct test_traits_signed
+{};
+
+struct test_traits_unsigned
+{};
+
+struct test_traits_fractional
+{};
+
+struct test_traits_epsilon
+{
+    float value;
+
+    constexpr explicit test_traits_epsilon(float value) noexcept
+        : value(value)
+    {}
+};
+
+namespace eirin::traits
 {
 template <>
 struct is_integral<test_ud_int> : public std::true_type
@@ -96,12 +114,53 @@ struct is_integral<test_ud_int> : public std::true_type
 template <>
 struct is_signed<test_ud_int> : public std::true_type
 {};
-} // namespace eirin::detail
+
+template <>
+struct is_integral<test_traits_signed> : public std::true_type
+{};
+
+template <>
+struct is_signed<test_traits_signed> : public std::true_type
+{};
+
+template <>
+struct is_integral<test_traits_unsigned> : public std::true_type
+{};
+
+template <>
+struct is_unsigned<test_traits_unsigned> : public std::true_type
+{};
+
+template <>
+struct make_unsigned<test_traits_signed>
+{
+    using type = test_traits_unsigned;
+};
+
+template <>
+struct make_signed<test_traits_unsigned, true>
+{
+    using type = test_traits_signed;
+};
+
+template <>
+struct is_fractional_scalar<test_traits_fractional> : public std::true_type
+{};
+
+template <>
+struct element_compute_epsilon<test_traits_epsilon>
+{
+    static constexpr test_traits_epsilon eval() noexcept
+    {
+        return test_traits_epsilon{0.125f};
+    }
+};
+} // namespace eirin::traits
 
 // user-defined big-int: split into two uint64 words (lo first, little-endian).
 template <eirin::detail::bit_width_word OutType>
 requires std::is_same_v<OutType, std::uint64_t>
-struct eirin::int_sequence_generator<test_ud_int, OutType> : eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>
+struct eirin::traits::int_sequence_generator<test_ud_int, OutType> : eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>
 {
     using base_t = eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>;
     static constexpr bool is_specialized = true;
@@ -149,7 +208,7 @@ struct test_ud_short
 };
 
 template <>
-struct eirin::int_sequence_generator<test_ud_short, unsigned short>
+struct eirin::traits::int_sequence_generator<test_ud_short, unsigned short>
     : eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>
 {
     using base_t = eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>;
@@ -350,33 +409,42 @@ namespace eirin::detail
 
 TEST(FixedNum, TypeTraits)
 {
+    static_assert(traits::is_integral_v<test_traits_signed>);
+    static_assert(traits::is_signed_v<test_traits_signed>);
+    static_assert(traits::is_integral_v<test_traits_unsigned>);
+    static_assert(traits::is_unsigned_v<test_traits_unsigned>);
+    static_assert(std::is_same_v<traits::make_unsigned_t<test_traits_signed>, test_traits_unsigned>);
+    static_assert(std::is_same_v<traits::make_signed_t<test_traits_unsigned>, test_traits_signed>);
+    static_assert(traits::is_fractional_scalar_v<test_traits_fractional>);
+    static_assert(traits::element_compute_epsilon<test_traits_epsilon>::eval().value == 0.125f);
+
     EXPECT_FALSE(detail::has_make_unsigned_v<test_ud_int>);
     EXPECT_TRUE(detail::has_make_unsigned_v<int64_t>);
 #ifdef EIRIN_MATH_HAS_INT128
     EXPECT_TRUE(detail::has_make_unsigned_v<detail::int128_t>);
 #endif
 
-    bool f = std::is_same_v<detail::make_unsigned_t<int64_t>, uint64_t>;
+    bool f = std::is_same_v<traits::make_unsigned_t<int64_t>, uint64_t>;
     EXPECT_TRUE(f);
 #ifdef EIRIN_MATH_HAS_INT128
-    f = std::is_same_v<detail::make_unsigned_t<detail::int128_t>, detail::uint128_t>;
+    f = std::is_same_v<traits::make_unsigned_t<detail::int128_t>, detail::uint128_t>;
     EXPECT_TRUE(f);
 #endif
 
     // int_sequence_generator: placeholder vs. user partial specialization.
-    EXPECT_FALSE((int_sequence_generator<int, uint64_t>::is_specialized));
-    EXPECT_TRUE((int_sequence_generator<test_ud_int, uint64_t>::is_specialized));
-    EXPECT_TRUE((std::is_same_v<int_sequence_generator<test_ud_int, uint64_t>::word_type, uint64_t>));
+    EXPECT_FALSE((traits::int_sequence_generator<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((traits::int_sequence_generator<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<traits::int_sequence_generator<test_ud_int, uint64_t>::word_type, uint64_t>));
 
     // int_sequence_generator_traits mirrors the generator contract for consumers.
-    EXPECT_FALSE((int_sequence_generator_traits<int, uint64_t>::is_specialized));
-    EXPECT_TRUE((int_sequence_generator_traits<test_ud_int, uint64_t>::is_specialized));
-    EXPECT_TRUE((std::is_same_v<int_sequence_generator_traits<test_ud_int, uint64_t>::word_type, uint64_t>));
-    EXPECT_EQ((int_sequence_generator_traits<test_ud_int, uint64_t>::word_bits), std::size_t{64});
+    EXPECT_FALSE((detail::int_sequence_generator_traits<int, uint64_t>::is_specialized));
+    EXPECT_TRUE((detail::int_sequence_generator_traits<test_ud_int, uint64_t>::is_specialized));
+    EXPECT_TRUE((std::is_same_v<detail::int_sequence_generator_traits<test_ud_int, uint64_t>::word_type, uint64_t>));
+    EXPECT_EQ((detail::int_sequence_generator_traits<test_ud_int, uint64_t>::word_bits), std::size_t{64});
 
     // placeholder: begin == end (empty range), dereference is well-defined.
-    auto p_it = int_sequence_generator<int, uint64_t>::begin(0);
-    const auto p_end = int_sequence_generator<int, uint64_t>::end(0);
+    auto p_it = traits::int_sequence_generator<int, uint64_t>::begin(0);
+    const auto p_end = traits::int_sequence_generator<int, uint64_t>::end(0);
     EXPECT_TRUE(p_it == p_end);
     EXPECT_EQ(*p_it, std::uint64_t{0});
 
@@ -401,8 +469,8 @@ TEST(FixedNum, TypeTraits)
 
     // 16-bit word specialization: `detail::bit_width` probes the standard
     // unsigned word types and finds this one.
-    EXPECT_TRUE((int_sequence_generator_traits<test_ud_short, uint16_t>::is_specialized));
-    EXPECT_EQ((int_sequence_generator_traits<test_ud_short, uint16_t>::word_bits), std::size_t{16});
+    EXPECT_TRUE((detail::int_sequence_generator_traits<test_ud_short, uint16_t>::is_specialized));
+    EXPECT_EQ((detail::int_sequence_generator_traits<test_ud_short, uint16_t>::word_bits), std::size_t{16});
     test_ud_short us{1, 2}; // (2 << 16) | 1 -> 16 + bit_width(2) = 18
     EXPECT_EQ(detail::bit_width(us), std::size_t{18});
     constexpr test_ud_short cus{3, 5}; // (5 << 16) | 3 -> 16 + bit_width(5) = 19
