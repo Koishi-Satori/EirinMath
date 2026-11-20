@@ -280,7 +280,7 @@ public:
 
 #define EIRIN_MATRIX_FUNC_ACCESSES_IMPL(name, ...)                    \
     {                                                                 \
-        return detail::__matrix_get_##name /**/ (*this, __VA_ARGS__); \
+        return detail::matrix::get_##name /**/ (*this, __VA_ARGS__); \
     }
 
     /**
@@ -597,12 +597,12 @@ EIRIN_MATH_FUNC_API typename tmat<4, 4, T>::row_type operator*(typename tmat<4, 
     return typename tmat<4, 4, T>::row_type(dot(mat[0], vec), dot(mat[1], vec), dot(mat[2], vec), dot(mat[3], vec));
 }
 
-namespace detail
+namespace detail::matrix
 {
     // this might be optimized to SIMD by compiler.
     // TODO: implement SIMD version further.
     template <typename T>
-    EIRIN_MATH_FUNC_API tmat<4, 4, T> __mat4x4mul4x4(const tmat<4, 4, T>& mat1, const tmat<4, 4, T>& mat2) noexcept
+    EIRIN_MATH_FUNC_API tmat<4, 4, T> multiply(const tmat<4, 4, T>& mat1, const tmat<4, 4, T>& mat2) noexcept
     {
         using col_type = typename tmat<4, 4, T>::col_type;
         const col_type& a0 = mat1[0];
@@ -633,12 +633,12 @@ namespace detail
 
         return tmat<4, 4, T>(tmp0, tmp1, tmp2, tmp3);
     }
-} // namespace detail
+} // namespace detail::matrix
 
 template <typename T>
 EIRIN_MATH_FUNC_API tmat<4, 4, T> operator*(const tmat<4, 4, T>& mat1, const tmat<4, 4, T>& mat2) noexcept
 {
-    return detail::__mat4x4mul4x4(mat1, mat2);
+    return detail::matrix::multiply(mat1, mat2);
 }
 
 // TODO: add multiply with other shape of matrix later. (4x4 * 2x4/3x4)

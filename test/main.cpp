@@ -160,9 +160,9 @@ struct element_compute_epsilon<test_traits_epsilon>
 // user-defined big-int: split into two uint64 words (lo first, little-endian).
 template <eirin::detail::bit_width_word OutType>
 requires std::is_same_v<OutType, std::uint64_t>
-struct eirin::traits::int_sequence_generator<test_ud_int, OutType> : eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>
+struct eirin::traits::int_sequence_generator<test_ud_int, OutType> : eirin::detail::int_sequence_generator_base<test_ud_int, OutType>
 {
-    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_int, OutType>;
+    using base_t = eirin::detail::int_sequence_generator_base<test_ud_int, OutType>;
     static constexpr bool is_specialized = true;
 
     struct it
@@ -209,9 +209,9 @@ struct test_ud_short
 
 template <>
 struct eirin::traits::int_sequence_generator<test_ud_short, unsigned short>
-    : eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>
+    : eirin::detail::int_sequence_generator_base<test_ud_short, unsigned short>
 {
-    using base_t = eirin::detail::__int_sequence_generator_base<test_ud_short, unsigned short>;
+    using base_t = eirin::detail::int_sequence_generator_base<test_ud_short, unsigned short>;
     static constexpr bool is_specialized = true;
 
     struct it
@@ -396,7 +396,7 @@ TEST(FixedNum, ValidateSigned128)
 #endif // _MSC_VER
 
 // Customize the nearly_* comparison epsilon for one dedicated test type.
-namespace eirin::detail
+namespace eirin::traits
 {
     using custom_nearly_fixed = eirin::fixed_num<std::int16_t, std::int32_t, 8, true>;
     template <>
@@ -405,7 +405,7 @@ namespace eirin::detail
         static constexpr bool is_specialized = true;
         static constexpr custom_nearly_fixed value = custom_nearly_fixed::from_internal_value(4096);
     };
-} // namespace eirin::detail
+} // namespace eirin::traits
 
 TEST(FixedNum, TypeTraits)
 {
@@ -479,7 +479,7 @@ TEST(FixedNum, TypeTraits)
 
 TEST(FixedNum, CustomNearlyCompareEpsilon)
 {
-    using custom = eirin::detail::custom_nearly_fixed;
+    using custom = eirin::traits::custom_nearly_fixed;
     EXPECT_EQ(custom::nearly_compare_epsilon().internal_value(), 4096);
     // Library typedefs keep the built-in epsilon 5/2^16.
     EXPECT_EQ(fixed32::nearly_compare_epsilon().internal_value(), 5);

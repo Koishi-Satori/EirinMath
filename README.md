@@ -429,9 +429,11 @@ For custom scalar behavior outside integer arithmetic, specialize:
   scalar type in APIs that require a fractional type, such as matrix inverse;
 - `eirin::traits::element_compute_epsilon<my_scalar>` to provide the epsilon
   used by element-wise nearly comparisons.
+- `eirin::traits::nearly_compare_epsilon<my_fixed>` to override the epsilon
+  used by a fixed-point type's `nearly_*` comparisons.
 
 ```c++
-namespace eirin::detail
+namespace eirin::traits
 {
 template <>
 struct is_integral<my_int> : public std::true_type
@@ -440,7 +442,7 @@ struct is_integral<my_int> : public std::true_type
 template <>
 struct is_signed<my_int> : public std::true_type
 {};
-} // namespace eirin::detail
+} // namespace eirin::traits
 
 namespace std
 {
@@ -474,7 +476,7 @@ Two more traits are optional:
   generic path.
 
 ```c++
-namespace eirin::detail
+namespace eirin::traits
 {
 template <>
 struct make_unsigned<my_int>
@@ -487,13 +489,13 @@ struct make_signed<my_uint, true>
 {
     using type = my_int;
 };
-} // namespace eirin::detail
+} // namespace eirin::traits
 ```
 
 - `eirin::traits::int_sequence_generator<my_int, Word>` lets `detail::bit_width` (and
   therefore `fixed_num::bit_width()`) split a big integer into words instead of
   using the slower generic loop. Inherit
-  `eirin::detail::__int_sequence_generator_base`, set
+  `eirin::detail::int_sequence_generator_base`, set
   `is_specialized = true`, and provide `constexpr` `begin()`/`end()` returning
   an iterator with `operator*`, `operator++` and `operator!=`. Words are
   yielded least significant first; `test/main.cpp` contains working examples

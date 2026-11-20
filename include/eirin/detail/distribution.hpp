@@ -244,7 +244,7 @@ public:
     FixedType operator()(_UniformRandomBitGeneratorAdapter& a, const param_type& param)
     {
         // the m_param and the underlying distribution should be consistent, so just call m_dist.operator()
-        auto raw_val = m_dist(a.__underlying_engine(), param.to_underlying());
+        auto raw_val = m_dist(a.get_underlying_engine(), param.to_underlying());
         return FixedType::template from_fixed_num_value<result_type::precision>(static_cast<value_type>(raw_val));
     }
 

@@ -41,7 +41,7 @@ constexpr inline fixed64 f64_min = fixed64::from_internal_value(0x80000000000000
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 {
-    return T::from_internal_value(detail::__any_int_traits<typename T::value_type>::max);
+    return T::from_internal_value(detail::any_int_traits<typename T::value_type>::max);
 }
 
 /**
@@ -53,7 +53,7 @@ EIRIN_MATH_SMALL_FUNC_API T max_value() noexcept
 template <fixed_point T>
 EIRIN_MATH_SMALL_FUNC_API T min_value() noexcept
 {
-    return T::from_internal_value(detail::__any_int_traits<typename T::value_type>::min);
+    return T::from_internal_value(detail::any_int_traits<typename T::value_type>::min);
 }
 
 /**
@@ -473,8 +473,8 @@ EIRIN_MATH_FUNC_API fixed_num<T, I, f, r> sin(fixed_num<T, I, f, r> fp) noexcept
             using wide = fixed_num<T, I, best_wide_fraction, r>;
             constexpr I scale = static_cast<I>(1) << (best_wide_fraction - f);
             const I scaled = static_cast<I>(fp.internal_value()) * scale;
-            if(scaled >= static_cast<I>(detail::__any_int_traits<T>::min) &&
-               scaled <= static_cast<I>(detail::__any_int_traits<T>::max))
+            if(scaled >= static_cast<I>(detail::any_int_traits<T>::min) &&
+               scaled <= static_cast<I>(detail::any_int_traits<T>::max))
             {
                 const wide wx = wide::from_internal_value(static_cast<T>(scaled));
                 const wide wres = detail::sin_minimax<T, I, f, r, pi>(wx);

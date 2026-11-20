@@ -58,7 +58,7 @@ namespace detail
     {
         EIRIN_MATH_FUNC_API static tmat<C, R, T> eval([[maybe_unused]] const tmat<C, R, T>& mat) noexcept
         {
-            static_assert(__always_false<T>, "this operation is not allowed for this shape of mat.");
+            static_assert(always_false<T>, "this operation is not allowed for this shape of mat.");
         }
     };
 
@@ -67,7 +67,7 @@ namespace detail
     {
         EIRIN_MATH_FUNC_API static typename tmat<C, R, T>::transpose_type eval([[maybe_unused]] const tmat<C, R, T>& mat) noexcept
         {
-            static_assert(__always_false<T>, "this operation is not allowed for this shape of mat.");
+            static_assert(always_false<T>, "this operation is not allowed for this shape of mat.");
         }
     };
 
@@ -77,7 +77,7 @@ namespace detail
     {
         EIRIN_MATH_FUNC_API static T eval([[maybe_unused]] const tmat<C, R, T>& mat) noexcept
         {
-            static_assert(__always_false<T>, "this operation is not allowed for this shape of mat.");
+            static_assert(always_false<T>, "this operation is not allowed for this shape of mat.");
         }
     };
 } // namespace detail

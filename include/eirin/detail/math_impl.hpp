@@ -329,7 +329,7 @@ namespace detail
         if constexpr(os == overflow_strategy::SATURATION)
         {
             if(k > static_cast<I>(fixed::digits_int) + 2)
-                return fixed::from_internal_value(__any_int_traits<T>::max);
+                return fixed::from_internal_value(any_int_traits<T>::max);
             if constexpr(traits::is_signed_v<I>)
             {
                 if(k < -static_cast<I>(f) - 3)
@@ -410,8 +410,8 @@ namespace detail
 
         if constexpr(os == overflow_strategy::SATURATION)
         {
-            if(v > static_cast<I>(__any_int_traits<T>::max))
-                return fixed::from_internal_value(__any_int_traits<T>::max);
+            if(v > static_cast<I>(any_int_traits<T>::max))
+                return fixed::from_internal_value(any_int_traits<T>::max);
         }
         return fixed::from_internal_value(static_cast<T>(v));
     }
@@ -422,8 +422,8 @@ namespace detail
     template <typename T, typename I, unsigned int f>
     struct pow_scales
     {
-        static constexpr unsigned int digits = static_cast<unsigned int>(detail::__eval_max_bit_width<T>());
-        static constexpr unsigned int I_bits = static_cast<unsigned int>(detail::__eval_max_bit_width<I>());
+        static constexpr unsigned int digits = static_cast<unsigned int>(detail::max_bit_width<T>());
+        static constexpr unsigned int I_bits = static_cast<unsigned int>(detail::max_bit_width<I>());
         static constexpr unsigned int digits_int = digits - f;
         // mantissa reduction scale, never below f so all shifts are non-negative
         static constexpr unsigned int bf = []() constexpr -> unsigned int
@@ -629,7 +629,7 @@ namespace detail
 
         // saturation for out-of-range exponents
         if(k > static_cast<J>(digits_int) + 2)
-            return fixed::from_internal_value(__any_int_traits<T>::max);
+            return fixed::from_internal_value(any_int_traits<T>::max);
         if constexpr(traits::is_signed_v<J>)
         {
             if(k < -static_cast<J>(f) - 3)
@@ -739,8 +739,8 @@ namespace detail
             v = e_r << sh;
         else
             v = (e_r + (static_cast<J>(1) << (-sh - 1))) >> (-sh);
-        if(v > static_cast<J>(__any_int_traits<T>::max))
-            v = static_cast<J>(__any_int_traits<T>::max);
+        if(v > static_cast<J>(any_int_traits<T>::max))
+            v = static_cast<J>(any_int_traits<T>::max);
         return fixed::from_internal_value(static_cast<T>(v));
     }
 
@@ -1047,7 +1047,7 @@ namespace detail
     template <typename T, typename I, unsigned int f>
     struct cbrt_frexp_scales
     {
-        static constexpr unsigned int digits = static_cast<unsigned int>(detail::__eval_max_bit_width<T>());
+        static constexpr unsigned int digits = static_cast<unsigned int>(detail::max_bit_width<T>());
         // extend to f + e_max / 3 + 4
         static constexpr unsigned int fraction = f + (digits - f) / 3u + 4u;
     };

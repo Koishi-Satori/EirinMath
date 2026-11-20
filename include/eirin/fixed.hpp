@@ -36,7 +36,7 @@ namespace eirin
 namespace detail
 {
     template <typename T>
-    consteval std::size_t __eval_max_bit_width() noexcept
+    consteval std::size_t max_bit_width() noexcept
     {
         if constexpr(std::numeric_limits<T>::is_specialized && std::numeric_limits<T>::radix == 2)
         {
@@ -58,7 +58,7 @@ namespace detail
 
 // if the type is unsigned type, then the fraction <= bit width, else <= bit width - 1.
 template <typename Type, unsigned int fraction>
-concept fixed_num_fraction = fraction > 0 && fraction <= static_cast<int>(detail::__eval_max_bit_width<Type>());
+concept fixed_num_fraction = fraction > 0 && fraction <= static_cast<int>(detail::max_bit_width<Type>());
 
 template <typename Type, typename IntermediateType>
 concept fixed_num_size = sizeof(IntermediateType) > sizeof(Type);
@@ -101,7 +101,7 @@ public:
     static constexpr inline auto precision = fraction;
     static constexpr inline bool is_round_enable = rounding;
     // indicates the binary digits of the fixed number(internal representation)
-    static constexpr inline auto digits = detail::__eval_max_bit_width<Type>();
+    static constexpr inline auto digits = detail::max_bit_width<Type>();
     // indicates the binary digits of the integral part of the fixed number
     static constexpr inline auto digits_int = digits - fraction;
 
@@ -115,9 +115,9 @@ private:
     // represent value 1.0, and for UQ0.n, this shoule always be 0.0.
     static constexpr Type raw_value_one = (precision == digits) ? static_cast<Type>(0) : static_cast<Type>(1) << fraction;
 
-    static constexpr Type raw_value_max = detail::__any_int_traits<Type>::max;
+    static constexpr Type raw_value_max = detail::any_int_traits<Type>::max;
 
-    static constexpr Type raw_value_min = detail::__any_int_traits<Type>::min;
+    static constexpr Type raw_value_min = detail::any_int_traits<Type>::min;
 
     constexpr inline fixed_num(Type val, raw_value_construct_tag) noexcept
         : m_value(val) {};
@@ -220,14 +220,14 @@ public:
      * @brief Get the epsilon used by the nearly_* comparison functions.
      *
      * Defaults to 5/2^16 = 0.0000762939453125. Specialize
-     * `eirin::detail::nearly_compare_epsilon<fixed_num>` to customize the
+     * `eirin::traits::nearly_compare_epsilon<fixed_num>` to customize the
      * epsilon for a fixed point type.
      *
      * @return the comparison epsilon of this fixed point type.
      */
     static constexpr fixed_num nearly_compare_epsilon()
     {
-        using custom_epsilon = detail::nearly_compare_epsilon<fixed_num>;
+        using custom_epsilon = traits::nearly_compare_epsilon<fixed_num>;
         if constexpr(custom_epsilon::is_specialized)
             return custom_epsilon::value;
         // 5/2^16 = 0.0000762939453125
@@ -1175,7 +1175,7 @@ namespace detail
         }
 
         // check overflow
-        if(fixed_value > static_cast<I>(detail::__any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::__any_int_traits<T>::min))
+        if(fixed_value > static_cast<I>(detail::any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::any_int_traits<T>::min))
         {
             return false;
         }
@@ -1442,7 +1442,7 @@ constexpr bool fixed_from_cstring(const char* str, size_t len, fixed_num<T, I, f
     }
 
     // check overflow
-    if(fixed_value > static_cast<I>(detail::__any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::__any_int_traits<T>::min))
+    if(fixed_value > static_cast<I>(detail::any_int_traits<T>::max) || fixed_value < static_cast<I>(detail::any_int_traits<T>::min))
     {
         return false;
     }
@@ -1545,7 +1545,7 @@ struct numeric_limits<eirin::fixed_num<T, I, f, r>>
         // n * log10(2) is at least 1.4e-3 away from the nearest integer,
         // far larger than the accumulated approximation error, so the
         // integer division yields the exact floor value.
-        constexpr int n = static_cast<int>(eirin::detail::__eval_max_bit_width<T>());
+        constexpr int n = static_cast<int>(eirin::detail::max_bit_width<T>());
         return n * 643 / 2136;
     }
 

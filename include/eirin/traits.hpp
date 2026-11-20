@@ -24,7 +24,7 @@ concept bit_width_word =
  * @brief Common CRTP base for user-provided int_sequence_generator types.
  */
 template <typename InType, bit_width_word OutType>
-struct __int_sequence_generator_base
+struct int_sequence_generator_base
 {
     using word_type = OutType;
 
@@ -117,11 +117,11 @@ using make_signed_t = typename make_signed<T>::type;
 
 // std::make_unsigned is not SFINAE-friendly in libstdc++, so gate it first.
 template <typename T, bool = (std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>) || std::is_enum_v<T>>
-struct __std_make_unsigned
+struct std_make_unsigned
 {};
 
 template <typename T>
-struct __std_make_unsigned<T, true>
+struct std_make_unsigned<T, true>
 {
     using type = typename std::make_unsigned<T>::type;
 };
@@ -131,9 +131,9 @@ struct make_unsigned
 {};
 
 template <typename T>
-struct make_unsigned<T, std::void_t<typename __std_make_unsigned<T>::type>>
+struct make_unsigned<T, std::void_t<typename std_make_unsigned<T>::type>>
 {
-    using type = typename __std_make_unsigned<T>::type;
+    using type = typename std_make_unsigned<T>::type;
 };
 
 template <typename T>
@@ -151,6 +151,18 @@ struct element_compute_epsilon
     {
         return T{1e-6};
     }
+};
+
+/**
+ * @brief Epsilon used by the nearly_* comparisons of a fixed-point type.
+ *
+ * A specialization must set `is_specialized` to `true` and provide a static
+ * constexpr `value` of the fixed-point type.
+ */
+template <typename T>
+struct nearly_compare_epsilon
+{
+    static constexpr bool is_specialized = false;
 };
 
 /**
@@ -178,12 +190,12 @@ inline constexpr bool is_fractional_scalar_v = is_fractional_scalar<std::remove_
  * and provide constexpr begin(const InType&) and end(const InType&) iterators.
  */
 template <typename InType, detail::bit_width_word OutType>
-struct int_sequence_generator : detail::__int_sequence_generator_base<InType, OutType>
+struct int_sequence_generator : detail::int_sequence_generator_base<InType, OutType>
 {
-    using word_type = typename detail::__int_sequence_generator_base<InType, OutType>::word_type;
+    using word_type = typename detail::int_sequence_generator_base<InType, OutType>::word_type;
 
 private:
-    struct __default_iterator : detail::__int_sequence_generator_base<InType, OutType>::template iterator<__default_iterator>
+    struct default_iterator : detail::int_sequence_generator_base<InType, OutType>::template iterator<default_iterator>
     {
         using value_type = OutType;
         using difference_type = std::size_t;
@@ -194,7 +206,7 @@ private:
 
         constexpr void move_backward() noexcept {}
 
-        constexpr bool equal_to([[maybe_unused]] const __default_iterator& other) const noexcept
+        constexpr bool equal_to([[maybe_unused]] const default_iterator& other) const noexcept
         {
             return true;
         }
@@ -208,19 +220,19 @@ private:
         value_type zero_value{0};
     };
 
-    static constexpr const inline __default_iterator __iter_instance{};
+    static constexpr const inline default_iterator default_iter_instance{};
 
 public:
     static constexpr const inline bool is_specialized = false;
 
-    static constexpr inline __default_iterator begin([[maybe_unused]] const InType& input) noexcept
+    static constexpr inline default_iterator begin([[maybe_unused]] const InType& input) noexcept
     {
-        return __iter_instance;
+        return default_iter_instance;
     }
 
-    static constexpr inline __default_iterator end([[maybe_unused]] const InType& input) noexcept
+    static constexpr inline default_iterator end([[maybe_unused]] const InType& input) noexcept
     {
-        return __iter_instance;
+        return default_iter_instance;
     }
 };
 } // namespace eirin::traits

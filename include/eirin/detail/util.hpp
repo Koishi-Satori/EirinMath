@@ -174,7 +174,7 @@ namespace lut
         return lut;
     }
 
-    inline fixed64 __sin(fixed64 x)
+    inline fixed64 lut_sin(fixed64 x)
     {
         auto val = std::sin((double)x);
         return fixed64(val);
@@ -183,7 +183,7 @@ namespace lut
     template <size_t N = 512>
     fixed64 lut_calc_sin(fixed64 x)
     {
-        static auto lut = func_ptr_lut<N>(__sin);
+        static auto lut = func_ptr_lut<N>(lut_sin);
         // linear interpolation
         constexpr auto two_pi = eirin::numbers::pi_f64 * 2_f64;
         auto x_mod = x - two_pi * (x / two_pi).integral_part();

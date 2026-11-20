@@ -261,7 +261,7 @@ public:
 
 #define EIRIN_MATRIX_FUNC_ACCESSES_IMPL(name, ...)                    \
     {                                                                 \
-        return detail::__matrix_get_##name /**/ (*this, __VA_ARGS__); \
+        return detail::matrix::get_##name /**/ (*this, __VA_ARGS__); \
     }
 
     /**
@@ -557,12 +557,12 @@ EIRIN_MATH_FUNC_API typename tmat<3, 3, T>::row_type operator*(typename tmat<3, 
     return typename tmat<3, 3, T>::row_type(dot(mat[0], vec), dot(mat[1], vec), dot(mat[2], vec));
 }
 
-namespace detail
+namespace detail::matrix
 {
     // this might be optimized to SIMD by compiler.
     // TODO: implement SIMD version further.
     template <typename T>
-    EIRIN_MATH_FUNC_API tmat<3, 3, T> __mat3x3mul3x3(const tmat<3, 3, T>& mat1, const tmat<3, 3, T>& mat2) noexcept
+    EIRIN_MATH_FUNC_API tmat<3, 3, T> multiply(const tmat<3, 3, T>& mat1, const tmat<3, 3, T>& mat2) noexcept
     {
         using col_type = typename tmat<3, 3, T>::col_type;
         const col_type& a0 = mat1[0];
@@ -584,12 +584,12 @@ namespace detail
 
         return tmat<3, 3, T>(tmp0, tmp1, tmp2);
     }
-} // namespace detail
+} // namespace detail::matrix
 
 template <typename T>
 EIRIN_MATH_FUNC_API tmat<3, 3, T> operator*(const tmat<3, 3, T>& mat1, const tmat<3, 3, T>& mat2) noexcept
 {
-    return detail::__mat3x3mul3x3(mat1, mat2);
+    return detail::matrix::multiply(mat1, mat2);
 }
 
 template <typename T>

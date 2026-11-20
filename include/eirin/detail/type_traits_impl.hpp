@@ -46,40 +46,44 @@ inline constexpr bool has_make_unsigned_v = has_make_unsigned<T>::value;
 // by GCC as soon as the template is parsed, even if no specialization is ever
 // instantiated.
 template <typename...>
-inline constexpr bool __always_false = false;
+inline constexpr bool always_false = false;
+
+// Not used yet, maybe later.
+template <typename...>
+inline constexpr bool always_true = true;
 
 /**
  * @brief Picks the first word type, in priority order, with a generator.
  */
 template <typename T, typename... Words>
-struct __generator_word_selector;
+struct generator_word_selector;
 
 template <typename T>
-struct __generator_word_selector<T>
+struct generator_word_selector<T>
 {
     static constexpr bool specialized = false;
     using word_type = void;
 };
 
 template <typename T, typename Word, typename... Rest>
-struct __generator_word_selector<T, Word, Rest...>
+struct generator_word_selector<T, Word, Rest...>
 {
     static constexpr bool specialized =
         int_sequence_generator_traits<T, Word>::is_specialized ||
-        __generator_word_selector<T, Rest...>::specialized;
+        generator_word_selector<T, Rest...>::specialized;
 
     using word_type = std::conditional_t<
         int_sequence_generator_traits<T, Word>::is_specialized,
         Word,
-        typename __generator_word_selector<T, Rest...>::word_type>;
+        typename generator_word_selector<T, Rest...>::word_type>;
 };
 
 template <typename T, typename = void>
-struct __can_apply_bit_width : std::false_type
+struct can_apply_bit_width : std::false_type
 {};
 
 template <typename T>
-struct __can_apply_bit_width<T, std::void_t<decltype(std::bit_width(std::declval<T>()))>> : std::true_type
+struct can_apply_bit_width<T, std::void_t<decltype(std::bit_width(std::declval<T>()))>> : std::true_type
 {};
 
 /**
@@ -92,11 +96,11 @@ struct __can_apply_bit_width<T, std::void_t<decltype(std::bit_width(std::declval
 template <typename T>
 EIRIN_MATH_FUNC_API std::size_t bit_width(T value) noexcept
 {
-    if constexpr(__can_apply_bit_width<T>::value)
+    if constexpr(can_apply_bit_width<T>::value)
     {
         return std::bit_width(value);
     }
-    else if constexpr(__generator_word_selector<
+    else if constexpr(generator_word_selector<
                           T,
                           unsigned long long,
                           unsigned long,
@@ -104,7 +108,7 @@ EIRIN_MATH_FUNC_API std::size_t bit_width(T value) noexcept
                           unsigned short,
                           unsigned char>::specialized)
     {
-        using selector = __generator_word_selector<
+        using selector = generator_word_selector<
             T,
             unsigned long long,
             unsigned long,

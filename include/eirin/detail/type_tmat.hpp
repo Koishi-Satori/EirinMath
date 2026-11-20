@@ -49,9 +49,11 @@ namespace detail
     template <std::size_t C, std::size_t R>
     concept square_matrix = C == R;
 
+namespace matrix
+{
     template <typename size_type, size_type N>
     [[nodiscard]]
-    EIRIN_ALWAYS_INLINE constexpr size_type __wrap_matrix_element_index(std::integral auto i) noexcept
+    EIRIN_ALWAYS_INLINE constexpr size_type wrap_index(std::integral auto i) noexcept
     {
         if constexpr(std::is_signed_v<decltype(i)>)
         {
@@ -65,6 +67,7 @@ namespace detail
             return static_cast<size_type>(i) % N;
         }
     }
+} // namespace matrix
 } // namespace detail
 
 template <typename T>
@@ -79,8 +82,10 @@ struct tmat;
 
 namespace detail
 {
+namespace matrix
+{
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_at(tmat<C, R, T>& mat, std::integral auto i)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_at(tmat<C, R, T>& mat, std::integral auto i)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type size = tmat<C, R, T>::size();
@@ -94,7 +99,7 @@ namespace detail
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_at(const tmat<C, R, T>& mat, std::integral auto i)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_at(const tmat<C, R, T>& mat, std::integral auto i)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type size = tmat<C, R, T>::size();
@@ -108,7 +113,7 @@ namespace detail
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_at(tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_at(tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type rows = tmat<C, R, T>::rows(), cols = tmat<C, R, T>::cols();
@@ -122,7 +127,7 @@ namespace detail
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_at(const tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_at(const tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type rows = tmat<C, R, T>::rows(), cols = tmat<C, R, T>::cols();
@@ -136,43 +141,44 @@ namespace detail
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_element(tmat<C, R, T>& mat, std::integral auto i)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_element(tmat<C, R, T>& mat, std::integral auto i)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type size = tmat<C, R, T>::size();
-        return mat[__wrap_matrix_element_index<size_type, size>(i)];
+        return mat[wrap_index<size_type, size>(i)];
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_element(const tmat<C, R, T>& mat, std::integral auto i)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_element(const tmat<C, R, T>& mat, std::integral auto i)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type size = tmat<C, R, T>::size();
-        return mat[__wrap_matrix_element_index<size_type, size>(i)];
+        return mat[wrap_index<size_type, size>(i)];
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_element(tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_element(tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type rows = tmat<C, R, T>::rows(), cols = tmat<C, R, T>::cols();
 
-        size_type r_index = __wrap_matrix_element_index<size_type, rows>(r);
-        size_type c_index = __wrap_matrix_element_index<size_type, cols>(c);
+        size_type r_index = wrap_index<size_type, rows>(r);
+        size_type c_index = wrap_index<size_type, cols>(c);
         return mat[c_index][r_index];
     }
 
     template <std::size_t C, std::size_t R, typename T>
-    EIRIN_ALWAYS_INLINE constexpr decltype(auto) __matrix_get_element(const tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
+    EIRIN_ALWAYS_INLINE constexpr decltype(auto) get_element(const tmat<C, R, T>& mat, std::integral auto r, std::integral auto c)
     {
         using size_type = typename tmat<C, R, T>::size_type;
         constexpr size_type rows = tmat<C, R, T>::rows(), cols = tmat<C, R, T>::cols();
 
-        size_type r_index = __wrap_matrix_element_index<size_type, rows>(r);
-        size_type c_index = __wrap_matrix_element_index<size_type, cols>(c);
+        size_type r_index = wrap_index<size_type, rows>(r);
+        size_type c_index = wrap_index<size_type, cols>(c);
         return mat[c_index][r_index];
     }
 
+} // namespace matrix
 } // namespace detail
 } // namespace eirin
 

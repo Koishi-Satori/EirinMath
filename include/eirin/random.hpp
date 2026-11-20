@@ -34,7 +34,7 @@ namespace detail
      *         full-width `x ^ (x >> 8)` output mixing.
      */
     template <typename Word>
-    EIRIN_ALWAYS_INLINE constexpr Word __pcg_mix(Word x, Word increment, Word xor_multiplier, Word mix_multiplier) noexcept
+    EIRIN_ALWAYS_INLINE constexpr Word pcg_mix(Word x, Word increment, Word xor_multiplier, Word mix_multiplier) noexcept
     {
         x = (x ^ (x >> 8)) + increment;
         x = (x * static_cast<Word>(0x100)) ^ x;
@@ -43,12 +43,12 @@ namespace detail
         return x;
     }
 
-    template <typename FixedType, typename _RandomNumberEngine>
+    template <typename FixedType, typename RandomNumberEngine>
     concept fixed_random_engine_type_check = requires {
         requires is_fixed_point_v<FixedType>;
-        requires std::uniform_random_bit_generator<_RandomNumberEngine>;
-        requires sizeof(typename FixedType::value_type) <= sizeof(typename _RandomNumberEngine::result_type);
-        { FixedType::template from_fixed_num_value<FixedType::precision>(static_cast<typename FixedType::value_type>(_RandomNumberEngine()())) } -> std::same_as<FixedType>;
+        requires std::uniform_random_bit_generator<RandomNumberEngine>;
+        requires sizeof(typename FixedType::value_type) <= sizeof(typename RandomNumberEngine::result_type);
+        { FixedType::template from_fixed_num_value<FixedType::precision>(static_cast<typename FixedType::value_type>(RandomNumberEngine()())) } -> std::same_as<FixedType>;
     };
 } // namespace detail
 
@@ -84,8 +84,8 @@ protected:
             const uint32_t xm = static_cast<uint32_t>(xor_multiplier);
             const uint32_t mm = static_cast<uint32_t>(mix_multiplier);
 
-            const uint32_t raw0 = detail::__pcg_mix<uint32_t>(c * mul + s, inc, xm, mm);
-            const uint32_t raw1 = detail::__pcg_mix<uint32_t>((c + 1u) * mul + s, inc, xm, mm);
+            const uint32_t raw0 = detail::pcg_mix<uint32_t>(c * mul + s, inc, xm, mm);
+            const uint32_t raw1 = detail::pcg_mix<uint32_t>((c + 1u) * mul + s, inc, xm, mm);
             m_state = static_cast<UIntType>(c) + UIntType{2};
 
             const UIntType out0 = static_cast<UIntType>(raw0 ^ (raw0 >> 8));
@@ -94,7 +94,7 @@ protected:
         }
         else
         {
-            const UIntType raw = detail::__pcg_mix<UIntType>(
+            const UIntType raw = detail::pcg_mix<UIntType>(
                 m_state * multiplier + m_seed, increment, xor_multiplier, mix_multiplier
             );
             ++m_state;
@@ -191,18 +191,18 @@ inline std::basic_ostream<charT, charTraits>& operator<<(std::basic_ostream<char
 }
 
 /**
- * @brief A adapter for standard random engines to support fixed point types, which fits RandomNumberEngine requirements.
+ * @brief An adapter for standard random engines to support fixed point types, which fits RandomNumberEngine requirements.
  *
  * @tparam FixedType Fixed point type, must satisfy concept `is_fixed_point_v`.
- * @tparam _RandomNumberEngine The underlying random number engine type.
+ * @tparam RandomNumberEngine The underlying random number engine type.
  */
-template <typename FixedType, typename _RandomNumberEngine>
-requires detail::fixed_random_engine_type_check<FixedType, _RandomNumberEngine>
+template <typename FixedType, typename RandomNumberEngine>
+requires detail::fixed_random_engine_type_check<FixedType, RandomNumberEngine>
 class fixed_random_engine_adapter
 {
 public:
     typedef FixedType result_type;
-    typedef _RandomNumberEngine underlying_type;
+    typedef RandomNumberEngine underlying_type;
 
     fixed_random_engine_adapter() = default;
 
@@ -261,7 +261,7 @@ public:
         return is;
     }
 
-    underlying_type& __underlying_engine()
+    underlying_type& get_underlying_engine()
     {
         return m_engine;
     }

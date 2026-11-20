@@ -120,7 +120,7 @@ The base class also provides:
   for 3-component vectors the usual vector cross product;
 - ``nearly_eq(rhs)``: tolerance-based comparison, component-wise. Fixed
   point components use the epsilon configured through
-  ``detail::nearly_compare_epsilon``; built-in floating point components use
+  ``traits::nearly_compare_epsilon``; built-in floating point components use
   a per-type epsilon.
 
 .. code-block:: c++

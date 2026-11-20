@@ -389,9 +389,10 @@ res = eirin::saturating_cast(INT64_MAX);   // INT32_MAX
 
 - `eirin::traits::is_fractional_scalar<my_scalar>`：让自定义标量类型可用于矩阵 `inverse` 等需要小数类型的 API；
 - `eirin::traits::element_compute_epsilon<my_scalar>`：为逐元素 nearly 比较提供 epsilon。
+- `eirin::traits::nearly_compare_epsilon<my_fixed>`：覆盖某个定点数类型用于 `nearly_*` 比较的 epsilon。
 
 ```c++
-namespace eirin::detail
+namespace eirin::traits
 {
 template <>
 struct is_integral<my_int> : public std::true_type
@@ -400,7 +401,7 @@ struct is_integral<my_int> : public std::true_type
 template <>
 struct is_signed<my_int> : public std::true_type
 {};
-} // namespace eirin::detail
+} // namespace eirin::traits
 
 namespace std
 {
@@ -428,7 +429,7 @@ public:
 - `eirin::traits::make_unsigned<my_int>`，以及无符号类型对应的 `make_signed`，用于启用 `saturating_*` 的无分支溢出路径；当该类型用作 `fixed_num` 存储类型时，这个 trait 是必需的。没有对应无符号类型时，饱和助手会检测到并回退到通用路径。
 
 ```c++
-namespace eirin::detail
+namespace eirin::traits
 {
 template <>
 struct make_unsigned<my_int>
@@ -441,10 +442,10 @@ struct make_signed<my_uint, true>
 {
     using type = my_int;
 };
-} // namespace eirin::detail
+} // namespace eirin::traits
 ```
 
-- `eirin::traits::int_sequence_generator<my_int, Word>` 可以让 `detail::bit_width` 以及 `fixed_num::bit_width()` 按 word 拆分大整数，避免使用较慢的通用循环。继承 `eirin::detail::__int_sequence_generator_base`，设置 `is_specialized = true`，并提供返回迭代器的 `constexpr begin()` / `end()`；迭代器需要支持 `operator*`、`operator++` 和 `operator!=`。word 按最低有效位在前输出；`test/main.cpp` 中有 64 位和 16 位 word 类型的完整示例。
+- `eirin::traits::int_sequence_generator<my_int, Word>` 可以让 `detail::bit_width` 以及 `fixed_num::bit_width()` 按 word 拆分大整数，避免使用较慢的通用循环。继承 `eirin::detail::int_sequence_generator_base`，设置 `is_specialized = true`，并提供返回迭代器的 `constexpr begin()` / `end()`；迭代器需要支持 `operator*`、`operator++` 和 `operator!=`。word 按最低有效位在前输出；`test/main.cpp` 中有 64 位和 16 位 word 类型的完整示例。
 
 ## 构建与测试
 

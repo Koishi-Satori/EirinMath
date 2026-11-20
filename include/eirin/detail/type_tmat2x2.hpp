@@ -241,7 +241,7 @@ public:
 
 #define EIRIN_MATRIX_FUNC_ACCESSES_IMPL(name, ...)                    \
     {                                                                 \
-        return detail::__matrix_get_##name /**/ (*this, __VA_ARGS__); \
+        return detail::matrix::get_##name /**/ (*this, __VA_ARGS__); \
     }
 
     /**

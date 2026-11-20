@@ -32,14 +32,14 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
     using type = typename T::value_type;
     using intermediate_type = typename T::intermediate_type;
     type z;
-    if(!detail::__add_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
+    if(!detail::saturating::add_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
         return T::from_internal_value(z);
     if constexpr(traits::is_unsigned_v<type>)
-        return T::from_internal_value(detail::__any_int_traits<type>::max);
+        return T::from_internal_value(detail::any_int_traits<type>::max);
     else if(x < T(0))
-        return T::from_internal_value(detail::__any_int_traits<type>::min);
+        return T::from_internal_value(detail::any_int_traits<type>::min);
     else
-        return T::from_internal_value(detail::__any_int_traits<type>::max);
+        return T::from_internal_value(detail::any_int_traits<type>::max);
 }
 
 /**
@@ -57,14 +57,14 @@ EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
     using type = typename T::value_type;
     using intermediate_type = typename T::intermediate_type;
     type z;
-    if(!detail::__sub_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
+    if(!detail::saturating::sub_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z))
         return T::from_internal_value(z);
     if constexpr(traits::is_unsigned_v<type>)
         return T::from_internal_value(static_cast<type>(0));
     else if(x < T(0)) // neg - pos can neg overflow
-        return T::from_internal_value(detail::__any_int_traits<type>::min);
+        return T::from_internal_value(detail::any_int_traits<type>::min);
     else
-        return T::from_internal_value(detail::__any_int_traits<type>::max);
+        return T::from_internal_value(detail::any_int_traits<type>::max);
 }
 
 /**
@@ -84,19 +84,19 @@ EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
     constexpr bool rounding = T::is_round_enable;
     constexpr auto fraction = T::precision;
 
-    const intermediate_type res = detail::__mul_scaled<type, intermediate_type, rounding, fraction>(
+    const intermediate_type res = detail::saturating::mul_scaled<type, intermediate_type, rounding, fraction>(
         x.internal_value(), y.internal_value()
     );
 
     if constexpr(traits::is_unsigned_v<type>)
     {
-        const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
+        const intermediate_type max_v = static_cast<intermediate_type>(detail::any_int_traits<type>::max);
         return T::from_internal_value(static_cast<type>(res > max_v ? max_v : res));
     }
     else
     {
-        const intermediate_type min_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::min);
-        const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
+        const intermediate_type min_v = static_cast<intermediate_type>(detail::any_int_traits<type>::min);
+        const intermediate_type max_v = static_cast<intermediate_type>(detail::any_int_traits<type>::max);
         const intermediate_type clamped = res < min_v ? min_v : (res > max_v ? max_v : res);
         return T::from_internal_value(static_cast<type>(clamped));
     }
@@ -139,17 +139,17 @@ EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
         }
     }
 
-    const intermediate_type res = detail::__div_scaled<type, intermediate_type, rounding, fraction>(xi, yi);
+    const intermediate_type res = detail::saturating::div_scaled<type, intermediate_type, rounding, fraction>(xi, yi);
 
     if constexpr(traits::is_unsigned_v<type>)
     {
-        const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
+        const intermediate_type max_v = static_cast<intermediate_type>(detail::any_int_traits<type>::max);
         return T::from_internal_value(static_cast<type>(res > max_v ? max_v : res));
     }
     else
     {
-        const intermediate_type min_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::min);
-        const intermediate_type max_v = static_cast<intermediate_type>(detail::__any_int_traits<type>::max);
+        const intermediate_type min_v = static_cast<intermediate_type>(detail::any_int_traits<type>::min);
+        const intermediate_type max_v = static_cast<intermediate_type>(detail::any_int_traits<type>::max);
         const intermediate_type clamped = res < min_v ? min_v : (res > max_v ? max_v : res);
         return T::from_internal_value(static_cast<type>(clamped));
     }
@@ -181,8 +181,8 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
     using dst_intermediate_type = typename T::intermediate_type;
     constexpr auto src_fraction = U::precision;
     constexpr auto dst_fraction = T::precision;
-    constexpr res_type min_res = detail::__any_int_traits<res_type>::min;
-    constexpr res_type max_res = detail::__any_int_traits<res_type>::max;
+    constexpr res_type min_res = detail::any_int_traits<res_type>::min;
+    constexpr res_type max_res = detail::any_int_traits<res_type>::max;
     const auto xi = x.internal_value();
 
     if constexpr(traits::is_signed_v<type> && !traits::is_signed_v<res_type>)
@@ -258,7 +258,7 @@ EIRIN_MATH_FUNC_API T saturating_cast(U x) noexcept
 
 /// Add two integers, with saturation in case of overflow.
 template <typename T>
-requires detail::__saturating_arithmetic_type<T>
+requires detail::saturating::saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
 {
 #if defined(_MSC_VER) || defined(__clang__)
@@ -269,101 +269,101 @@ EIRIN_MATH_FUNC_API T saturating_add(T x, T y) noexcept
     // branchless will perform one extra `add` but not depend on data.
     if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
-        constexpr auto shifts = detail::__any_int_traits<T>::digits;
-        T saturated = (static_cast<traits::make_unsigned_t<T>>(y) >> shifts) + detail::__any_int_traits<T>::max;
+        constexpr auto shifts = detail::any_int_traits<T>::digits;
+        T saturated = (static_cast<traits::make_unsigned_t<T>>(y) >> shifts) + detail::any_int_traits<T>::max;
         T z;
-        bool overflowed = detail::__integral_add_overflow(x, y, std::addressof(z));
+        bool overflowed = detail::saturating::integral_add_overflow(x, y, std::addressof(z));
         return !overflowed ? z : saturated;
     }
 #endif
     T z;
-    if(!detail::__integral_add_overflow(x, y, std::addressof(z)))
+    if(!detail::saturating::integral_add_overflow(x, y, std::addressof(z)))
         return z;
     if constexpr(traits::is_unsigned_v<T>)
-        return detail::__any_int_traits<T>::max;
+        return detail::any_int_traits<T>::max;
     else if(x < 0)
-        return detail::__any_int_traits<T>::min;
+        return detail::any_int_traits<T>::min;
     else
-        return detail::__any_int_traits<T>::max;
+        return detail::any_int_traits<T>::max;
 }
 
 /// Subtract one integer from another, with saturation in case of overflow.
 template <typename T>
-requires detail::__saturating_arithmetic_type<T>
+requires detail::saturating::saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_sub(T x, T y) noexcept
 {
 #if defined(_MSC_VER) || defined(__clang__)
     if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
-        T saturated = x >= y ? detail::__any_int_traits<T>::max : detail::__any_int_traits<T>::min;
+        T saturated = x >= y ? detail::any_int_traits<T>::max : detail::any_int_traits<T>::min;
         T z;
-        bool overflowed = detail::__integral_sub_overflow(x, y, std::addressof(z));
+        bool overflowed = detail::saturating::integral_sub_overflow(x, y, std::addressof(z));
         return !overflowed ? z : saturated;
     }
 #endif
     T z;
-    if(!detail::__integral_sub_overflow(x, y, std::addressof(z)))
+    if(!detail::saturating::integral_sub_overflow(x, y, std::addressof(z)))
         return z;
     if constexpr(traits::is_unsigned_v<T>)
-        return detail::__any_int_traits<T>::min;
+        return detail::any_int_traits<T>::min;
     else if(x < 0)
-        return detail::__any_int_traits<T>::min;
+        return detail::any_int_traits<T>::min;
     else
-        return detail::__any_int_traits<T>::max;
+        return detail::any_int_traits<T>::max;
 }
 
 /// Multiply two integers, with saturation in case of overflow.
 template <typename T>
-requires detail::__saturating_arithmetic_type<T>
+requires detail::saturating::saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_mul(T x, T y) noexcept
 {
 #if defined(_MSC_VER) || defined(__clang__)
     if constexpr(traits::is_signed_v<T> && detail::has_make_unsigned_v<T>)
     {
-        T saturated = (x < 0) ^ (y < 0) ? detail::__any_int_traits<T>::min : detail::__any_int_traits<T>::max;
+        T saturated = (x < 0) ^ (y < 0) ? detail::any_int_traits<T>::min : detail::any_int_traits<T>::max;
         T z;
-        bool overflowed = detail::__integral_mul_overflow(x, y, std::addressof(z));
+        bool overflowed = detail::saturating::integral_mul_overflow(x, y, std::addressof(z));
         return !overflowed ? z : saturated;
     }
 #endif
     T z;
-    if(!detail::__integral_mul_overflow(x, y, std::addressof(z)))
+    if(!detail::saturating::integral_mul_overflow(x, y, std::addressof(z)))
         return z;
     if constexpr(traits::is_unsigned_v<T>)
-        return detail::__any_int_traits<T>::max;
+        return detail::any_int_traits<T>::max;
     else if((x < 0) ^ (y < 0))
-        return detail::__any_int_traits<T>::min;
+        return detail::any_int_traits<T>::min;
     else
-        return detail::__any_int_traits<T>::max;
+        return detail::any_int_traits<T>::max;
 }
 
 /// Divide one integer from another, with saturation in case of overflow.
 template <typename T>
-requires detail::__saturating_arithmetic_type<T>
+requires detail::saturating::saturating_arithmetic_type<T>
 EIRIN_MATH_FUNC_API T saturating_div(T x, T y) noexcept
 {
     if constexpr(traits::is_unsigned_v<T>)
         return x / y;
-    else if(x == detail::__any_int_traits<T>::min && y == -1)
-        return detail::__any_int_traits<T>::max;
+    else if(x == detail::any_int_traits<T>::min && y == -1)
+        return detail::any_int_traits<T>::max;
     else
         return x / y;
 }
 
 /// Type casting, with saturation in case of overflow.
 template <typename Res, typename T>
-requires detail::__saturating_arithmetic_type<T> && detail::__saturating_arithmetic_type<Res>
+requires detail::saturating::saturating_arithmetic_type<T> && detail::saturating::saturating_arithmetic_type<Res>
 EIRIN_MATH_FUNC_API Res saturating_cast(T x) noexcept
 {
-    constexpr auto digits_res = detail::__any_int_traits<Res>::digits;
-    constexpr auto digits_in = detail::__any_int_traits<T>::digits;
-    constexpr Res max_res = detail::__any_int_traits<Res>::max;
+    constexpr auto digits_res = detail::any_int_traits<Res>::digits;
+    constexpr auto digits_in = detail::any_int_traits<T>::digits;
+    constexpr Res max_res = detail::any_int_traits<Res>::max;
 
     if constexpr(traits::is_signed_v<Res> && traits::is_signed_v<T>)
     {
         if constexpr(digits_res < digits_in)
         {
-            constexpr Res min_res = detail::__any_int_traits<Res>::min;
+            constexpr Res min_res = detail::any_int_traits<Res>::min;
 
             if(x < static_cast<T>(min_res))
                 return min_res;
@@ -405,7 +405,7 @@ EIRIN_MATH_FUNC_API T modwarp_add(T x, T y) noexcept
     using type = typename T::value_type;
     using intermediate_type = typename T::intermediate_type;
     type z;
-    detail::__add_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z);
+    detail::saturating::add_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z);
     return T::from_internal_value(z);
 }
 
@@ -424,7 +424,7 @@ EIRIN_MATH_FUNC_API T modwarp_sub(T x, T y) noexcept
     using type = typename T::value_type;
     using intermediate_type = typename T::intermediate_type;
     type z;
-    detail::__sub_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z);
+    detail::saturating::sub_overflow<type, intermediate_type>(x.internal_value(), y.internal_value(), &z);
     return T::from_internal_value(z);
 }
 
@@ -445,7 +445,7 @@ EIRIN_MATH_FUNC_API T modwarp_mul(T x, T y) noexcept
     constexpr bool rounding = T::is_round_enable;
     constexpr auto fraction = T::precision;
     type z;
-    detail::__mul_overflow<type, intermediate_type, rounding, fraction>(x.internal_value(), y.internal_value(), &z);
+    detail::saturating::mul_overflow<type, intermediate_type, rounding, fraction>(x.internal_value(), y.internal_value(), &z);
     return T::from_internal_value(z);
 }
 
@@ -469,7 +469,7 @@ EIRIN_MATH_FUNC_API T modwarp_div(T x, T y) noexcept
     constexpr bool rounding = T::is_round_enable;
     constexpr auto fraction = T::precision;
     type z;
-    detail::__div_overflow<type, intermediate_type, rounding, fraction>(x.internal_value(), y.internal_value(), &z);
+    detail::saturating::div_overflow<type, intermediate_type, rounding, fraction>(x.internal_value(), y.internal_value(), &z);
     return T::from_internal_value(z);
 }
 } // namespace eirin
