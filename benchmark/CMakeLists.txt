@@ -11,8 +11,8 @@ set(BENCHMARK_DOWNLOAD_DEPENDENCIES OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     google_benchmark
-    URL https://github.com/google/benchmark/archive/refs/tags/v1.9.4.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.9.4
 )
 FetchContent_MakeAvailable(google_benchmark)
 
@@ -35,14 +35,9 @@ message(STATUS "EirinMath: Google Benchmark from FetchContent (v1.9.4)")
 # ---------------------------------------------------------------------------
 function(eirin_add_benchmark target)
     add_executable(${target} ${ARGN})
-    target_link_libraries(${target} PRIVATE EirinMath::math benchmark::benchmark)
+    target_link_libraries(${target} PRIVATE EirinMath::math)
+    target_link_libraries(${target} PRIVATE benchmark::benchmark)
     target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    eirin_enable_warnings(${target})
-
-    # Catch uninitialized variable usage on Linux.  The flag is GCC-only.
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        target_compile_options(${target} PRIVATE -Wmaybe-uninitialized)
-    endif()
 
     if(EMSCRIPTEN)
         target_link_options(${target} PRIVATE -sEXIT_RUNTIME=1)
