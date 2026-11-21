@@ -3,9 +3,9 @@
  * @author KKoishi_
  * @brief INTERNAL ALGORITHM DEVELOPMENT/TESTING ONLY.
  * @date 2025-04-26
- * 
+ *
  * @copyright Copyright (c) 2026
- * 
+ *
  */
 #ifndef EIRIN_MATH_UTIL_HPP
 #define EIRIN_MATH_UTIL_HPP
@@ -23,9 +23,6 @@
 #include <array>
 #include <cstdio>
 #include "../eirin.hpp"
-#ifndef EIRIN_MATH_NO_SIMD
-#    include <immintrin.h>
-#endif
 
 namespace eirin::util
 {
