@@ -178,6 +178,89 @@ jobs:
               cmake --build "$RUNNER_TEMP/consumer-cmake/build"
               "$RUNNER_TEMP/consumer-cmake/build/consumer"
 
+    GCC-ARM:
+        runs-on: ubuntu-24.04-arm
+
+        strategy:
+          matrix:
+            gcc: [14]
+          fail-fast: false
+        name: Linux ARM GCC ${{ matrix.gcc }}
+
+        steps:
+          - uses: actions/checkout@v4
+
+          # The image already provides CMake, Ninja and the compilers; only
+          # GoogleTest is missing.  The script installs it when the Ubuntu
+          # mirrors are reachable and otherwise lets CMake fall back to
+          # FetchContent.
+          - name: Install system GoogleTest
+            id: gtest
+            run: bash .github/install-gtest.sh
+
+          # eirin_test_simd_avx2 is a no-op on aarch64 (it is gated on the x86
+          # ABI options); it is kept so the job stays a copy of the GCC one.
+          - name: Configure
+            run: |
+              set -o pipefail
+              cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} \
+                -Deirin_test_simd_avx2=ON \
+                2>&1 | tee "$RUNNER_TEMP/configure.log"
+
+          - name: Verify system GoogleTest
+            if: steps.gtest.outputs.system_gtest == 'true'
+            run: grep -q "GoogleTest from system" "$RUNNER_TEMP/configure.log"
+
+          - name: Build
+            run: cmake --build build --verbose
+
+          - name: Test (non-SIMD)
+            run: ctest --test-dir build -LE simd --output-on-failure
+
+          - name: Test (SIMD)
+            run: ctest --test-dir build -L simd --output-on-failure
+
+          - name: Benchmark
+            run: ./build/bin/eirin_math.benchmark
+
+          - name: Benchmark (Vec Library)
+            run: ./build/bin/eirin_math.tvec.benchmark
+
+          - name: Benchmark (Saturating Arithmetic)
+            run: ./build/bin/eirin_math.sat_arith.benchmark
+
+          - name: Benchmark (For Compare)
+            run: ./build/bin/double.benchmark
+
+          - name: Install (header-only)
+            if: matrix.gcc == 14
+            run: |
+              cmake --install build --prefix "$RUNNER_TEMP/eirin-install"
+              test -f "$RUNNER_TEMP/eirin-install/include/eirin/eirin.hpp"
+              test -n "$(find "$RUNNER_TEMP/eirin-install" -name EirinMathConfig.cmake -print -quit)"
+
+              # The headers can be included directly...
+              printf '#include <eirin/fixed.hpp>\nint main() { return eirin::fixed32(1.5).internal_value() == 98304 ? 0 : 1; }\n' > "$RUNNER_TEMP/consumer.cpp"
+              g++-14 -std=c++20 -I"$RUNNER_TEMP/eirin-install/include" "$RUNNER_TEMP/consumer.cpp" -o "$RUNNER_TEMP/consumer"
+              "$RUNNER_TEMP/consumer"
+
+              # ...and the installed package can be consumed with find_package.
+              mkdir -p "$RUNNER_TEMP/consumer-cmake"
+              cat > "$RUNNER_TEMP/consumer-cmake/CMakeLists.txt" <<'EOF'
+              cmake_minimum_required(VERSION 3.24)
+              project(consumer LANGUAGES CXX)
+              find_package(EirinMath 1.5 CONFIG REQUIRED)
+              add_executable(consumer main.cpp)
+              target_link_libraries(consumer PRIVATE EirinMath::math)
+              EOF
+              cp "$RUNNER_TEMP/consumer.cpp" "$RUNNER_TEMP/consumer-cmake/main.cpp"
+              cmake -S "$RUNNER_TEMP/consumer-cmake" -B "$RUNNER_TEMP/consumer-cmake/build" -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/eirin-install"
+              cmake --build "$RUNNER_TEMP/consumer-cmake/build"
+              "$RUNNER_TEMP/consumer-cmake/build/consumer"
+
     Emscripten:
         runs-on: ubuntu-24.04
 
